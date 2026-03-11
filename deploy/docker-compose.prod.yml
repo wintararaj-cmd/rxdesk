@@ -1,0 +1,57 @@
+# Production Docker Compose – DocNear (RxDesk)
+# Runs only infrastructure services (Postgres, Redis).
+# The Node.js apps (backend, web) are managed by PM2 directly on the host.
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml up -d
+
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: rxdesk_postgres
+    restart: always
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-rxdesk_prod}
+      POSTGRES_USER:     ${POSTGRES_USER:-rxdesk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}   # required – no default
+    # Bind to localhost only – Nginx/apps on the host connect via 127.0.0.1
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro  # optional init scripts
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-rxdesk} -d ${POSTGRES_DB:-rxdesk_prod}']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    shm_size: 256mb    # recommended for Postgres
+
+  redis:
+    image: redis:7-alpine
+    container_name: rxdesk_redis
+    restart: always
+    # Bind to localhost only
+    ports:
+      - '127.0.0.1:6379:6379'
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', 'ping']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local

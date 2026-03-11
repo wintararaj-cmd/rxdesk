@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+.expo/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Turbo
+.turbo/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/settings.json
+*.swp
+
+# Test coverage
+coverage/
+
+# Expo
+ios/
+android/
+
+# Prisma
+!prisma/schema.prisma
+prisma/*.db
+prisma/*.db-journal
+
+# Certificates & keys
+*.pem
+*.key
+*.cert

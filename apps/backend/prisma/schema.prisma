@@ -1,0 +1,948 @@
+// RxDesk — Prisma Schema
+// PostgreSQL · Prisma ORM
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+//  Enums
+// ─────────────────────────────────────────────
+
+enum UserRole {
+  patient
+  doctor
+  shop_owner
+  admin
+}
+
+enum Gender {
+  male
+  female
+  other
+}
+
+enum VerificationStatus {
+  pending
+  approved
+  rejected
+}
+
+enum GstType {
+  unregistered
+  composite
+  regular
+}
+
+enum ShopType {
+  medical_shop
+  clinic
+  pharmacy
+  dispensary
+}
+
+enum ChamberLinkStatus {
+  pending
+  active
+  inactive
+}
+
+enum ChamberRequestBy {
+  doctor
+  shop
+}
+
+enum AppointmentStatus {
+  booked
+  confirmed
+  arrived
+  in_consultation
+  completed
+  cancelled
+  no_show
+}
+
+enum AppointmentCancelledBy {
+  patient
+  doctor
+  shop
+}
+
+enum AppointmentPaymentStatus {
+  pending
+  paid
+  not_required
+}
+
+enum MedicineForm {
+  tablet
+  capsule
+  syrup
+  injection
+  ointment
+  drops
+  inhaler
+  powder
+  other
+}
+
+enum BillPaymentMethod {
+  cash
+  upi
+  card
+  credit
+}
+
+enum BillPaymentStatus {
+  paid
+  pending
+  partial
+}
+
+// ─── Accounting Enums ─────────────────────────
+
+enum ExpenseCategory {
+  medicine_purchase
+  rent
+  salary
+  utilities
+  transport
+  maintenance
+  miscellaneous
+}
+
+enum AccountingPaymentMethod {
+  cash
+  upi
+  neft
+  cheque
+  card
+}
+
+enum IncomeEntryType {
+  sale_income
+  consultation_fee_collection
+  misc_income
+  refund_reversal
+}
+
+enum PurchasePaymentStatus {
+  unpaid
+  partial
+  paid
+}
+
+enum CreditTransactionType {
+  credit_given
+  payment_received
+}
+
+enum NotificationType {
+  sms
+  push
+  whatsapp
+}
+
+enum NotificationCategory {
+  appointment_reminder
+  appointment_confirmed
+  prescription_ready
+  bill_generated
+  stock_alert
+  subscription_expiry
+  general
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  failed
+}
+
+enum SubscriptionStatus {
+  trial
+  active
+  expired
+  cancelled
+}
+
+// ─────────────────────────────────────────────
+//  Models
+// ─────────────────────────────────────────────
+
+model User {
+  id         String   @id @default(uuid())
+  phone      String   @unique
+  password   String?
+  role       UserRole
+  is_active  Boolean  @default(true)
+  is_verified Boolean @default(false)
+  fcm_token  String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  patient          Patient?
+  doctor           Doctor?
+  shop             MedicalShop?
+  bills_created    Bill[]            @relation("BillCreatedBy")
+  verified_doctors Doctor[]          @relation("VerifiedByAdmin")
+  notifications    Notification[]
+  audit_logs       AuditLog[]
+  purchases_created     PurchaseEntry[]   @relation("PurchaseCreatedBy")
+  supplier_payments_created SupplierPayment[] @relation("SupplierPaymentCreatedBy")
+  income_created   IncomeEntry[]     @relation("IncomeCreatedBy")
+  expenses_created ExpenseEntry[]    @relation("ExpenseCreatedBy")
+  credit_txns_created CreditTransaction[] @relation("CreditTxnCreatedBy")
+  cash_registers_closed DailyCashRegister[] @relation("CashRegisterClosedBy")
+
+  @@map("users")
+}
+
+model Patient {
+  id                String   @id @default(uuid())
+  user_id           String   @unique
+  full_name         String
+  age               Int?
+  gender            Gender?
+  date_of_birth     DateTime?
+  blood_group       String?
+  address_line      String?
+  city              String?
+  pin_code          String?
+  state             String?
+  emergency_contact String?
+  profile_photo     String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  // Relations
+  user             User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  appointments     Appointment[]
+  prescriptions    Prescription[]
+  bills            Bill[]
+  credit_accounts  CreditCustomer[]
+
+  @@map("patients")
+}
+
+model Doctor {
+  id                  String             @id @default(uuid())
+  user_id             String             @unique
+  full_name           String
+  mci_number          String             @unique
+  specialization      String?
+  qualifications      String[]
+  experience_years    Int                @default(0)
+  profile_photo       String?
+  degree_cert_url     String?
+  id_proof_url        String?
+  gender              Gender?
+  languages           String[]
+  verification_status VerificationStatus @default(pending)
+  rejection_reason    String?
+  verified_by         String?
+  verified_at         DateTime?
+  created_at          DateTime           @default(now())
+  updated_at          DateTime           @updatedAt
+
+  // Relations
+  user      User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  verifier  User?            @relation("VerifiedByAdmin", fields: [verified_by], references: [id])
+  chambers  DoctorChamber[]
+  prescriptions Prescription[]
+
+  @@map("doctors")
+}
+
+model MedicalShop {
+  id                  String             @id @default(uuid())
+  owner_user_id       String             @unique
+  shop_name           String
+  shop_type           ShopType           @default(medical_shop)
+  gst_number          String?
+  gst_type            GstType            @default(unregistered)
+  drug_license_no     String
+  drug_license_url    String?
+  address_line        String
+  city                String
+  district            String?
+  state               String
+  pin_code            String
+  latitude            Decimal?           @db.Decimal(10, 8)
+  longitude           Decimal?           @db.Decimal(11, 8)
+  contact_phone       String
+  contact_email       String?
+  opening_time        String?
+  closing_time        String?
+  working_days        String[]
+  is_active           Boolean            @default(true)
+  verification_status VerificationStatus @default(pending)
+  created_at          DateTime           @default(now())
+  updated_at          DateTime           @updatedAt
+
+  // Relations
+  owner              User               @relation(fields: [owner_user_id], references: [id], onDelete: Cascade)
+  chambers           DoctorChamber[]
+  inventory          ShopInventory[]
+  bills              Bill[]
+  prescriptions      Prescription[]
+  subscriptions      ShopSubscription[]
+  suppliers          Supplier[]
+  purchase_entries   PurchaseEntry[]
+  supplier_payments  SupplierPayment[]
+  income_entries     IncomeEntry[]
+  expense_entries    ExpenseEntry[]
+  credit_customers   CreditCustomer[]
+  credit_transactions CreditTransaction[]
+  cash_registers     DailyCashRegister[]
+  sale_returns       SaleReturn[]
+  purchase_returns   PurchaseReturn[]
+  contra_entries     ContraEntry[]
+
+  @@map("medical_shops")
+}
+
+model DoctorChamber {
+  id               String           @id @default(uuid())
+  doctor_id        String
+  shop_id          String
+  consultation_fee Decimal          @default(0) @db.Decimal(10, 2)
+  status           ChamberLinkStatus @default(pending)
+  requested_by     ChamberRequestBy
+  approved_at      DateTime?
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
+
+  // Relations
+  doctor        Doctor              @relation(fields: [doctor_id], references: [id], onDelete: Cascade)
+  shop          MedicalShop         @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  schedules     ChamberSchedule[]
+  leaves        ChamberLeave[]
+  appointments  Appointment[]
+
+  @@unique([doctor_id, shop_id])
+  @@map("doctor_chambers")
+}
+
+model ChamberSchedule {
+  id             String  @id @default(uuid())
+  chamber_id     String
+  day_of_week    Int     // 0=Sun, 6=Sat
+  start_time     String  // "09:00"
+  end_time       String  // "17:00"
+  slot_duration  Int     @default(15)
+  max_patients   Int     @default(20)
+  is_active      Boolean @default(true)
+
+  // Relations
+  chamber DoctorChamber @relation(fields: [chamber_id], references: [id], onDelete: Cascade)
+
+  @@map("chamber_schedules")
+}
+
+model ChamberLeave {
+  id         String   @id @default(uuid())
+  chamber_id String
+  leave_date DateTime @db.Date
+  reason     String?
+  created_at DateTime @default(now())
+
+  // Relations
+  chamber DoctorChamber @relation(fields: [chamber_id], references: [id], onDelete: Cascade)
+
+  @@map("chamber_leaves")
+}
+
+model Appointment {
+  id               String                   @id @default(uuid())
+  patient_id       String
+  chamber_id       String
+  appointment_date DateTime                 @db.Date
+  slot_start_time  String
+  slot_end_time    String
+  token_number     Int?
+  chief_complaint  String?
+  status           AppointmentStatus        @default(booked)
+  cancelled_by     AppointmentCancelledBy?
+  cancel_reason    String?
+  reminder_sent    Boolean                  @default(false)
+  payment_status   AppointmentPaymentStatus @default(not_required)
+  payment_amount   Decimal?                 @db.Decimal(10, 2)
+  payment_ref      String?
+  created_at       DateTime                 @default(now())
+  updated_at       DateTime                 @updatedAt
+
+  // Relations
+  patient      Patient        @relation(fields: [patient_id], references: [id], onDelete: Restrict)
+  chamber      DoctorChamber  @relation(fields: [chamber_id], references: [id], onDelete: Restrict)
+  prescription Prescription?
+
+  @@index([chamber_id, appointment_date])
+  @@index([patient_id])
+  @@map("appointments")
+}
+
+model Prescription {
+  id             String   @id @default(uuid())
+  appointment_id String   @unique
+  doctor_id      String
+  patient_id     String
+  shop_id        String
+  diagnosis      String
+  chief_complaint String?
+  vitals         Json?
+  advice         String?
+  follow_up_date DateTime? @db.Date
+  is_valid       Boolean  @default(true)
+  dispensed      Boolean  @default(false)
+  qr_code_hash   String?
+  pdf_url        String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  // Relations
+  appointment Appointment       @relation(fields: [appointment_id], references: [id], onDelete: Restrict)
+  doctor      Doctor            @relation(fields: [doctor_id], references: [id])
+  patient     Patient           @relation(fields: [patient_id], references: [id])
+  shop        MedicalShop       @relation(fields: [shop_id], references: [id])
+  items       PrescriptionItem[]
+  bill        Bill?
+
+  @@map("prescriptions")
+}
+
+model PrescriptionItem {
+  id              String  @id @default(uuid())
+  prescription_id String
+  medicine_id     String?
+  medicine_name   String
+  dosage          String?
+  frequency       String?
+  duration        String?
+  instructions    String?
+  quantity        Int
+  sort_order      Int     @default(0)
+
+  // Relations
+  prescription Prescription @relation(fields: [prescription_id], references: [id], onDelete: Cascade)
+  medicine     Medicine?    @relation(fields: [medicine_id], references: [id])
+
+  @@map("prescription_items")
+}
+
+model Medicine {
+  id            String        @id @default(uuid())
+  name          String
+  generic_name  String?
+  brand_name    String?
+  form          MedicineForm?
+  strength      String?
+  manufacturer  String?
+  hsn_code      String?
+  gst_rate      Decimal       @default(12.0) @db.Decimal(5, 2)
+  is_schedule_h Boolean       @default(false)
+  is_active     Boolean       @default(true)
+  created_at    DateTime      @default(now())
+
+  // Relations
+  inventory          ShopInventory[]
+  prescription_items PrescriptionItem[]
+  purchase_items     PurchaseItem[]
+
+  @@index([name])
+  @@map("medicines")
+}
+
+model ShopInventory {
+  id             String    @id @default(uuid())
+  shop_id        String
+  medicine_id    String?
+  medicine_name  String
+  hsn_code       String?
+  batch_number   String?
+  expiry_date    DateTime? @db.Date
+  mrp            Decimal   @db.Decimal(10, 2)
+  purchase_price Decimal?  @db.Decimal(10, 2)
+  gst_rate       Decimal   @default(12.0) @db.Decimal(5, 2)
+  stock_qty      Int       @default(0)
+  reorder_level  Int       @default(10)
+  unit           String    @default("strip")
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  // Relations
+  shop       MedicalShop  @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  medicine   Medicine?    @relation(fields: [medicine_id], references: [id])
+  bill_items BillItem[]
+
+  @@index([shop_id])
+  @@index([medicine_id])
+  @@map("shop_inventory")
+}
+
+model Bill {
+  id              String            @id @default(uuid())
+  prescription_id String?           @unique
+  shop_id         String
+  patient_id      String?
+  customer_name   String?
+  customer_phone  String?
+  bill_number     String            @unique
+  subtotal        Decimal           @db.Decimal(12, 2)
+  discount_amount Decimal           @default(0) @db.Decimal(12, 2)
+  gst_amount      Decimal           @default(0) @db.Decimal(12, 2)
+  total_amount    Decimal           @db.Decimal(12, 2)
+  payment_method  BillPaymentMethod @default(cash)
+  payment_status  BillPaymentStatus @default(pending)
+  staff_id        String?
+  pdf_url         String?
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @updatedAt
+
+  // Relations
+  prescription     Prescription?     @relation(fields: [prescription_id], references: [id])
+  shop             MedicalShop       @relation(fields: [shop_id], references: [id])
+  patient          Patient?          @relation(fields: [patient_id], references: [id])
+  staff            User?             @relation("BillCreatedBy", fields: [staff_id], references: [id])
+  items            BillItem[]
+  income_entry     IncomeEntry?
+  credit_transactions CreditTransaction[]
+
+  @@map("bills")
+}
+
+model BillItem {
+  id           String   @id @default(uuid())
+  bill_id      String
+  inventory_id String?
+  medicine_name String
+  batch_number  String?
+  expiry_date   DateTime? @db.Date
+  mrp          Decimal   @db.Decimal(10, 2)
+  quantity     Int
+  discount_pct Decimal   @default(0) @db.Decimal(5, 2)
+  gst_rate     Decimal   @default(12.0) @db.Decimal(5, 2)
+  line_total   Decimal   @db.Decimal(12, 2)
+
+  // Relations
+  bill      Bill           @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+  inventory ShopInventory? @relation(fields: [inventory_id], references: [id])
+
+  @@map("bill_items")
+}
+
+model SubscriptionPlan {
+  id             String   @id @default(uuid())
+  name           String   @unique
+  price_monthly  Decimal  @db.Decimal(10, 2)
+  max_doctors    Int      @default(1)
+  max_appointments_per_month Int @default(50)
+  max_sessions   Int      @default(2)
+  features       Json?
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
+
+  // Relations
+  subscriptions ShopSubscription[]
+
+  @@map("subscription_plans")
+}
+
+model ShopSubscription {
+  id                   String             @id @default(uuid())
+  shop_id              String
+  plan_id              String
+  status               SubscriptionStatus @default(trial)
+  trial_ends_at        DateTime?
+  current_period_start DateTime?
+  current_period_end   DateTime?
+  razorpay_sub_id      String?
+  created_at           DateTime           @default(now())
+  updated_at           DateTime           @updatedAt
+
+  // Relations
+  shop MedicalShop     @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  plan SubscriptionPlan @relation(fields: [plan_id], references: [id])
+
+  @@map("shop_subscriptions")
+}
+
+model Notification {
+  id             String               @id @default(uuid())
+  user_id        String
+  type           NotificationType
+  category       NotificationCategory
+  title          String?
+  body           String
+  reference_id   String?
+  reference_type String?
+  is_read        Boolean              @default(false)
+  sent_at        DateTime?
+  status         NotificationStatus   @default(pending)
+  provider_ref   String?
+  created_at     DateTime             @default(now())
+
+  // Relations
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, is_read])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  user_id     String?
+  action      String
+  resource    String?
+  resource_id String?
+  ip_address  String?
+  user_agent  String?
+  old_data    Json?
+  new_data    Json?
+  created_at  DateTime @default(now())
+
+  // Relations
+  user User? @relation(fields: [user_id], references: [id])
+
+  @@index([user_id])
+  @@index([resource, resource_id])
+  @@map("audit_logs")
+}
+
+model Banner {
+  id          String   @id @default(uuid())
+  title       String?
+  image_url   String
+  link_url    String?
+  is_active   Boolean  @default(true)
+  sort_order  Int      @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@map("banners")
+}
+
+// ─────────────────────────────────────────────
+//  Accounting Module
+// ─────────────────────────────────────────────
+
+model Supplier {
+  id              String    @id @default(uuid())
+  shop_id         String
+  name            String
+  contact_person  String?
+  phone           String?
+  email           String?
+  address         String?
+  gst_number      String?
+  drug_license_no String?
+  bank_name       String?
+  bank_account    String?
+  bank_ifsc       String?
+  credit_limit    Decimal   @default(0) @db.Decimal(12, 2)
+  payment_terms   String?
+  is_active       Boolean   @default(true)
+  notes           String?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  shop     MedicalShop       @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  purchases        PurchaseEntry[]
+  payments         SupplierPayment[]
+  purchase_returns PurchaseReturn[]
+
+  @@index([shop_id])
+  @@map("suppliers")
+}
+
+model PurchaseEntry {
+  id              String                @id @default(uuid())
+  shop_id         String
+  supplier_id     String?
+  invoice_number  String?
+  invoice_date    DateTime              @db.Date
+  received_date   DateTime              @db.Date
+  subtotal        Decimal               @db.Decimal(12, 2)
+  discount_amount Decimal               @default(0) @db.Decimal(12, 2)
+  gst_amount      Decimal               @default(0) @db.Decimal(12, 2)
+  total_amount    Decimal               @db.Decimal(12, 2)
+  payment_status  PurchasePaymentStatus @default(unpaid)
+  amount_paid     Decimal               @default(0) @db.Decimal(12, 2)
+  notes           String?
+  created_by      String?
+  created_at      DateTime              @default(now())
+  updated_at      DateTime              @updatedAt
+
+  shop     MedicalShop     @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  supplier Supplier?       @relation(fields: [supplier_id], references: [id])
+  creator  User?           @relation("PurchaseCreatedBy", fields: [created_by], references: [id])
+  items    PurchaseItem[]
+  payments SupplierPayment[]
+  expense  ExpenseEntry?
+
+  @@index([shop_id, invoice_date])
+  @@map("purchase_entries")
+}
+
+model PurchaseItem {
+  id             String   @id @default(uuid())
+  purchase_id    String
+  medicine_id    String?
+  medicine_name  String
+  batch_number   String
+  expiry_date    DateTime @db.Date
+  quantity       Int
+  free_qty       Int      @default(0)
+  purchase_price Decimal  @db.Decimal(10, 2)
+  mrp            Decimal  @db.Decimal(10, 2)
+  discount_pct   Decimal  @default(0) @db.Decimal(5, 2)
+  gst_rate       Decimal  @default(12.0) @db.Decimal(5, 2)
+  line_total     Decimal  @db.Decimal(12, 2)
+
+  purchase PurchaseEntry @relation(fields: [purchase_id], references: [id], onDelete: Cascade)
+  medicine Medicine?     @relation(fields: [medicine_id], references: [id])
+
+  @@map("purchase_items")
+}
+
+model SupplierPayment {
+  id             String                  @id @default(uuid())
+  shop_id        String
+  supplier_id    String
+  purchase_id    String?
+  amount         Decimal                 @db.Decimal(12, 2)
+  payment_method AccountingPaymentMethod @default(cash)
+  payment_date   DateTime                @db.Date
+  reference_no   String?
+  notes          String?
+  created_by     String?
+  created_at     DateTime                @default(now())
+
+  shop     MedicalShop    @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  supplier Supplier       @relation(fields: [supplier_id], references: [id])
+  purchase PurchaseEntry? @relation(fields: [purchase_id], references: [id])
+  creator  User?          @relation("SupplierPaymentCreatedBy", fields: [created_by], references: [id])
+
+  @@index([supplier_id])
+  @@map("supplier_payments")
+}
+
+model IncomeEntry {
+  id                String                  @id @default(uuid())
+  shop_id           String
+  entry_type        IncomeEntryType
+  amount            Decimal                 @db.Decimal(12, 2)
+  payment_method    AccountingPaymentMethod @default(cash)
+  reference_bill_id String?                 @unique
+  entry_date        DateTime                @db.Date
+  notes             String?
+  created_by        String?
+  created_at        DateTime                @default(now())
+
+  shop    MedicalShop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  bill    Bill?       @relation(fields: [reference_bill_id], references: [id])
+  creator User?       @relation("IncomeCreatedBy", fields: [created_by], references: [id])
+
+  @@index([shop_id, entry_date])
+  @@map("income_entries")
+}
+
+model ExpenseEntry {
+  id                 String                  @id @default(uuid())
+  shop_id            String
+  category           ExpenseCategory
+  description        String?
+  amount             Decimal                 @db.Decimal(12, 2)
+  payment_method     AccountingPaymentMethod @default(cash)
+  reference_no       String?
+  linked_purchase_id String?                 @unique
+  entry_date         DateTime                @db.Date
+  receipt_url        String?
+  created_by         String?
+  created_at         DateTime                @default(now())
+
+  shop     MedicalShop    @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  purchase PurchaseEntry? @relation(fields: [linked_purchase_id], references: [id])
+  creator  User?          @relation("ExpenseCreatedBy", fields: [created_by], references: [id])
+
+  @@index([shop_id, entry_date])
+  @@index([shop_id, category])
+  @@map("expense_entries")
+}
+
+model CreditCustomer {
+  id                String   @id @default(uuid())
+  shop_id           String
+  patient_id        String?
+  name              String
+  phone             String?
+  address           String?
+  credit_limit      Decimal  @default(0) @db.Decimal(10, 2)
+  total_outstanding Decimal  @default(0) @db.Decimal(12, 2)
+  is_active         Boolean  @default(true)
+  notes             String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  shop         MedicalShop         @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  patient      Patient?            @relation(fields: [patient_id], references: [id])
+  transactions CreditTransaction[]
+
+  @@index([shop_id])
+  @@map("credit_customers")
+}
+
+model CreditTransaction {
+  id               String                   @id @default(uuid())
+  customer_id      String
+  shop_id          String
+  type             CreditTransactionType
+  amount           Decimal                  @db.Decimal(12, 2)
+  bill_id          String?
+  payment_method   AccountingPaymentMethod? @default(cash)
+  reference_no     String?
+  transaction_date DateTime                 @db.Date
+  notes            String?
+  created_by       String?
+  created_at       DateTime                 @default(now())
+
+  customer CreditCustomer @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  shop     MedicalShop    @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  bill     Bill?          @relation(fields: [bill_id], references: [id])
+  creator  User?          @relation("CreditTxnCreatedBy", fields: [created_by], references: [id])
+
+  @@index([customer_id, transaction_date])
+  @@map("credit_transactions")
+}
+
+model DailyCashRegister {
+  id                   String    @id @default(uuid())
+  shop_id              String
+  register_date        DateTime  @db.Date
+  opening_balance      Decimal   @default(0) @db.Decimal(12, 2)
+  cash_sales_total     Decimal   @default(0) @db.Decimal(12, 2)
+  cash_expenses_total  Decimal   @default(0) @db.Decimal(12, 2)
+  cash_supplier_paid   Decimal   @default(0) @db.Decimal(12, 2)
+  expected_closing_bal Decimal?  @db.Decimal(12, 2)
+  actual_closing_bal   Decimal?  @db.Decimal(12, 2)
+  variance             Decimal?  @db.Decimal(12, 2)
+  closed_by            String?
+  closed_at            DateTime?
+  notes                String?
+
+  shop   MedicalShop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  closer User?       @relation("CashRegisterClosedBy", fields: [closed_by], references: [id])
+
+  @@unique([shop_id, register_date])
+  @@map("daily_cash_register")
+}
+
+// ─────────────────────────────────────────────
+//  Sale Returns
+// ─────────────────────────────────────────────
+
+model SaleReturn {
+  id            String                  @id @default(uuid())
+  shop_id       String
+  return_number String                  @unique
+  bill_id       String?
+  customer_name String?
+  return_date   DateTime                @db.Date
+  total_amount  Decimal                 @db.Decimal(12, 2)
+  refund_method AccountingPaymentMethod @default(cash)
+  reason        String?
+  notes         String?
+  created_by    String?
+  created_at    DateTime                @default(now())
+
+  shop  MedicalShop    @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  items SaleReturnItem[]
+
+  @@index([shop_id, return_date])
+  @@map("sale_returns")
+}
+
+model SaleReturnItem {
+  id            String   @id @default(uuid())
+  return_id     String
+  medicine_name String
+  batch_number  String?
+  quantity      Int
+  mrp           Decimal  @db.Decimal(10, 2)
+  gst_rate      Decimal  @default(12) @db.Decimal(5, 2)
+  discount_pct  Decimal  @default(0) @db.Decimal(5, 2)
+  line_total    Decimal  @db.Decimal(12, 2)
+
+  return SaleReturn @relation(fields: [return_id], references: [id], onDelete: Cascade)
+
+  @@map("sale_return_items")
+}
+
+// ─────────────────────────────────────────────
+//  Purchase Returns
+// ─────────────────────────────────────────────
+
+model PurchaseReturn {
+  id            String   @id @default(uuid())
+  shop_id       String
+  return_number String   @unique
+  supplier_id   String?
+  invoice_ref   String?
+  return_date   DateTime @db.Date
+  total_amount  Decimal  @db.Decimal(12, 2)
+  reason        String?
+  notes         String?
+  created_by    String?
+  created_at    DateTime @default(now())
+
+  shop     MedicalShop        @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  supplier Supplier?          @relation(fields: [supplier_id], references: [id])
+  items    PurchaseReturnItem[]
+
+  @@index([shop_id, return_date])
+  @@map("purchase_returns")
+}
+
+model PurchaseReturnItem {
+  id             String  @id @default(uuid())
+  return_id      String
+  medicine_name  String
+  batch_number   String?
+  quantity       Int
+  purchase_price Decimal @db.Decimal(10, 2)
+  gst_rate       Decimal @default(12) @db.Decimal(5, 2)
+  line_total     Decimal @db.Decimal(12, 2)
+
+  return PurchaseReturn @relation(fields: [return_id], references: [id], onDelete: Cascade)
+
+  @@map("purchase_return_items")
+}
+
+// ─────────────────────────────────────────────
+//  Contra Entries
+// ─────────────────────────────────────────────
+
+model ContraEntry {
+  id           String                  @id @default(uuid())
+  shop_id      String
+  entry_date   DateTime                @db.Date
+  from_account AccountingPaymentMethod
+  to_account   AccountingPaymentMethod
+  amount       Decimal                 @db.Decimal(12, 2)
+  description  String?
+  reference_no String?
+  created_by   String?
+  created_at   DateTime                @default(now())
+
+  shop MedicalShop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+
+  @@index([shop_id, entry_date])
+  @@map("contra_entries")
+}
+
