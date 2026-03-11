@@ -438,7 +438,7 @@ model PrescriptionItem {
 
 model Medicine {
   id            String        @id @default(uuid())
-  name          String
+  name          String        @unique
   generic_name  String?
   brand_name    String?
   form          MedicineForm?
@@ -455,7 +455,6 @@ model Medicine {
   prescription_items PrescriptionItem[]
   purchase_items     PurchaseItem[]
 
-  @@index([name])
   @@map("medicines")
 }
 
