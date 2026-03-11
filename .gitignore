@@ -45,6 +45,9 @@ android/
 prisma/*.db
 prisma/*.db-journal
 
+# Large data files
+**/*.csv
+
 # Certificates & keys
 *.pem
 *.key
