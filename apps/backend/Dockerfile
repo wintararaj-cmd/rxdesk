@@ -53,7 +53,7 @@ RUN npm install --omit=dev --frozen-lockfile
 
 COPY --from=builder /app/apps/backend/dist/ ./apps/backend/dist/
 COPY --from=builder /app/apps/backend/dist-seed/ ./apps/backend/dist-seed/
-COPY --from=builder /app/apps/backend/node_modules/.prisma/ ./apps/backend/node_modules/.prisma/
+COPY --from=builder /app/node_modules/.prisma/ ./node_modules/.prisma/
 COPY apps/backend/prisma/ ./apps/backend/prisma/
 COPY apps/backend/docker-entrypoint.sh ./apps/backend/docker-entrypoint.sh
 RUN chmod +x ./apps/backend/docker-entrypoint.sh
