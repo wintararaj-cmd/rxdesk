@@ -4,7 +4,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install dependencies for native modules
-RUN apk add --no-cache python3 make g++
+RUN apk add --no-cache python3 make g++ openssl
 
 # Copy workspace manifests
 COPY package.json turbo.json ./
@@ -36,7 +36,7 @@ RUN npx tsc -p tsconfig.seed.json
 # ── Stage 2: Production ───────────────────────────────────────────────────────
 FROM node:20-alpine AS production
 
-RUN apk add --no-cache dumb-init
+RUN apk add --no-cache dumb-init openssl
 
 WORKDIR /app
 
