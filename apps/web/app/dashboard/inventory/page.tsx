@@ -122,7 +122,7 @@ export default function InventoryPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['inventory'] });
       setShowAdd(false);
-      setForm(EMPTY_FORM);
+      setForm(EMPTY_ADD_FORM);
     },
   });
 
