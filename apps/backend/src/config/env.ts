@@ -28,11 +28,8 @@ const envSchema = z.object({
   // Optional: set to use Cloudflare R2 or Backblaze B2 instead of AWS S3
   S3_ENDPOINT: z.string().url().optional(),
 
-  // MSG91
-  MSG91_AUTH_KEY: z.string().optional(),
-  MSG91_TEMPLATE_ID_OTP: z.string().optional(),
-  MSG91_TEMPLATE_ID_REMINDER: z.string().optional(),
-  MSG91_SENDER_ID: z.string().default('DOCNER'),
+  // Fast2SMS
+  FAST2SMS_API_KEY: z.string().optional(),
 
   // Firebase
   FIREBASE_SERVICE_ACCOUNT_JSON: z.string().optional(),

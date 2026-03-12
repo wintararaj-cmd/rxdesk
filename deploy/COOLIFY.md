@@ -104,10 +104,7 @@ Go to **Environment Variables** for `rxdesk-backend` and add all of the followin
 | `AWS_REGION` | `ap-south-1` |
 | `S3_BUCKET_NAME` | `rxdesk-files` |
 | `S3_ENDPOINT` | *(only if using R2 or B2, else omit)* |
-| `MSG91_AUTH_KEY` | *(your MSG91 key)* |
-| `MSG91_TEMPLATE_ID_OTP` | *(OTP template ID)* |
-| `MSG91_TEMPLATE_ID_REMINDER` | *(reminder template ID)* |
-| `MSG91_SENDER_ID` | `RXDESK` |
+| `FAST2SMS_API_KEY` | *(your Fast2SMS API key)* |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | *(full JSON in one line — see tip below)* |
 | `RAZORPAY_KEY_ID` | `rzp_live_xxxx` |
 | `RAZORPAY_KEY_SECRET` | *(Razorpay secret)* |
@@ -315,7 +312,7 @@ Common causes:
 ### OTP not received
 
 - In production `NODE_ENV=production` is required, otherwise OTPs go through the mock path
-- Check `MSG91_AUTH_KEY` and template IDs are correct
+- Check `FAST2SMS_API_KEY` is correct (Dashboard → Dev API → API Key)
 
 ### File uploads not working
 
@@ -361,10 +358,7 @@ AWS_REGION=ap-south-1
 S3_BUCKET_NAME=rxdesk-files
 # S3_ENDPOINT=  (R2/B2 only)
 
-MSG91_AUTH_KEY=
-MSG91_TEMPLATE_ID_OTP=
-MSG91_TEMPLATE_ID_REMINDER=
-MSG91_SENDER_ID=RXDESK
+FAST2SMS_API_KEY=
 
 FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
 

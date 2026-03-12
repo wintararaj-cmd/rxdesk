@@ -14,7 +14,7 @@ import { UserRole, JwtPayload } from '@rxdesk/shared';
 // ─── OTP Generation ──────────────────────────
 
 function generateOtp(length = env.OTP_LENGTH): string {
-  if (isDev && env.DEV_FIXED_OTP) return env.DEV_FIXED_OTP;
+  if (env.DEV_FIXED_OTP) return env.DEV_FIXED_OTP; // override — remove in production
   return Array.from({ length }, () => Math.floor(Math.random() * 10)).join('');
 }
 

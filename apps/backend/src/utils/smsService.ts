@@ -9,7 +9,7 @@ interface SmsResult {
 }
 
 /**
- * Send OTP via MSG91
+ * Send OTP via Fast2SMS
  */
 export async function sendOtpSms(phone: string, otp: string): Promise<SmsResult> {
   // In development, skip actual SMS and log the OTP
@@ -18,23 +18,25 @@ export async function sendOtpSms(phone: string, otp: string): Promise<SmsResult>
     return { success: true, messageId: 'dev-mock' };
   }
 
-  if (!env.MSG91_AUTH_KEY || !env.MSG91_TEMPLATE_ID_OTP) {
-    logger.warn('MSG91 not configured — skipping OTP SMS');
+  if (!env.FAST2SMS_API_KEY) {
+    logger.warn('Fast2SMS not configured — skipping OTP SMS');
     return { success: false, error: 'SMS not configured' };
   }
 
+  // Strip country code — Fast2SMS expects 10-digit Indian mobile number
+  const mobile = phone.replace(/^\+91/, '').replace(/^\+/, '');
+
   try {
     const response = await axios.post(
-      'https://api.msg91.com/api/v5/otp',
+      'https://www.fast2sms.com/dev/bulkV2',
       {
-        template_id: env.MSG91_TEMPLATE_ID_OTP,
-        mobile: phone.replace('+', ''),
-        otp,
+        route: 'otp',
+        variables_values: otp,
+        numbers: mobile,
       },
       {
         headers: {
-          authkey: env.MSG91_AUTH_KEY,
-          'Content-Type': 'application/json',
+          authorization: env.FAST2SMS_API_KEY,
         },
         timeout: 10_000,
       }
@@ -69,27 +71,26 @@ export async function sendReminderSms(
     return { success: true, messageId: 'dev-mock' };
   }
 
-  if (!env.MSG91_AUTH_KEY || !env.MSG91_TEMPLATE_ID_REMINDER) {
+  if (!env.FAST2SMS_API_KEY) {
     return { success: false, error: 'SMS not configured' };
   }
 
-  // MSG91 transactional SMS via Flow API
+  // Strip country code — Fast2SMS expects 10-digit Indian mobile number
+  const mobile = phone.replace(/^\+91/, '').replace(/^\+/, '');
+  const message = `Dear ${patientName}, your appointment with ${doctorName} at ${shopName} is scheduled on ${appointmentDate} at ${appointmentTime}.`;
+
+  // Fast2SMS quick SMS (DLT route for production; uses 'q' route for now)
   try {
     const response = await axios.post(
-      'https://api.msg91.com/api/v5/flow/',
+      'https://www.fast2sms.com/dev/bulkV2',
       {
-        template_id: env.MSG91_TEMPLATE_ID_REMINDER,
-        sender: env.MSG91_SENDER_ID,
-        mobiles: phone.replace('+', ''),
-        VAR1: patientName,
-        VAR2: doctorName,
-        VAR3: shopName,
-        VAR4: `${appointmentDate} at ${appointmentTime}`,
+        route: 'q',
+        message,
+        numbers: mobile,
       },
       {
         headers: {
-          authkey: env.MSG91_AUTH_KEY,
-          'Content-Type': 'application/json',
+          authorization: env.FAST2SMS_API_KEY,
         },
         timeout: 10_000,
       }
