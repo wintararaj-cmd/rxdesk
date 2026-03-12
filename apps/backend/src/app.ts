@@ -27,7 +27,11 @@ import accountingRoutes from './modules/accounting/accounting.routes';
 import path from 'path';
 
 
+
 const app = express();
+
+// Trust proxy for correct client IP detection (required for express-rate-limit)
+app.set('trust proxy', 1);
 
 // ─── Security ────────────────────────────────
 app.use(helmet());
