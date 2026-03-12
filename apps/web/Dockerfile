@@ -6,6 +6,9 @@ COPY packages/shared/package.json ./packages/shared/
 COPY apps/web/package.json ./apps/web/
 
 RUN npm install --frozen-lockfile
+# Remove any workspace-local React copies so all packages share the single
+# hoisted instance from /app/node_modules — prevents styled-jsx SSR crash.
+RUN rm -rf /app/apps/web/node_modules/react /app/apps/web/node_modules/react-dom 2>/dev/null || true
 
 COPY packages/shared/ ./packages/shared/
 COPY apps/web/ ./apps/web/
