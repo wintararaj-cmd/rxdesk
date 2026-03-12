@@ -24,7 +24,8 @@ router.post('/register', authenticate, async (req, res, next) => {
 });
 
 // GET /shops/me  (mobile client uses this)
-router.get('/me', requireRole('shop_owner'), async (req, res, next) => {
+// Uses authenticate only (not requireRole) so a new user can discover they have no shop yet → 404
+router.get('/me', authenticate, async (req, res, next) => {
   try {
     const shop = await service.getShopByOwnerId(req.user!.id);
     res.json({ success: true, data: shop });
@@ -32,7 +33,7 @@ router.get('/me', requireRole('shop_owner'), async (req, res, next) => {
 });
 
 // GET /shops/me/dashboard  (mobile client uses this)
-router.get('/me/dashboard', requireRole('shop_owner'), async (req, res, next) => {
+router.get('/me/dashboard', authenticate, async (req, res, next) => {
   try {
     const data = await service.getTodayDashboard(req.user!.id);
     res.json({ success: true, data });

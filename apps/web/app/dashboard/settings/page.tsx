@@ -95,11 +95,13 @@ export default function SettingsPage() {
     queryKey: ['shop-profile'],
     queryFn: () => shopApi.getMyShop(),
     retry: false,
+    // treat 404 (no shop yet) as a non-error — isError will be true but we handle it as isNewShop
   });
 
   const { data: subRes } = useQuery({
     queryKey: ['shop-subscription'],
     queryFn: () => subscriptionApi.getCurrent(),
+    enabled: !!shop,
   });
 
   const { data: plansRes } = useQuery({
@@ -111,6 +113,7 @@ export default function SettingsPage() {
   const { data: pendingChambersRes, refetch: refetchPending } = useQuery({
     queryKey: ['web-pending-chambers'],
     queryFn: () => chamberApi.getShopChambers('pending'),
+    enabled: !!shop,
   });
   const pendingChambers: PendingChamber[] = pendingChambersRes?.data?.data ?? [];
 

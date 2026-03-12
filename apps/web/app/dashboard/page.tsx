@@ -83,14 +83,14 @@ export default function DashboardPage() {
   const { data: dashboard } = useQuery<Dashboard>({
     queryKey: ['web-dashboard'],
     queryFn: () => shopApi.getDashboard().then((r) => r.data.data),
-    enabled: !!accessToken,
+    enabled: !!shop,
     refetchInterval: 60_000,
   });
 
   const { data: analytics } = useQuery<Analytics>({
     queryKey: ['web-analytics-7'],
     queryFn: () => reportsApi.getAnalytics(7).then((r) => r.data.data),
-    enabled: !!accessToken,
+    enabled: !!shop,
     staleTime: 5 * 60_000,
   });
 

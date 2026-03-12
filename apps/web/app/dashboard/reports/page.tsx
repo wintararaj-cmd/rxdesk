@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { reportsApi } from '../../../lib/apiClient';
+import { useAuthStore } from '../../../store/authStore';
+import Link from 'next/link';
 
 interface DailyRevenue { date: string; amount: number; }
 interface DailyAppointments { date: string; count: number; }
@@ -82,11 +84,26 @@ function BarChart({
 
 export default function ReportsPage() {
   const [period, setPeriod] = useState(30);
+  const { user } = useAuthStore();
+  const isShopOwner = user?.role === 'shop_owner';
 
   const { data: analytics, isLoading, isError } = useQuery<Analytics>({
     queryKey: ['shop-analytics', period],
     queryFn: () => reportsApi.getAnalytics(period).then((r) => r.data.data),
+    enabled: isShopOwner,
   });
+
+  if (!isShopOwner) {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center h-64 gap-3 text-center">
+        <p className="text-gray-700 font-semibold">Shop setup required</p>
+        <p className="text-gray-400 text-sm">Complete your shop profile to unlock analytics.</p>
+        <Link href="/dashboard/settings" className="px-4 py-2 bg-violet-600 text-white text-sm font-semibold rounded-xl hover:bg-violet-700">
+          Go to Settings →
+        </Link>
+      </div>
+    );
+  }
 
   const fmtCurrency = (v: number) =>
     `₹${v.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
@@ -107,11 +124,10 @@ export default function ReportsPage() {
             <button
               key={p.value}
               onClick={() => setPeriod(p.value)}
-              className={`px-4 py-2 font-medium transition-colors ${
-                period === p.value
+              className={`px-4 py-2 font-medium transition-colors ${period === p.value
                   ? 'bg-violet-600 text-white'
                   : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
+                }`}
             >
               {p.label}
             </button>
