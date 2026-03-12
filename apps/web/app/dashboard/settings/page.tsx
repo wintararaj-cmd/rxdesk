@@ -153,17 +153,17 @@ export default function SettingsPage() {
   const activeForm: Partial<ShopProfile> = Object.keys(form).length
     ? form
     : {
-        shop_name: shop?.shop_name ?? '',
-        drug_license_no: shop?.drug_license_no ?? '',
-        address_line: shop?.address_line ?? '',
-        city: shop?.city ?? '',
-        state: shop?.state ?? '',
-        pin_code: shop?.pin_code ?? '',
-        contact_phone: shop?.contact_phone ?? user?.phone ?? '',
-        contact_email: shop?.contact_email ?? '',
-        gst_type: shop?.gst_type ?? 'unregistered',
-        gst_number: shop?.gst_number ?? '',
-      };
+      shop_name: shop?.shop_name ?? '',
+      drug_license_no: shop?.drug_license_no ?? '',
+      address_line: shop?.address_line ?? '',
+      city: shop?.city ?? '',
+      state: shop?.state ?? '',
+      pin_code: shop?.pin_code ?? '',
+      contact_phone: shop?.contact_phone ?? user?.phone ?? '',
+      contact_email: shop?.contact_email ?? '',
+      gst_type: shop?.gst_type ?? 'unregistered',
+      gst_number: shop?.gst_number ?? '',
+    };
 
   const updateMutation = useMutation({
     mutationFn: (data: Partial<ShopProfile>) => shopApi.updateProfile(data),
@@ -175,7 +175,13 @@ export default function SettingsPage() {
       setTimeout(() => setSaved(false), 3000);
     },
     onError: (err: any) => {
-      setFormError(err?.response?.data?.error?.message ?? 'Failed to save changes.');
+      const details = err?.response?.data?.error?.details;
+      const fieldErrors = details && typeof details === 'object'
+        ? Object.entries(details as Record<string, string[]>)
+          .map(([f, msgs]) => `${f}: ${(msgs as string[]).join(', ')}`)
+          .join('; ')
+        : null;
+      setFormError(fieldErrors ?? err?.response?.data?.error?.message ?? 'Failed to save changes.');
     },
   });
 
@@ -189,12 +195,26 @@ export default function SettingsPage() {
       setTimeout(() => setSaved(false), 3000);
     },
     onError: (err: any) => {
-      setFormError(err?.response?.data?.error?.message ?? 'Failed to create shop profile.');
+      const details = err?.response?.data?.error?.details;
+      const fieldErrors = details && typeof details === 'object'
+        ? Object.entries(details as Record<string, string[]>)
+          .map(([f, msgs]) => `${f}: ${(msgs as string[]).join(', ')}`)
+          .join('; ')
+        : null;
+      setFormError(fieldErrors ?? err?.response?.data?.error?.message ?? 'Failed to create shop profile.');
     },
   });
 
   const handleChange = (field: keyof ShopProfile, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  /** Normalises a 10-digit or +91-prefixed number to +91XXXXXXXXXX */
+  const normalisePhone = (raw: string): string => {
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length === 10) return `+91${digits}`;
+    if (digits.length === 12 && digits.startsWith('91')) return `+${digits}`;
+    return raw.trim(); // return as-is and let server validate edge cases
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -212,10 +232,14 @@ export default function SettingsPage() {
       return;
     }
     setFormError('');
+    const payload = {
+      ...activeForm,
+      contact_phone: normalisePhone(activeForm.contact_phone ?? ''),
+    };
     if (isNewShop) {
-      createMutation.mutate(activeForm);
+      createMutation.mutate(payload);
     } else {
-      updateMutation.mutate(activeForm);
+      updateMutation.mutate(payload);
     }
   };
 
@@ -390,13 +414,12 @@ export default function SettingsPage() {
                       : 'Invoices will be generated as \'Tax Invoice\''}
                   </p>
                 </div>
-                <span className={`text-xs px-2.5 py-1 rounded-full font-semibold border ${
-                  activeForm.gst_type === 'regular'
-                    ? 'bg-green-50 text-green-700 border-green-200'
-                    : activeForm.gst_type === 'composite'
+                <span className={`text-xs px-2.5 py-1 rounded-full font-semibold border ${activeForm.gst_type === 'regular'
+                  ? 'bg-green-50 text-green-700 border-green-200'
+                  : activeForm.gst_type === 'composite'
                     ? 'bg-amber-50 text-amber-700 border-amber-200'
                     : 'bg-gray-50 text-gray-500 border-gray-200'
-                }`}>
+                  }`}>
                   {activeForm.gst_type === 'regular' ? 'Tax Invoice' : 'Bill of Supply'}
                 </span>
               </div>

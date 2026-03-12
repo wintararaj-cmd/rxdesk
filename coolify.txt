@@ -1,0 +1,14 @@
+Postgres URL (internal)
+
+postgres://rxdesk:Rxdesk%4050252@zc4s0k0o0sc0scoskk4wwgoc:5432/rxdesk_prod
+
+
+Redis URL (internal)
+redis://default:i2lrDx5i688bcwpDLZ0epyOwcDa0c5YYhXXfoUPzpkij4IjILjTw1hDIsRL6x0wg@kgs0kk00s804g48g8s8c8gs8:6379/0
+
+
+JWT_REFRESH_SECRET = 0c36471982b3ee50528215b5ff7b5eb71b816ce1434fe4800bd15dbe9511793a
+
+JWT_REFRESH_SECRET = eb1d3bd6fe5bcd607c50350e42508c6d5b89510f91e49e4ce5cf89549b94dece
+
+PRESCRIPTION_HMAC_SECRET =  a2c344aa331db8bc9aca32284c83f375
