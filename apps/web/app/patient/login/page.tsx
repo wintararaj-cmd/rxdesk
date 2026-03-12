@@ -1,8 +1,6 @@
 ﻿'use client';
 
-export const dynamic = 'force-dynamic';
-
-import { useState, useEffect, useRef } from 'react';
+import { Suspense, useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Activity, ArrowLeft } from 'lucide-react';
@@ -12,7 +10,7 @@ import { useAuthStore } from '../../../store/authStore';
 const GENDER_OPTIONS = ['male', 'female', 'other'];
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 
-export default function PatientLoginPage() {
+function PatientLoginContent() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [step, setStep] = useState<'login' | 'otp' | 'set-password' | 'profile'>('login');
@@ -380,5 +378,13 @@ export default function PatientLoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PatientLoginPage() {
+  return (
+    <Suspense>
+      <PatientLoginContent />
+    </Suspense>
   );
 }

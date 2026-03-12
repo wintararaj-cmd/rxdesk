@@ -1,15 +1,13 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
-import { useState, useEffect, useRef } from 'react';
+import { Suspense, useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authApi } from '../../lib/apiClient';
 import { useAuthStore } from '../../store/authStore';
 
 type Step = 'login' | 'otp' | 'set-password';
 
-export default function LoginPage() {
+function LoginContent() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -439,5 +437,13 @@ export default function LoginPage() {
         <p className="text-center text-gray-700 text-xs mt-6">Powered by RxDesk Technologies</p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   );
 }
