@@ -98,6 +98,9 @@ export default function SettingsPage() {
     // treat 404 (no shop yet) as a non-error — isError will be true but we handle it as isNewShop
   });
 
+  // Derive shop early so queries below can use it as an `enabled` guard
+  const shop: ShopProfile | null = shopRes?.data?.data ?? null;
+
   const { data: subRes } = useQuery({
     queryKey: ['shop-subscription'],
     queryFn: () => subscriptionApi.getCurrent(),
@@ -145,7 +148,6 @@ export default function SettingsPage() {
     },
   });
 
-  const shop: ShopProfile | null = shopRes?.data?.data ?? null;
   const sub: Subscription | null = subRes?.data?.data ?? null;
 
   const [form, setForm] = useState<Partial<ShopProfile>>({});
