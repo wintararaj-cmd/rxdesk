@@ -198,7 +198,7 @@ router.post('/import', requireRole('shop_owner'), async (req, res, next) => {
     );
 
     // ── Step 3: classify each row as insert or update ──────────────────────
-    const toInsert: Parameters<typeof prisma.shopInventory.createMany>[0]['data'] = [];
+    const toInsert: NonNullable<Parameters<typeof prisma.shopInventory.createMany>[0]>['data'] = [];
     const toUpdate: Array<{ id: string; data: Omit<ParsedPayload, 'shop_id' | 'medicine_name'> }> = [];
 
     for (const r of valid) {

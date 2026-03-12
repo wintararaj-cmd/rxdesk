@@ -99,9 +99,9 @@ router.patch('/:id/fee', requireRole('shop_owner'), async (req, res, next) => {
     }
     const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: req.user!.id } });
     if (!shop) { res.status(404).json({ success: false, error: { message: 'Shop not found' } }); return; }
-    const chamber = await prisma.chamber.findFirst({ where: { id: req.params.id, shop_id: shop.id } });
+    const chamber = await prisma.doctorChamber.findFirst({ where: { id: req.params.id, shop_id: shop.id } });
     if (!chamber) { res.status(404).json({ success: false, error: { message: 'Chamber not found' } }); return; }
-    const updated = await prisma.chamber.update({ where: { id: req.params.id }, data: { consultation_fee } });
+    const updated = await prisma.doctorChamber.update({ where: { id: req.params.id }, data: { consultation_fee } });
     res.json({ success: true, data: updated, message: 'Fee updated' });
   } catch (err) { next(err); }
 });
