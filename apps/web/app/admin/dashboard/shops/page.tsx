@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { adminApi } from '../../../../lib/apiClient';
+import { adminApi, subscriptionApi } from '../../../../lib/apiClient';
 
 type Shop = {
   id: string;
@@ -18,6 +18,12 @@ type Shop = {
   verification_status: 'pending' | 'approved' | 'rejected';
   created_at: string;
   owner: { phone: string };
+};
+
+type Plan = {
+  id: string;
+  name: string;
+  price_monthly: number;
 };
 
 const STATUS_TABS = [
@@ -42,8 +48,14 @@ function ShopsContent() {
   const [shops, setShops] = useState<Shop[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  
   const [rejectModal, setRejectModal] = useState<{ id: string; name: string } | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+
+  const [rechargeModal, setRechargeModal] = useState<{ id: string; name: string } | null>(null);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState<string>('');
+  const [rechargePeriod, setRechargePeriod] = useState<string>('1');
 
   const status = searchParams.get('status') ?? 'pending';
 
@@ -55,7 +67,20 @@ function ShopsContent() {
       .finally(() => setLoading(false));
   }, [status]);
 
-  useEffect(() => { load(); }, [load]);
+  const loadPlans = useCallback(() => {
+    subscriptionApi.getPlans()
+      .then((r) => {
+        const p = r.data.data;
+        setPlans(p);
+        if (p.length > 0) setSelectedPlan(p[0].id);
+      })
+      .catch(console.error);
+  }, []);
+
+  useEffect(() => { 
+    load(); 
+    loadPlans(); 
+  }, [load, loadPlans]);
 
   const handleVerify = async (id: string, action: 'approved') => {
     setActionLoading(id + action);
@@ -79,6 +104,21 @@ function ShopsContent() {
       load();
     } catch (err: any) {
       alert(err?.response?.data?.error?.message ?? 'Failed');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRecharge = async () => {
+    if (!rechargeModal || !selectedPlan) return;
+    setActionLoading(rechargeModal.id + 'recharge');
+    try {
+      await adminApi.rechargeShop(rechargeModal.id, { plan_id: selectedPlan, months: Number(rechargePeriod) });
+      setRechargeModal(null);
+      alert(`Successfully recharged ${rechargeModal.name} for ${rechargePeriod} month(s)!`);
+      load();
+    } catch (err: any) {
+      alert(err?.response?.data?.error?.message ?? 'Recharge Failed');
     } finally {
       setActionLoading(null);
     }
@@ -142,31 +182,43 @@ function ShopsContent() {
                     <p><span className="text-gray-600">Registered:</span> {new Date(s.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                   </div>
                 </div>
-                {s.verification_status === 'pending' && (
-                  <div className="flex gap-2 shrink-0">
+                
+                <div className="flex flex-col gap-2 shrink-0 items-end">
+                  {s.verification_status === 'pending' && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleVerify(s.id, 'approved')}
+                        disabled={!!actionLoading}
+                        className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 text-xs font-semibold rounded-lg border border-emerald-500/30 transition-all disabled:opacity-50"
+                      >
+                        {actionLoading === s.id + 'approved' ? '…' : 'Approve'}
+                      </button>
+                      <button
+                        onClick={() => setRejectModal({ id: s.id, name: s.shop_name })}
+                        disabled={!!actionLoading}
+                        className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 text-xs font-semibold rounded-lg border border-red-500/30 transition-all disabled:opacity-50"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
+                  {s.verification_status === 'approved' && (
                     <button
-                      onClick={() => handleVerify(s.id, 'approved')}
+                      onClick={() => setRechargeModal({ id: s.id, name: s.shop_name })}
                       disabled={!!actionLoading}
-                      className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 text-xs font-semibold rounded-lg border border-emerald-500/30 transition-all disabled:opacity-50"
+                      className="px-3 py-1.5 bg-violet-600/20 hover:bg-violet-600/30 text-violet-400 text-xs font-semibold rounded-lg border border-violet-500/30 transition-all disabled:opacity-50"
                     >
-                      {actionLoading === s.id + 'approved' ? '…' : 'Approve'}
+                      {actionLoading === s.id + 'recharge' ? '…' : 'Recharge Shop'}
                     </button>
-                    <button
-                      onClick={() => setRejectModal({ id: s.id, name: s.shop_name })}
-                      disabled={!!actionLoading}
-                      className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 text-xs font-semibold rounded-lg border border-red-500/30 transition-all disabled:opacity-50"
-                    >
-                      Reject
-                    </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Reject with reason modal */}
+      {/* Reject modal */}
       {rejectModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-[#111318] border border-white/[0.08] rounded-2xl p-6 w-full max-w-md shadow-2xl">
@@ -195,6 +247,63 @@ function ShopsContent() {
                 className="flex-1 px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 text-sm font-semibold rounded-xl border border-red-500/30 transition-all disabled:opacity-50"
               >
                 {actionLoading ? '…' : 'Confirm Reject'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recharge modal */}
+      {rechargeModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#111318] border border-white/[0.08] rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <h3 className="text-white font-semibold text-lg mb-1">Manual Recharge</h3>
+            <p className="text-gray-500 text-sm mb-4">
+              Extend subscription for <span className="text-gray-300">{rechargeModal.name}</span>.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-gray-400 text-xs font-medium mb-1.5">Select Plan</label>
+                <select
+                  value={selectedPlan}
+                  onChange={e => setSelectedPlan(e.target.value)}
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-violet-500/50"
+                >
+                  {plans.map(p => (
+                    <option key={p.id} value={p.id} className="bg-gray-900">{p.name} (₹{p.price_monthly}/mo)</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-gray-400 text-xs font-medium mb-1.5">Recharge Period</label>
+                <select
+                  value={rechargePeriod}
+                  onChange={e => setRechargePeriod(e.target.value)}
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-violet-500/50"
+                >
+                  <option value="1" className="bg-gray-900">Monthly (1 Mo)</option>
+                  <option value="3" className="bg-gray-900">Quarterly (3 Mo)</option>
+                  <option value="6" className="bg-gray-900">Half-Yearly (6 Mo)</option>
+                  <option value="12" className="bg-gray-900">Yearly (12 Mo)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setRechargeModal(null)}
+                className="flex-1 px-4 py-2 bg-white/[0.05] hover:bg-white/10 text-gray-300 text-sm font-semibold rounded-xl border border-white/[0.08] transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRecharge}
+                disabled={!!actionLoading || !selectedPlan}
+                className="flex-1 px-4 py-2 bg-violet-600/20 hover:bg-violet-600/30 text-violet-400 text-sm font-semibold rounded-xl border border-violet-500/30 transition-all disabled:opacity-50"
+              >
+                {actionLoading ? '…' : 'Recharge'}
               </button>
             </div>
           </div>

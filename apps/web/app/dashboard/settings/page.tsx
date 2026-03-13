@@ -89,6 +89,7 @@ export default function SettingsPage() {
   const [formError, setFormError] = useState('');
   const [showPlans, setShowPlans] = useState(false);
   const [subError, setSubError] = useState('');
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('1');
 
   const { user } = useAuthStore();
   const { data: shopRes, isLoading, isError: shopNotFound } = useQuery({
@@ -123,7 +124,7 @@ export default function SettingsPage() {
   const plans: Plan[] = plansRes?.data?.data ?? [];
 
   const subscribeMutation = useMutation({
-    mutationFn: (planId: string) => subscriptionApi.subscribe(planId),
+    mutationFn: ({ planId, period }: { planId: string; period: string }) => subscriptionApi.subscribe(planId, period),
     onSuccess: (res) => {
       const data = res.data.data;
       qc.invalidateQueries({ queryKey: ['shop-subscription'] });
@@ -325,7 +326,19 @@ export default function SettingsPage() {
           {/* Plans grid */}
           {showPlans && (
             <div className="mt-5 border-t border-gray-100 pt-5">
-              <p className="text-sm font-medium text-gray-700 mb-3">Available Plans</p>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
+                <p className="text-sm font-medium text-gray-700">Available Plans</p>
+                <select
+                  value={selectedPeriod}
+                  onChange={(e) => setSelectedPeriod(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-violet-400"
+                >
+                  <option value="1">Monthly Recharge</option>
+                  <option value="3">Quarterly Recharge (3 Mo)</option>
+                  <option value="6">Half-Yearly Recharge (6 Mo)</option>
+                  <option value="12">Yearly Recharge (12 Mo)</option>
+                </select>
+              </div>
               {subError && <p className="text-red-500 text-sm mb-3">{subError}</p>}
               {plans.length === 0 ? (
                 <div className="flex items-center justify-center py-6">
@@ -333,26 +346,33 @@ export default function SettingsPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {plans.map((plan) => (
-                    <div key={plan.id} className="border border-gray-200 rounded-xl p-4">
-                      <p className="font-semibold text-gray-900">{plan.name}</p>
-                      <p className="text-xl font-bold text-violet-600 mt-1">
-                        ₹{plan.price_monthly}<span className="text-sm font-normal text-gray-400">/mo</span>
-                      </p>
-                      <ul className="mt-2 space-y-1 text-xs text-gray-600">
-                        <li>✓ Up to {plan.max_doctors} doctor{plan.max_doctors !== 1 ? 's' : ''}</li>
-                        <li>✓ {plan.max_appointments_per_month >= 99999 ? 'Unlimited' : plan.max_appointments_per_month} appointments/month</li>
-                        <li>✓ {plan.max_sessions} active session{plan.max_sessions !== 1 ? 's' : ''}</li>
-                      </ul>
-                      <button
-                        onClick={() => subscribeMutation.mutate(plan.id)}
-                        disabled={subscribeMutation.isPending}
-                        className="mt-3 w-full py-2 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 disabled:opacity-50"
-                      >
-                        {subscribeMutation.isPending ? 'Processing…' : 'Subscribe'}
-                      </button>
-                    </div>
-                  ))}
+                  {plans.map((plan) => {
+                    const months = Number(selectedPeriod);
+                    const totalAmount = plan.price_monthly * months;
+                    return (
+                      <div key={plan.id} className="border border-gray-200 rounded-xl p-4">
+                        <p className="font-semibold text-gray-900">{plan.name}</p>
+                        <p className="text-xl font-bold text-violet-600 mt-1">
+                          ₹{totalAmount}<span className="text-sm font-normal text-gray-400">/{months === 1 ? 'mo' : `${months} mo`}</span>
+                        </p>
+                        {months > 1 && (
+                          <p className="text-xs text-gray-500 mt-0.5">Base: ₹{plan.price_monthly}/mo</p>
+                        )}
+                        <ul className="mt-2 space-y-1 text-xs text-gray-600">
+                          <li>✓ Up to {plan.max_doctors} doctor{plan.max_doctors !== 1 ? 's' : ''}</li>
+                          <li>✓ {plan.max_appointments_per_month >= 99999 ? 'Unlimited' : plan.max_appointments_per_month} appointments/month</li>
+                          <li>✓ {plan.max_sessions} active session{plan.max_sessions !== 1 ? 's' : ''}</li>
+                        </ul>
+                        <button
+                          onClick={() => subscribeMutation.mutate({ planId: plan.id, period: selectedPeriod })}
+                          disabled={subscribeMutation.isPending}
+                          className="mt-3 w-full py-2 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 disabled:opacity-50"
+                        >
+                          {subscribeMutation.isPending ? 'Processing…' : 'Subscribe'}
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

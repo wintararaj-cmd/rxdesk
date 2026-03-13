@@ -34,11 +34,11 @@ export async function registerShop(
   // Update user role to shop_owner
   await prisma.user.update({ where: { id: userId }, data: { role: 'shop_owner' } });
 
-  // Start 30-day trial subscription
+  // Start 7-day trial subscription
   const basicPlan = await prisma.subscriptionPlan.findFirst({ where: { name: 'Basic', is_active: true } });
   if (basicPlan) {
     const trialEnd = new Date();
-    trialEnd.setDate(trialEnd.getDate() + 30);
+    trialEnd.setDate(trialEnd.getDate() + 7);
     await prisma.shopSubscription.create({
       data: { shop_id: shop.id, plan_id: basicPlan.id, status: 'trial', trial_ends_at: trialEnd },
     });

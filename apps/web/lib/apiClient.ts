@@ -89,7 +89,7 @@ export const shopApi = {
 export const subscriptionApi = {
   getCurrent: () => apiClient.get('/subscriptions/current'),
   getPlans: () => apiClient.get('/subscriptions/plans'),
-  subscribe: (planId: string) => apiClient.post('/subscriptions/subscribe', { plan_id: planId }),
+  subscribe: (planId: string, period: string = '1') => apiClient.post('/subscriptions/subscribe', { plan_id: planId, period }),
 };
 
 export const appointmentApi = {
@@ -227,6 +227,7 @@ export const adminApi = {
   verifyShop: (id: string, status: 'approved' | 'rejected', rejection_reason?: string) =>
     apiClient.patch(`/admin/shops/${id}/verify`, { status, rejection_reason }),
   getUsers: (role?: string) => apiClient.get('/admin/users', { params: role ? { role } : undefined }),
+  rechargeShop: (id: string, data: { plan_id: string; months: number }) => apiClient.post(`/admin/shops/${id}/recharge`, data),
 };
 
 export const bannerApi = {

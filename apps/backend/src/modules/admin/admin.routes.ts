@@ -126,4 +126,47 @@ router.get('/analytics', requireRole('admin'), async (_req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// POST /admin/shops/:id/recharge  (Admin manual recharge)
+router.post('/shops/:id/recharge', requireRole('admin'), async (req, res, next) => {
+  try {
+    const { plan_id, months } = req.body as { plan_id: string; months: number };
+    const shopId = req.params.id;
+    if (!plan_id || !months) {
+      res.status(400).json({ success: false, error: { code: 'VALIDATION', message: 'plan_id and months are required' } });
+      return;
+    }
+
+    let sub = await prisma.shopSubscription.findFirst({ where: { shop_id: shopId } });
+    const rechargeMs = months * 30 * 24 * 60 * 60 * 1000;
+    const now = new Date();
+
+    if (sub) {
+      let currentEnd = sub.current_period_end ? new Date(sub.current_period_end).getTime() : now.getTime();
+      if (currentEnd < now.getTime()) currentEnd = now.getTime(); // expired, start from now
+      
+      sub = await prisma.shopSubscription.update({
+        where: { id: sub.id },
+        data: {
+          plan_id,
+          status: 'active',
+          current_period_end: new Date(currentEnd + rechargeMs),
+          current_period_start: sub.current_period_start ?? now,
+        },
+      });
+    } else {
+      sub = await prisma.shopSubscription.create({
+        data: {
+          shop_id: shopId,
+          plan_id,
+          status: 'active',
+          current_period_start: now,
+          current_period_end: new Date(now.getTime() + rechargeMs),
+        },
+      });
+    }
+
+    res.json({ success: true, data: sub, message: `Recharged shop successfully for ${months} month(s)` });
+  } catch (err) { next(err); }
+});
+
 export default router;
