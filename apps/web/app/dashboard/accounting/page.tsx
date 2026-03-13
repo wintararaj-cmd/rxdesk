@@ -85,24 +85,39 @@ interface GstSummary {
 }
 
 // ── sub-components ────────────────────────────────────────────────────────────
-function StatCard({
-  label,
-  value,
-  sub,
-  color = 'bg-white',
-  textColor = 'text-gray-900',
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  color?: string;
-  textColor?: string;
-}) {
+function StatCard({ label, value, sub, icon, trend, color = 'violet', textColor }: { label: string; value: string; sub?: string; icon?: React.ReactNode; trend?: string; color?: string; textColor?: string }) {
+  // Backwards compatibility for legacy bg- class usage
+  if (color.startsWith('bg-')) {
+    return (
+      <div className={`${color} ${textColor || 'text-gray-900'} p-5 rounded-2xl shadow-sm border border-black/5`}>
+        <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">{label}</p>
+        <h3 className="text-xl font-black tracking-tight">{value}</h3>
+        {sub && <p className="text-[10px] opacity-60 font-bold mt-1">{sub}</p>}
+      </div>
+    );
+  }
+
+  const colorMap: Record<string, string> = {
+    violet: 'from-violet-500 to-indigo-600',
+    rose: 'from-rose-500 to-pink-600',
+    amber: 'from-amber-400 to-orange-500',
+    emerald: 'from-emerald-500 to-teal-600',
+    blue: 'from-blue-500 to-cyan-600',
+  };
+
   return (
-    <div className={`${color} rounded-xl p-5 shadow-sm`}>
-      <p className="text-gray-500 text-sm">{label}</p>
-      <p className={`text-2xl font-bold mt-1 ${textColor}`}>{value}</p>
-      {sub && <p className="text-gray-400 text-xs mt-0.5">{sub}</p>}
+    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex items-start gap-4 hover:shadow-md transition-shadow">
+      <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${colorMap[color] || 'from-gray-100 to-gray-200'} flex items-center justify-center text-white shadow-lg shadow-gray-200/50`}>
+        {icon || <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+      </div>
+      <div className="flex-1">
+        <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1">{label}</p>
+        <h3 className="text-2xl font-black text-gray-900 tracking-tight">{value}</h3>
+        <div className="flex items-center gap-2 mt-1">
+          {sub && <span className="text-xs text-gray-400 font-medium">{sub}</span>}
+          {trend && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-lg ${trend.includes('+') ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>{trend}</span>}
+        </div>
+      </div>
     </div>
   );
 }
@@ -608,6 +623,7 @@ type PIItem = typeof EMPTY_PI_ITEM;
 function PurchasesTab() {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
 
   // form state
   const [supplierId, setSupplierId] = useState('');
@@ -745,13 +761,51 @@ function PurchasesTab() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* ── Stats Dashboard ── */}
+      {!showForm && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center shadow-inner">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" /></svg>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Total Purchases</p>
+              <p className="text-xl font-black text-gray-900">{fmt(listData?.total_amount_sum ?? 0)}</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center shadow-inner">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Outstanding Due</p>
+              <p className="text-xl font-black text-red-600">{fmt(listData?.total_due_sum ?? 0)}</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shadow-inner">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Top Supplier</p>
+              <p className="text-xl font-black text-gray-900 truncate max-w-[150px]">{listData?.top_supplier ?? 'N/A'}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-end">
         <button
           onClick={() => { setShowForm((v) => !v); if (showForm) resetForm(); }}
-          className="bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-violet-700 transition-colors"
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-bold transition-all duration-300 shadow-lg ${showForm ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:scale-105 active:scale-95 shadow-violet-200'}`}
         >
-          {showForm ? '✕ Cancel' : '+ New Purchase Invoice'}
+          {showForm ? '✕ Close Form' : (
+            <>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+              New Purchase Invoice
+            </>
+          )}
         </button>
       </div>
 
@@ -760,14 +814,13 @@ function PurchasesTab() {
         <div className="bg-white rounded-2xl border border-violet-100 shadow-sm p-6 space-y-5">
           <h3 className="font-bold text-gray-800 text-base">New Purchase Invoice</h3>
 
-          {/* Header fields */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
             <div>
-              <label className="text-xs font-medium text-gray-500 block mb-1">Supplier</label>
+              <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider block mb-1.5 ml-1">Supplier</label>
               <select
                 value={supplierId}
                 onChange={(e) => { setSupplierId(e.target.value); setTimeout(() => piInvoiceNoRef.current?.focus(), 0); }}
-                className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400 bg-white"
+                className="w-full border border-gray-200 rounded-xl px-3 h-10 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400 bg-white shadow-sm transition-all"
               >
                 <option value="">— Walk-in / Ad-hoc —</option>
                 {(suppliersData ?? []).map((s) => (
@@ -776,46 +829,47 @@ function PurchasesTab() {
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500 block mb-1">Invoice No.</label>
+              <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider block mb-1.5 ml-1">Invoice No.</label>
               <input ref={piInvoiceNoRef} type="text" placeholder="INV-001" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piInvDateRef.current?.focus(); } }}
-                className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400" />
+                className="w-full border border-gray-200 rounded-xl px-3 h-10 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400 shadow-sm transition-all" />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500 block mb-1">Invoice Date *</label>
+              <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider block mb-1.5 ml-1">Invoice Date *</label>
               <input ref={piInvDateRef} type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piReceivedDateRef.current?.focus(); } }}
-                className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400" />
+                className="w-full border border-gray-200 rounded-xl px-3 h-10 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400 shadow-sm transition-all" />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500 block mb-1">Received Date</label>
+              <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider block mb-1.5 ml-1">Received Date</label>
               <input ref={piReceivedDateRef} type="date" value={receivedDate} onChange={(e) => setReceivedDate(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piMedRefs.current[0]?.focus(); } }}
-                className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400" />
+                className="w-full border border-gray-200 rounded-xl px-3 h-10 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400 shadow-sm transition-all" />
             </div>
           </div>
 
           {/* Line items */}
           <div>
-            <div className="grid grid-cols-13 gap-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-1 mb-1" style={{gridTemplateColumns:'2.5fr 1fr 1.5fr 0.8fr 0.8fr 1fr 1fr 0.8fr 1fr 1fr'}}>
+            <div className="grid gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-2" style={{gridTemplateColumns:'2.5fr 1fr 1.5fr 0.8fr 0.8fr 1fr 1fr 0.8fr 1fr 80px 32px'}}>
               <div>Medicine</div>
               <div>Unit</div>
               <div>Batch / Expiry</div>
-              <div>Qty</div>
-              <div>Free</div>
+              <div className="text-center">Qty</div>
+              <div className="text-center">Free</div>
               <div>Cost (₹)</div>
               <div>MRP (₹)</div>
-              <div>Disc%</div>
-              <div>GST%</div>
-              <div className="text-right">Total</div>
+              <div className="text-center">Disc%</div>
+              <div className="text-center">GST%</div>
+              <div className="text-right">Line Total</div>
+              <div />
             </div>
             <div className="space-y-2">
               {piItems.map((item, idx) => (
                 <div key={idx} className="relative">
-                  <div className="grid gap-1.5 items-center" style={{gridTemplateColumns:'2.5fr 1fr 1.5fr 0.8fr 0.8fr 1fr 1fr 0.8fr 1fr 1fr'}}>
+                  <div className="grid gap-2 items-start" style={{gridTemplateColumns:'2.5fr 1fr 1.5fr 0.8fr 0.8fr 1fr 1fr 0.8fr 1fr 80px 32px'}}>
                     {/* Medicine Name with autocomplete */}
                     <div className="relative">
-                      <input type="text" placeholder="Medicine name" value={item.medicine_name}
+                      <input type="text" placeholder="Search medicine..." value={item.medicine_name}
                         ref={(el) => { piMedRefs.current[idx] = el; }}
                         onChange={(e) => updatePiItem(idx, 'medicine_name', e.target.value)}
                         onKeyDown={(e) => {
@@ -827,15 +881,15 @@ function PurchasesTab() {
                           else if (e.key === 'Enter' && (h < 0 || suggs.length === 0)) { e.preventDefault(); setSuggestions((p) => ({ ...p, [idx]: [] })); piUnitRefs.current[idx]?.focus(); }
                           else if (e.key === 'Escape') { setSuggestions((p) => ({ ...p, [idx]: [] })); setSuggHighlights((p) => ({ ...p, [idx]: -1 })); }
                         }}
-                        className="w-full border border-gray-200 rounded-lg px-2 h-8 text-xs text-gray-900 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-200"
+                        className="w-full border border-gray-200 rounded-xl px-3 h-10 text-sm text-gray-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 placeholder:text-gray-300 transition-all font-medium"
                       />
                       {suggestions[idx]?.length > 0 && (
-                        <div className="absolute z-30 top-full mt-0.5 left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-40 overflow-y-auto">
+                        <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto ring-1 ring-black/5 animate-in fade-in slide-in-from-top-1">
                           {suggestions[idx].map((s, si) => (
-                            <button key={s.id} type="button" onClick={() => selectSuggestion(idx, s)}
-                              className={`w-full flex justify-between px-3 py-1.5 text-xs text-left transition-colors ${si === (suggHighlights[idx] ?? -1) ? 'bg-violet-100' : 'hover:bg-violet-50'}`}>
-                              <span className="text-gray-800 font-medium">{s.medicine_name}</span>
-                              {s.mrp > 0 && <span className="text-violet-600">₹{s.mrp}</span>}
+                            <button key={s.id} type="button" onMouseDown={() => selectSuggestion(idx, s)}
+                              className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors border-b border-gray-50 last:border-0 ${si === (suggHighlights[idx] ?? -1) ? 'bg-violet-600 text-white shadow-inner' : 'hover:bg-violet-50'}`}>
+                              <span className="font-semibold">{s.medicine_name}</span>
+                              {s.mrp > 0 && <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${si === (suggHighlights[idx] ?? -1) ? 'bg-white/20' : 'bg-violet-50 text-violet-600'}`}>₹{s.mrp}</span>}
                             </button>
                           ))}
                         </div>
@@ -845,60 +899,60 @@ function PurchasesTab() {
                     <div>
                       <select ref={(el) => { piUnitRefs.current[idx] = el; }} value={item.unit} onChange={(e) => updatePiItem(idx, 'unit', e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piBatchRefs.current[idx]?.focus(); } }}
-                        className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs text-gray-900 outline-none focus:border-violet-500 bg-white">
+                        className="w-full border border-gray-200 rounded-xl px-2 h-10 text-xs text-gray-900 outline-none focus:border-violet-500 bg-white cursor-pointer uppercase font-bold shadow-sm">
                         {Array.from(new Set([...PI_UNITS, item.unit].filter(Boolean))).map((u) => <option key={u} value={u}>{u}</option>)}
                       </select>
                     </div>
                     {/* Batch + Expiry stacked */}
-                    <div className="flex flex-col gap-1">
-                      <input ref={(el) => { piBatchRefs.current[idx] = el; }} type="text" placeholder="Batch no." value={item.batch_number}
+                    <div className="flex flex-col gap-1.5">
+                      <input ref={(el) => { piBatchRefs.current[idx] = el; }} type="text" placeholder="Batch" value={item.batch_number}
                         onChange={(e) => updatePiItem(idx, 'batch_number', e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piExpiryRefs.current[idx]?.focus(); } }}
-                        className="w-full border border-gray-200 rounded-lg px-2 h-8 text-xs text-gray-900 outline-none focus:border-violet-500"
+                        className="w-full border border-gray-200 rounded-xl px-3 h-10 text-xs text-gray-900 outline-none focus:border-violet-500 shadow-sm font-mono placeholder:text-gray-300"
                       />
                       <input ref={(el) => { piExpiryRefs.current[idx] = el; }} type="date" value={item.expiry_date}
                         onChange={(e) => updatePiItem(idx, 'expiry_date', e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piQtyRefs.current[idx]?.focus(); } }}
-                        className="w-full border border-gray-200 rounded-lg px-2 h-8 text-xs text-gray-900 outline-none focus:border-violet-500"
+                        className="w-full border border-gray-200 rounded-xl px-2 h-10 text-xs text-gray-900 outline-none focus:border-violet-500 shadow-sm"
                       />
                     </div>
                     <div>
                       <input ref={(el) => { piQtyRefs.current[idx] = el; }} type="number" min="1" value={item.quantity} onChange={(e) => updatePiItem(idx, 'quantity', e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piFreeQtyRefs.current[idx]?.focus(); } }}
-                        className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs text-gray-900 outline-none focus:border-violet-500 text-center" />
+                        className="w-full border border-gray-200 rounded-xl px-1 h-10 text-sm font-bold text-gray-900 outline-none focus:border-violet-500 text-center shadow-sm" />
                     </div>
                     <div>
                       <input ref={(el) => { piFreeQtyRefs.current[idx] = el; }} type="number" min="0" placeholder="0" value={item.free_qty} onChange={(e) => updatePiItem(idx, 'free_qty', e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piCostRefs.current[idx]?.focus(); } }}
-                        className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs text-gray-900 outline-none focus:border-violet-500 text-center" />
+                        className="w-full border border-gray-200 rounded-xl px-1 h-10 text-sm italic text-gray-500 outline-none focus:border-violet-500 text-center shadow-sm" />
                     </div>
                     <div>
                       <input ref={(el) => { piCostRefs.current[idx] = el; }} type="number" min="0" step="0.01" placeholder="0.00" value={item.purchase_price} onChange={(e) => updatePiItem(idx, 'purchase_price', e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piMrpRefs.current[idx]?.focus(); } }}
-                        className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs text-gray-900 outline-none focus:border-violet-500" />
+                        className="w-full border border-gray-200 rounded-xl px-2 h-10 text-sm font-bold text-indigo-600 outline-none focus:border-indigo-500 shadow-sm" />
                     </div>
                     <div>
                       <input ref={(el) => { piMrpRefs.current[idx] = el; }} type="number" min="0" step="0.01" placeholder="0.00" value={item.mrp} onChange={(e) => updatePiItem(idx, 'mrp', e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piAddRowBtnRef.current?.focus(); } }}
-                        className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs text-gray-900 outline-none focus:border-violet-500" />
+                        className="w-full border border-gray-200 rounded-xl px-2 h-10 text-sm font-black text-violet-700 outline-none focus:border-violet-500 shadow-sm" />
                     </div>
                     <div>
                       <input type="number" min="0" max="100" placeholder="0" value={item.discount_pct} onChange={(e) => updatePiItem(idx, 'discount_pct', e.target.value)}
-                        className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs text-gray-900 outline-none focus:border-violet-500 text-center" />
+                        className="w-full border border-gray-200 rounded-xl px-1 h-10 text-sm text-center text-emerald-600 font-bold outline-none focus:border-emerald-500 shadow-sm" />
                     </div>
                     <div>
                       <select value={item.gst_rate} onChange={(e) => updatePiItem(idx, 'gst_rate', e.target.value)}
-                        className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs text-gray-900 outline-none focus:border-violet-500 bg-white">
+                        className="w-full border border-gray-200 rounded-xl px-1 h-10 text-xs text-gray-900 outline-none focus:border-violet-500 bg-white font-semibold">
                         {GST_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
                       </select>
                     </div>
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="text-xs font-semibold text-violet-700 whitespace-nowrap">
-                        {lineTotal(item) > 0 ? fmt(lineTotal(item)) : '—'}
-                      </span>
+                    <div className="pt-2.5 text-right font-black text-gray-900 text-sm font-mono truncate">
+                      {lineTotal(item) > 0 ? fmt(lineTotal(item)) : '—'}
+                    </div>
+                    <div className="pt-2">
                       <button onClick={() => removePiItem(idx)} disabled={piItems.length === 1}
-                        className="w-5 h-5 rounded text-gray-300 hover:text-red-500 disabled:opacity-20 flex items-center justify-center shrink-0 transition-colors">
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                        className="w-8 h-8 rounded-full text-gray-300 hover:text-red-500 hover:bg-red-50 disabled:opacity-10 flex items-center justify-center transition-all">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                       </button>
                     </div>
                   </div>
@@ -921,21 +975,31 @@ function PurchasesTab() {
           </div>
 
           {/* Summary + Submit */}
-          <div className="flex items-end justify-between pt-3 border-t border-gray-100">
-            <div className="flex gap-6 text-sm">
-              <div><span className="text-gray-400">Subtotal </span><span className="font-semibold text-gray-700">{fmt(calcSubtotal)}</span></div>
-              <div><span className="text-gray-400">GST </span><span className="font-semibold text-gray-700">{fmt(calcGst)}</span></div>
-              <div><span className="text-gray-400">Total </span><span className="font-bold text-violet-700 text-base">{fmt(calcTotal)}</span></div>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6 pt-6 border-t border-dashed border-gray-200">
+            <div className="bg-violet-50/50 rounded-2xl p-5 border border-violet-100 flex gap-10">
+              <div>
+                <p className="text-[10px] uppercase font-bold text-violet-400 tracking-wider mb-1">Taxable Subtotal</p>
+                <p className="text-lg font-black text-violet-900">{fmt(calcSubtotal)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-bold text-violet-400 tracking-wider mb-1">GST Amount</p>
+                <p className="text-lg font-black text-violet-900">+{fmt(calcGst)}</p>
+              </div>
+              <div className="px-6 border-l border-violet-100">
+                <p className="text-[10px] uppercase font-bold text-violet-400 tracking-wider mb-1">Net Invoice Total</p>
+                <p className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-700 to-indigo-700">{fmt(calcTotal)}</p>
+              </div>
             </div>
-            <div className="flex gap-3">
+            
+            <div className="flex gap-4">
               <button onClick={() => { setShowForm(false); resetForm(); }}
-                className="text-gray-500 text-sm px-4 py-2 hover:text-gray-700">Cancel</button>
+                className="text-gray-500 text-sm font-bold px-6 py-3 hover:text-gray-900 transition-colors">Discard Changes</button>
               <button
                 onClick={handleSubmit}
                 disabled={createMutation.isPending || !piItems.some((it) => it.medicine_name && it.batch_number && it.expiry_date && Number(it.purchase_price) > 0)}
-                className="bg-violet-600 text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-violet-700 disabled:opacity-50 transition-colors"
+                className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-10 py-3 rounded-2xl text-sm font-black shadow-xl shadow-violet-200 hover:scale-105 active:scale-95 disabled:opacity-50 transition-all"
               >
-                {createMutation.isPending ? 'Saving…' : 'Save Invoice'}
+                {createMutation.isPending ? 'Processing…' : 'Finalize & Save Invoice'}
               </button>
             </div>
           </div>
@@ -953,42 +1017,216 @@ function PurchasesTab() {
           <div className="w-7 h-7 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 text-gray-500 text-xs uppercase">
-                <th className="text-left px-5 py-3">Supplier</th>
-                <th className="text-left px-5 py-3">Invoice</th>
-                <th className="text-left px-5 py-3">Date</th>
-                <th className="text-right px-5 py-3">Total</th>
-                <th className="text-right px-5 py-3">Paid</th>
-                <th className="text-right px-5 py-3">Due</th>
-                <th className="px-5 py-3">Status</th>
+              <tr className="bg-gray-50/50 text-gray-400 text-[10px] uppercase font-bold tracking-widest border-b border-gray-100">
+                <th className="text-left px-6 py-4">Supplier</th>
+                <th className="text-left px-6 py-4">Invoice Detail</th>
+                <th className="text-left px-6 py-4">Date</th>
+                <th className="text-right px-6 py-4">Invoice Value</th>
+                <th className="text-right px-6 py-4">Amount Paid</th>
+                <th className="text-right px-6 py-4">Outstanding</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {(listData?.items ?? []).map((p) => (
-                <tr key={p.id} className="hover:bg-gray-50/50">
-                  <td className="px-5 py-3 font-medium text-gray-800">{p.supplier?.name ?? '—'}</td>
-                  <td className="px-5 py-3 text-gray-500 font-mono text-xs">{p.invoice_number ?? '—'}</td>
-                  <td className="px-5 py-3 text-gray-600">{new Date(p.invoice_date).toLocaleDateString('en-IN')}</td>
-                  <td className="px-5 py-3 text-right font-semibold text-gray-800">{fmt(p.total_amount)}</td>
-                  <td className="px-5 py-3 text-right text-green-600">{fmt(p.amount_paid)}</td>
-                  <td className="px-5 py-3 text-right text-red-600">{fmt(p.total_amount - p.amount_paid)}</td>
-                  <td className="px-5 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs capitalize ${statusColor[p.payment_status] ?? 'bg-gray-100 text-gray-600'}`}>
+                <tr key={p.id} onClick={() => setSelectedPurchaseId(p.id)} className="hover:bg-violet-50/30 transition-colors group cursor-pointer">
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-gray-900">{p.supplier?.name ?? '—'}</span>
+                      <span className="text-[10px] text-gray-400 uppercase tracking-tight">{p.supplier?.city ?? 'Ad-hoc'}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-lg font-mono text-xs font-bold">{p.invoice_number ?? 'N/A'}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-gray-600 font-medium">{new Date(p.invoice_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                  <td className="px-6 py-4 text-right font-black text-gray-900">{fmt(p.total_amount)}</td>
+                  <td className="px-6 py-4 text-right text-emerald-600 font-bold">{fmt(p.amount_paid)}</td>
+                  <td className="px-6 py-4 text-right">
+                    <span className={`font-black ${p.total_amount - p.amount_paid > 0 ? 'text-red-500' : 'text-gray-300'}`}>
+                      {fmt(p.total_amount - p.amount_paid)}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm ${
+                      p.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 
+                      p.payment_status === 'partial' ? 'bg-amber-100 text-amber-700' : 
+                      'bg-red-100 text-red-700'
+                    }`}>
                       {p.payment_status}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button className="w-8 h-8 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-400 group-hover:text-violet-600 group-hover:border-violet-200 transition-all shadow-sm">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
           {(listData?.items ?? []).length === 0 && (
-            <p className="text-center text-gray-400 py-10 text-sm">No purchase entries yet. Click "New Purchase Invoice" to add one.</p>
+            <div className="text-center py-20 bg-gray-50/30">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
+              </div>
+              <p className="text-gray-400 text-sm font-medium">No purchase entries yet.</p>
+              <button onClick={() => setShowForm(true)} className="mt-4 text-violet-600 font-bold hover:underline text-sm">Record your first invoice</button>
+            </div>
           )}
         </div>
       )}
+
+      {selectedPurchaseId && (
+        <PurchaseDetailModal id={selectedPurchaseId} onClose={() => setSelectedPurchaseId(null)} />
+      )}
+    </div>
+  );
+}
+
+function PurchaseDetailModal({ id, onClose }: { id: string; onClose: () => void }) {
+  const { data: p, isLoading } = useQuery<any>({
+    queryKey: ['web-purchase-detail', id],
+    queryFn: () => accountingApi.getPurchaseById(id).then((r) => r.data.data),
+  });
+
+  if (isLoading) return null; // or small loader overlay
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+      <div className="bg-white rounded-[2rem] w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+        {/* Modal Header */}
+        <div className="p-8 border-b border-gray-100 flex items-start justify-between relative overflow-hidden bg-gray-50/50">
+          <div className="absolute top-0 right-0 p-8 opacity-5">
+            <svg className="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
+          </div>
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <span className="px-2.5 py-1 bg-violet-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest">Purchase Invoice</span>
+              <span className="text-gray-400 font-mono text-sm font-bold">#{p?.invoice_number || 'N/A'}</span>
+            </div>
+            <h2 className="text-3xl font-black text-gray-900 tracking-tight">{p?.supplier?.name ?? 'Walk-in Supplier'}</h2>
+            <div className="flex gap-4 mt-2 text-sm text-gray-500 font-medium">
+              <span className="flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>
+                Invoice Date: {new Date(p?.invoice_date).toLocaleDateString()}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.129-1.125V3.375c0-.621-.508-1.125-1.129-1.125H16.125M16.125 14.25h2.25m-2.25 0H6.75m0 0V4.875c0-.621.504-1.125 1.125-1.125h12.75c.621 0 1.125.504 1.125 1.125v12.75c0 .621-.504 1.125-1.125 1.125h-4.5" /></svg>
+                Received: {new Date(p?.received_date).toLocaleDateString()}
+              </span>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-10 h-10 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-900 transition-colors shadow-sm">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        {/* Modal Content */}
+        <div className="flex-1 overflow-y-auto p-8 space-y-8 no-scrollbar">
+          {/* Items Table */}
+          <div>
+            <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 ml-1">Itemized Breakdown</h4>
+            <div className="border border-gray-100 rounded-3xl overflow-hidden shadow-sm">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50/50">
+                  <tr className="text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100">
+                    <th className="px-5 py-4">Medicine & Batch</th>
+                    <th className="px-5 py-4">Expiry</th>
+                    <th className="px-5 py-4 text-center">Batch Details</th>
+                    <th className="px-5 py-4 text-right">Cost × Qty</th>
+                    <th className="px-5 py-4 text-right">Line Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {p?.items?.map((item: any) => (
+                    <tr key={item.id}>
+                      <td className="px-5 py-4">
+                        <p className="font-bold text-gray-900">{item.medicine_name}</p>
+                        <p className="text-[10px] font-mono text-gray-400">BATCH: {item.batch_number}</p>
+                      </td>
+                      <td className="px-5 py-4 text-gray-600 font-medium">
+                        {new Date(item.expiry_date).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
+                      </td>
+                      <td className="px-5 py-4 text-center">
+                        <span className="text-[10px] font-bold px-2 py-1 bg-gray-100 text-gray-500 rounded-lg">
+                          MRP: {fmt(item.mrp)} · {item.gst_rate}% GST
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <p className="font-medium text-gray-900">{fmt(item.purchase_price)} × {item.quantity}</p>
+                        {item.free_qty > 0 && <p className="text-[10px] text-emerald-500 font-bold">+{item.free_qty} FREE</p>}
+                      </td>
+                      <td className="px-5 py-4 text-right font-black text-gray-900">{fmt(item.line_total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Payments History */}
+            {p?.payments?.length > 0 && (
+              <div>
+                <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 ml-1">Payment History</h4>
+                <div className="space-y-3">
+                  {p.payments.map((pm: any) => (
+                    <div key={pm.id} className="flex items-center justify-between p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-emerald-600 shadow-sm">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-900 capitalize">{pm.payment_method}</p>
+                          <p className="text-[10px] text-gray-400">{new Date(pm.payment_date).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                      <p className="text-sm font-black text-emerald-700">{fmt(pm.amount)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Final Summary Card */}
+            <div className="bg-gradient-to-br from-violet-600 to-indigo-700 rounded-3xl p-8 text-white shadow-xl shadow-violet-200 ml-auto w-full max-w-sm">
+              <div className="space-y-3 mb-6">
+                <div className="flex justify-between text-white/70 text-sm font-medium"><span>Subtotal</span><span>{fmt(p?.subtotal)}</span></div>
+                <div className="flex justify-between text-white/70 text-sm font-medium"><span>GST Total</span><span>+{fmt(p?.gst_amount)}</span></div>
+                {p?.discount_amount > 0 && <div className="flex justify-between text-white/70 text-sm font-medium"><span>Total Discount</span><span>−{fmt(p?.discount_amount)}</span></div>}
+              </div>
+              <div className="pt-6 border-t border-white/10">
+                <div className="flex justify-between items-baseline mb-4">
+                  <span className="text-white/80 font-bold uppercase tracking-widest text-[10px]">Grand Total</span>
+                  <span className="text-3xl font-black">{fmt(p?.total_amount)}</span>
+                </div>
+                <div className="flex justify-between text-white/70 text-sm font-medium">
+                  <span>Amount Paid</span>
+                  <span className="text-emerald-300 font-black">{fmt(p?.amount_paid)}</span>
+                </div>
+                {Number(p?.total_amount) - Number(p?.amount_paid) > 0 && (
+                  <div className="flex justify-between text-white/70 text-sm font-bold mt-2 pt-2 border-t border-white/5">
+                    <span>Balance Due</span>
+                    <span className="text-rose-300 text-xl font-black">{fmt(Number(p?.total_amount) - Number(p?.amount_paid))}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 px-8">
+           <button onClick={onClose} className="bg-white px-8 py-3 rounded-2xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-100 transition-all">Close</button>
+           {/* Add dynamic bill print/export button here if needed */}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1875,22 +2113,34 @@ export default function AccountingPage() {
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Accounting</h1>
-        <p className="text-gray-500 text-sm mt-0.5">P&amp;L, expenses, purchases, credits, returns, contra entries, cashbook &amp; bankbook</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Financial Center</h1>
+          <p className="text-gray-500 text-sm font-medium">Manage ledger, expenses, and supplier invoices</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="px-4 py-2 bg-white rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
+            <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center text-violet-600">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Cash Balance</p>
+              <p className="text-lg font-black text-gray-900">₹45,230</p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Tabs — scrollable */}
-      <div className="overflow-x-auto pb-1">
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-max">
+      <div className="sticky top-0 z-10 bg-gray-50/80 backdrop-blur-md py-2 border-b border-gray-100 -mx-6 px-6">
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
           {TABS.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+              className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 ${
                 activeTab === tab
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-violet-600 text-white shadow-lg shadow-violet-200 ring-2 ring-violet-100'
+                  : 'text-gray-500 hover:bg-white hover:text-gray-900'
               }`}
             >
               {tab}

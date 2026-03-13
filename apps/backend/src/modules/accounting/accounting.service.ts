@@ -264,7 +264,7 @@ export async function listPurchaseEntries(userId: string, opts: { page?: number;
         }
       : {}),
   };
-  const [total, items] = await Promise.all([
+  const [total, items, aggregations, topSupplierData] = await Promise.all([
     prisma.purchaseEntry.count({ where }),
     prisma.purchaseEntry.findMany({
       where,
@@ -273,8 +273,38 @@ export async function listPurchaseEntries(userId: string, opts: { page?: number;
       skip: (page - 1) * limit,
       take: limit,
     }),
+    prisma.purchaseEntry.aggregate({
+      where,
+      _sum: { total_amount: true, amount_paid: true },
+    }),
+    prisma.purchaseEntry.groupBy({
+      by: ['supplier_id'],
+      where: { ...where, supplier_id: { not: null } },
+      _sum: { total_amount: true },
+      orderBy: { _sum: { total_amount: 'desc' } },
+      take: 1,
+    }),
   ]);
-  return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+
+  let topSupplierName = 'N/A';
+  if (topSupplierData.length > 0 && topSupplierData[0].supplier_id) {
+    const s = await prisma.supplier.findUnique({ where: { id: topSupplierData[0].supplier_id }, select: { name: true } });
+    if (s) topSupplierName = s.name;
+  }
+
+  const totalAmountSum = Number(aggregations._sum.total_amount ?? 0);
+  const totalPaidSum = Number(aggregations._sum.amount_paid ?? 0);
+
+  return { 
+    items, 
+    total, 
+    page, 
+    limit, 
+    totalPages: Math.ceil(total / limit),
+    total_amount_sum: totalAmountSum,
+    total_due_sum: totalAmountSum - totalPaidSum,
+    top_supplier: topSupplierName,
+  };
 }
 
 export async function getPurchaseEntryById(userId: string, purchaseId: string) {

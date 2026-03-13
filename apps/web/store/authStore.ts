@@ -27,7 +27,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       setTokens: (accessToken, refreshToken) => {
         // Set cookie so the Next.js middleware can detect authentication
-        document.cookie = `rxdesk-access-token=${accessToken}; path=/; max-age=900; SameSite=Strict`;
+        document.cookie = `rxdesk-access-token=${accessToken}; path=/; max-age=604800; SameSite=Strict`;
         set({ accessToken, refreshToken });
       },
       setUser: (user) => set({ user }),

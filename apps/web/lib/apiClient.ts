@@ -131,6 +131,7 @@ export const billApi = {
 
 export const prescriptionApi = {
   verifyQR: (qrContent: string) => apiClient.post('/prescriptions/verify', { qr_content: qrContent }),
+  getById: (id: string) => apiClient.get(`/prescriptions/${id}/verify`),
   getPdf: (id: string) => apiClient.get(`/prescriptions/${id}/pdf`),
   create: (data: object) => apiClient.post('/prescriptions', data),
 };

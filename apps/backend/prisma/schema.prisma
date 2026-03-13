@@ -104,6 +104,11 @@ enum BillPaymentStatus {
   partial
 }
 
+enum DiscountType {
+  percentage
+  amount
+}
+
 // ─── Accounting Enums ─────────────────────────
 
 enum ExpenseCategory {
@@ -472,6 +477,8 @@ model ShopInventory {
   stock_qty      Int       @default(0)
   reorder_level  Int       @default(10)
   unit           String    @default("strip")
+  discount_type  DiscountType @default(percentage)
+  discount_value Decimal   @default(0) @db.Decimal(10, 2)
   created_at     DateTime  @default(now())
   updated_at     DateTime  @updatedAt
 
@@ -525,7 +532,8 @@ model BillItem {
   expiry_date   DateTime? @db.Date
   mrp          Decimal   @db.Decimal(10, 2)
   quantity     Int
-  discount_pct Decimal   @default(0) @db.Decimal(5, 2)
+  discount_type  DiscountType @default(percentage)
+  discount_value Decimal   @default(0) @db.Decimal(10, 2)
   gst_rate     Decimal   @default(12.0) @db.Decimal(5, 2)
   line_total   Decimal   @db.Decimal(12, 2)
 

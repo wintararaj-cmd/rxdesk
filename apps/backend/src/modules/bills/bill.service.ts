@@ -38,7 +38,8 @@ export async function generateBillFromPrescription(
     expiry_date?: Date;
     mrp: number;
     quantity: number;
-    discount_pct: number;
+    discount_type: 'percentage' | 'amount';
+    discount_value: number;
     gst_rate: number;
     line_total: number;
   }[] = [];
@@ -55,8 +56,12 @@ export async function generateBillFromPrescription(
     });
 
     const mrp = inv ? Number(inv.mrp) : 0;
+    const discountType = (inv?.discount_type as any) ?? 'percentage';
+    const discountValue = inv ? Number(inv.discount_value) : 0;
+    const sub = mrp * item.quantity;
+    const disc = discountType === 'percentage' ? (sub * discountValue) / 100 : (item.quantity * discountValue);
     const gstRate = isTaxInvoice ? 12 : 0;
-    const lineTotal = mrp * item.quantity;
+    const lineTotal = sub - disc;
 
     billItems.push({
       inventory_id: inv?.id,
@@ -65,7 +70,8 @@ export async function generateBillFromPrescription(
       expiry_date: inv?.expiry_date ?? undefined,
       mrp,
       quantity: item.quantity,
-      discount_pct: 0,
+      discount_type: discountType,
+      discount_value: discountValue,
       gst_rate: gstRate,
       line_total: lineTotal,
     });
@@ -100,17 +106,20 @@ export async function generateBillFromPrescription(
         medicine_name: extra.medicine_name,
         mrp: extra.mrp,
         quantity: extra.quantity,
-        discount_pct: 0,
+        discount_type: 'percentage',
+        discount_value: 0,
         gst_rate: isTaxInvoice ? (extra.gst_rate ?? 12) : 0,
         line_total: extra.mrp * extra.quantity,
       });
     }
   }
 
-  const subtotal = billItems.reduce((sum, i) => sum + i.line_total, 0);
-  const discountAmount = overrides?.discount_amount ?? 0;
-  const gstAmount = isTaxInvoice ? billItems.reduce((sum, i) => sum + (i.line_total * i.gst_rate) / 100, 0) : 0;
-  const totalAmount = subtotal - discountAmount + gstAmount;
+  const subtotal = billItems.reduce((sum, i) => sum + (Number(i.mrp) * i.quantity), 0);
+  const totalItemDiscounts = billItems.reduce((sum, i) => sum + (Number(i.mrp) * i.quantity - Number(i.line_total)), 0);
+  const globalDiscount = Number(overrides?.discount_amount ?? 0);
+  const totalDiscount = totalItemDiscounts + globalDiscount;
+  const gstAmount = isTaxInvoice ? billItems.reduce((sum, i) => sum + (Number(i.line_total) * i.gst_rate) / 100, 0) : 0;
+  const totalAmount = subtotal - totalDiscount + gstAmount;
 
   const bill = await prisma.bill.create({
     data: {
@@ -119,7 +128,7 @@ export async function generateBillFromPrescription(
       patient_id: prescription.patient_id,
       bill_number: await generateBillNumber(),
       subtotal,
-      discount_amount: discountAmount,
+      discount_amount: totalDiscount,
       gst_amount: gstAmount,
       total_amount: totalAmount,
       staff_id: userId,
@@ -155,7 +164,7 @@ export async function createManualBill(
   data: {
     customer_name?: string;
     customer_phone?: string;
-    items: { medicine_name: string; mrp: number; quantity: number; gst_rate?: number; inventory_id?: string }[];
+    items: { medicine_name: string; mrp: number; quantity: number; gst_rate?: number; inventory_id?: string; discount_type?: 'percentage' | 'amount'; discount_value?: number }[];
     discount_amount?: number;
     payment_method?: 'cash' | 'upi' | 'card' | 'credit' | 'pending';
     notes?: string;
@@ -176,7 +185,8 @@ export async function createManualBill(
     expiry_date?: Date;
     mrp: number;
     quantity: number;
-    discount_pct: number;
+    discount_type: 'percentage' | 'amount';
+    discount_value: number;
     gst_rate: number;
     line_total: number;
   }[] = [];
@@ -204,7 +214,11 @@ export async function createManualBill(
     }
 
     const gstRate = isTaxInvoice ? (item.gst_rate ?? 12) : 0;
-    const lineTotal = item.mrp * item.quantity;
+    const discType = item.discount_type ?? 'percentage';
+    const discVal = item.discount_value ?? 0;
+    const sub = item.mrp * item.quantity;
+    const discAmt = discType === 'percentage' ? (sub * discVal) / 100 : (item.quantity * discVal);
+    const lineTotal = sub - discAmt;
 
     billItems.push({
       inventory_id: invId,
@@ -213,7 +227,8 @@ export async function createManualBill(
       expiry_date: expiryDate,
       mrp: item.mrp,
       quantity: item.quantity,
-      discount_pct: 0,
+      discount_type: discType as any,
+      discount_value: discVal,
       gst_rate: gstRate,
       line_total: lineTotal,
     });
@@ -240,10 +255,12 @@ export async function createManualBill(
     }
   }
 
-  const subtotal = billItems.reduce((sum, i) => sum + i.line_total, 0);
-  const discountAmount = data.discount_amount ?? 0;
-  const gstAmount = isTaxInvoice ? billItems.reduce((sum, i) => sum + (i.line_total * i.gst_rate) / 100, 0) : 0;
-  const totalAmount = subtotal - discountAmount + gstAmount;
+  const subtotal = billItems.reduce((sum, i) => sum + (Number(i.mrp) * i.quantity), 0);
+  const totalItemDiscounts = billItems.reduce((sum, i) => sum + (Number(i.mrp) * i.quantity - Number(i.line_total)), 0);
+  const globalDiscount = Number(data.discount_amount ?? 0);
+  const totalDiscount = totalItemDiscounts + globalDiscount;
+  const gstAmount = isTaxInvoice ? billItems.reduce((sum, i) => sum + (Number(i.line_total) * i.gst_rate) / 100, 0) : 0;
+  const totalAmount = subtotal - totalDiscount + gstAmount;
   const paymentMethod = data.payment_method ?? 'cash';
   const isPaid = paymentMethod !== 'pending';
 
@@ -255,7 +272,7 @@ export async function createManualBill(
         customer_phone: data.customer_phone ?? null,
         bill_number: await generateBillNumber(),
         subtotal,
-        discount_amount: discountAmount,
+        discount_amount: totalDiscount,
         gst_amount: gstAmount,
         total_amount: totalAmount,
         payment_method: isPaid ? (paymentMethod as any) : 'cash',

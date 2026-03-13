@@ -6,7 +6,17 @@ import { billApi, prescriptionApi, inventoryApi, shopApi, medicinesApi } from '.
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-interface BillItem { id: string; medicine_name: string; quantity: number; mrp: number; line_total: number; }
+interface BillItem {
+  id: string;
+  medicine_name: string;
+  batch_number?: string;
+  expiry_date?: string;
+  quantity: number;
+  mrp: number;
+  discount_type: string;
+  discount_value: number;
+  line_total: number;
+}
 interface BillData {
   id: string;
   bill_number: string;
@@ -189,6 +199,14 @@ function NewBillTab() {
     },
   });
 
+  const verifyByIdMutation = useMutation({
+    mutationFn: (id: string) => prescriptionApi.getById(id),
+    onSuccess: (res) => {
+      const d = res.data.data;
+      if (d?.id) setPrescriptionId(d.id);
+    },
+  });
+
   const generateMutation = useMutation({
     mutationFn: (pid: string) => billApi.generate(pid),
     onSuccess: (res) => {
@@ -217,50 +235,80 @@ function NewBillTab() {
       {!bill ? (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-7 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-bl from-violet-100/50 to-transparent rounded-bl-full pointer-events-none" />
-          <div className="relative z-10">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/20">
-                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" /><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" /></svg>
+          <div className="relative z-10 flex flex-col gap-6">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-gradient-to-br from-violet-600 to-indigo-700 rounded-2xl flex items-center justify-center shadow-xl shadow-violet-500/30">
+                <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" /></svg>
               </div>
               <div>
-                <h2 className="font-bold text-gray-900 text-lg">Scan Prescription</h2>
-                <p className="text-gray-400 text-sm mt-0.5">Paste QR code content to generate a bill</p>
+                <h2 className="font-black text-gray-900 text-xl tracking-tight">Prescription Billing</h2>
+                <p className="text-gray-400 text-sm">Convert a doctor's prescription into a bill</p>
               </div>
             </div>
-            <textarea
-              className="w-full border border-gray-200 rounded-xl p-4 text-sm text-gray-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-100 resize-none h-28 transition-all placeholder:text-gray-300"
-              placeholder="Paste the QR code content here..."
-              value={qrContent}
-              onChange={(e) => setQrContent(e.target.value)}
-            />
-            <div className="flex gap-3 mt-5">
-              <button
-                onClick={() => verifyMutation.mutate(qrContent)}
-                disabled={!qrContent || verifyMutation.isPending}
-                className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:shadow-lg hover:shadow-violet-500/25 disabled:opacity-50 transition-all duration-200"
-              >
-                {verifyMutation.isPending ? 'Verifying…' : 'Verify QR'}
-              </button>
-              {prescriptionId && (
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Option 1: Paste QR Data</label>
+                <textarea
+                  className="w-full border-2 border-gray-100 rounded-2xl p-4 text-sm text-gray-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-50 resize-none h-24 transition-all placeholder:text-gray-300 font-mono"
+                  placeholder="Paste the hash or JSON from the patient's app..."
+                  value={qrContent}
+                  onChange={(e) => setQrContent(e.target.value)}
+                />
+                <button
+                  onClick={() => verifyMutation.mutate(qrContent)}
+                  disabled={!qrContent || verifyMutation.isPending}
+                  className="mt-2 w-full bg-violet-50 text-violet-700 py-3 rounded-xl text-sm font-bold hover:bg-violet-100 transition-all flex items-center justify-center gap-2"
+                >
+                  {verifyMutation.isPending ? <div className="w-4 h-4 border-2 border-violet-400 border-t-violet-700 rounded-full animate-spin" /> : 'Verify QR Content'}
+                </button>
+              </div>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
+                <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-gray-300 font-bold tracking-widest">OR</span></div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Option 2: Prescription ID</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="e.g. 550e8400-e29b..."
+                    className="flex-1 border-2 border-gray-100 rounded-xl px-4 h-12 text-sm text-gray-900 outline-none focus:border-violet-500 transition-all font-mono"
+                    onKeyDown={(e) => { if (e.key === 'Enter') verifyByIdMutation.mutate((e.target as any).value); }}
+                  />
+                  <button
+                    onClick={(e) => {
+                      const input = (e.currentTarget.previousSibling as HTMLInputElement);
+                      if (input.value) verifyByIdMutation.mutate(input.value);
+                    }}
+                    disabled={verifyByIdMutation.isPending}
+                    className="bg-gray-900 text-white px-5 rounded-xl text-sm font-bold hover:bg-black transition-all"
+                  >
+                    Load
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {prescriptionId && (
+              <div className="pt-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <button
                   onClick={() => generateMutation.mutate(prescriptionId)}
                   disabled={generateMutation.isPending}
-                  className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:shadow-lg hover:shadow-emerald-500/25 disabled:opacity-50 transition-all duration-200"
+                  className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white py-4 rounded-2xl text-base font-black shadow-xl shadow-emerald-500/20 hover:scale-[1.02] transition-all disabled:opacity-50 flex items-center justify-center gap-2 uppercase tracking-wide"
                 >
-                  {generateMutation.isPending ? 'Generating…' : 'Generate Bill'}
+                  {generateMutation.isPending ? 'Processing…' : 'Generate Full Bill Now'}
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
                 </button>
-              )}
-            </div>
-            {verifyMutation.isSuccess && prescriptionId && (
-              <div className="mt-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2.5 rounded-xl text-sm font-medium">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                Prescription verified — ready to generate bill
               </div>
             )}
-            {verifyMutation.isError && (
-              <div className="mt-4 flex items-center gap-2 text-red-600 bg-red-50 px-4 py-2.5 rounded-xl text-sm font-medium">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
-                Invalid or tampered QR code
+
+            {(verifyMutation.isError || verifyByIdMutation.isError) && (
+              <div className="mt-2 flex items-center gap-2 text-red-600 bg-red-50 px-4 py-3 rounded-xl text-sm font-bold border border-red-100 animate-shake">
+                <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+                Invalid prescription data or access denied.
               </div>
             )}
           </div>
@@ -368,57 +416,73 @@ function BillDetailModal({ bill, onClose, onPay }: {
           </div>
         </div>
 
-        <div className="px-6 py-6 space-y-5">
+        <div className="px-6 py-6 space-y-5 relative overflow-hidden">
+          {bill.payment_status === 'paid' && (
+            <div className="absolute top-10 right-10 rotate-12 opacity-10 pointer-events-none select-none">
+              <div className="border-8 border-emerald-600 text-emerald-600 font-black text-6xl px-4 py-2 rounded-2xl">PAID</div>
+            </div>
+          )}
+
           {/* Patient */}
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 bg-gradient-to-br from-violet-500 to-indigo-500 rounded-full flex items-center justify-center shadow-md">
-              <span className="text-white font-bold text-sm">{(bill.customer_name ?? bill.patient?.full_name ?? 'W').charAt(0).toUpperCase()}</span>
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-500/20">
+              <span className="text-white font-bold text-lg">{(bill.customer_name ?? bill.patient?.full_name ?? 'W').charAt(0).toUpperCase()}</span>
             </div>
             <div>
-              <p className="font-semibold text-gray-900">{bill.customer_name ?? bill.patient?.full_name ?? 'Walk-in Customer'}</p>
-              <p className="text-gray-400 text-xs flex items-center gap-1">
-                <span>{METHOD_LABEL[bill.payment_method]?.icon ?? ''}</span>
-                <span>{METHOD_LABEL[bill.payment_method]?.label ?? bill.payment_method}</span>
-              </p>
+              <p className="font-bold text-gray-900 text-base">{bill.customer_name ?? bill.patient?.full_name ?? 'Walk-in Customer'}</p>
+              <div className="flex items-center gap-3 mt-0.5">
+                <p className="text-gray-400 text-xs flex items-center gap-1">
+                  <span>{METHOD_LABEL[bill.payment_method]?.icon ?? ''}</span>
+                  <span className="font-medium">{METHOD_LABEL[bill.payment_method]?.label ?? bill.payment_method}</span>
+                </p>
+                {bill.customer_phone && <p className="text-gray-400 text-xs">📞 {bill.customer_phone}</p>}
+              </div>
             </div>
           </div>
 
           {/* Items */}
           <div>
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Items ({bill.items.length})</p>
-            <div className="bg-gray-50/80 rounded-xl p-4 space-y-0">
+            <div className="flex items-center justify-between mb-3 px-1">
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Items ({bill.items.length})</p>
+              <span className="text-[10px] text-gray-300">Detailed View</span>
+            </div>
+            <div className="bg-gray-50/80 rounded-2xl p-4 border border-gray-100">
               {bill.items.map((item, i) => (
-                <div key={item.id} className={`flex items-center justify-between py-2.5 text-sm ${i > 0 ? 'border-t border-gray-100' : ''}`}>
-                  <div>
-                    <span className="text-gray-900 font-medium">{item.medicine_name}</span>
-                    <span className="text-gray-400 ml-2 text-xs">× {item.quantity} @ {fmtCurrency(item.mrp)}</span>
+                <div key={item.id} className={`flex items-start justify-between py-3 ${i > 0 ? 'border-t border-gray-200/50' : ''}`}>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-gray-900 font-bold text-sm tracking-tight">{item.medicine_name}</span>
+                    <div className="flex items-center gap-2 text-[10px]">
+                      <span className="text-gray-400">Qty: <span className="text-gray-900 font-semibold">{item.quantity}</span></span>
+                      {item.batch_number && <span className="text-gray-400">Batch: <span className="text-gray-600 font-mono">{item.batch_number}</span></span>}
+                      {item.expiry_date && <span className="text-orange-500 font-medium">Exp: {fmtDate(item.expiry_date)}</span>}
+                    </div>
                   </div>
-                  <span className="font-semibold text-gray-900">{fmtCurrency(item.line_total)}</span>
+                  <span className="font-bold text-gray-900 text-sm whitespace-nowrap">{fmtCurrency(item.line_total)}</span>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Totals */}
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{fmtCurrency(bill.subtotal)}</span></div>
+          <div className="bg-violet-50 rounded-2xl p-5 border border-violet-100/50 space-y-2.5">
+            <div className="flex justify-between text-sm text-gray-500"><span>Subtotal</span><span className="font-medium">{fmtCurrency(bill.subtotal)}</span></div>
             {bill.discount_amount > 0 && (
-              <div className="flex justify-between text-emerald-600"><span>Discount</span><span>-{fmtCurrency(bill.discount_amount)}</span></div>
+              <div className="flex justify-between text-sm text-emerald-600"><span>Discount</span><span className="font-medium">−{fmtCurrency(bill.discount_amount)}</span></div>
             )}
-            {bill.gst_amount > 0 && <div className="flex justify-between text-gray-500"><span>GST</span><span>{fmtCurrency(bill.gst_amount)}</span></div>}
-            <div className="flex justify-between font-bold text-gray-900 text-xl mt-3 pt-4 border-t-2 border-gray-100">
-              <span>Total</span><span className="text-violet-700">{fmtCurrency(bill.total_amount)}</span>
+            {bill.gst_amount > 0 && <div className="flex justify-between text-sm text-gray-500"><span>GST</span><span className="font-medium">{fmtCurrency(bill.gst_amount)}</span></div>}
+            <div className="flex justify-between font-black text-violet-800 text-2xl pt-3 border-t border-violet-200/50 mt-1">
+              <span>Total</span><span>{fmtCurrency(bill.total_amount)}</span>
             </div>
           </div>
 
           {/* Pay */}
           {bill.payment_status !== 'paid' && (
             <div>
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Record Payment</p>
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">Record Final Payment</p>
               <div className="flex gap-2">
                 {(['cash', 'upi', 'card'] as const).map((m) => (
                   <button key={m} onClick={() => onPay(bill.id, m)}
-                    className="flex-1 border border-gray-200 rounded-xl py-3 text-sm font-semibold text-gray-700 hover:border-violet-400 hover:text-violet-600 hover:bg-violet-50 transition-all hover:shadow-sm">
+                    className="flex-1 border-2 border-gray-100 rounded-xl py-3 text-sm font-bold text-gray-700 hover:border-violet-600 hover:text-violet-600 hover:bg-violet-50 transition-all active:scale-95">
                     {METHOD_LABEL[m].icon} {m.toUpperCase()}
                   </button>
                 ))}
@@ -427,18 +491,20 @@ function BillDetailModal({ bill, onClose, onPay }: {
           )}
 
           {/* Print & WhatsApp */}
-          <div className="flex gap-2">
+          <div className="flex gap-3 pt-2">
             <button
               onClick={() => printThermalReceipt(bill, shopName)}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-all"
+              className="flex-1 flex items-center justify-center gap-2 bg-gray-900 text-white rounded-xl py-3 text-sm font-bold hover:bg-black transition-all shadow-lg shadow-gray-200 active:scale-95"
             >
-              🖨️ Print Receipt
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.821l.821-.821L12 16.179l3.459-3.459.821.821L12 17.821l-5.28-5.28zM6 18h12V6H6v12z" /><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12h-15" /></svg>
+              Print Invoice
             </button>
             <button
               onClick={() => sendWhatsApp(bill, shopName)}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-green-50 border border-green-200 rounded-xl py-2.5 text-sm font-semibold text-green-700 hover:bg-green-100 transition-all"
+              className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 text-white rounded-xl py-3 text-sm font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100 active:scale-95"
             >
-              💬 WhatsApp
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+              WhatsApp
             </button>
           </div>
         </div>
@@ -694,18 +760,42 @@ function BillHistoryTab() {
 
 // ── Walk-in Sale Tab ─────────────────────────────────────────────────────────
 
-interface WalkInItem { medicine_name: string; unit: string; mrp: string; quantity: string; gst_rate: string; }
-const EMPTY_ITEM: WalkInItem = { medicine_name: '', unit: 'strip', mrp: '', quantity: '1', gst_rate: '12' };
+interface WalkInItem {
+  medicine_name: string;
+  unit: string;
+  mrp: string;
+  quantity: string;
+  gst_rate: string;
+  discount_type: 'percentage' | 'amount';
+  discount_value: string;
+  batch_number?: string;
+  expiry_date?: string;
+  inventory_id?: string;
+  stock_qty?: number;
+}
+const EMPTY_ITEM: WalkInItem = {
+  medicine_name: '',
+  unit: 'strip',
+  mrp: '',
+  quantity: '1',
+  gst_rate: '12',
+  discount_type: 'percentage',
+  discount_value: '0',
+  batch_number: '',
+  expiry_date: '',
+  inventory_id: '',
+  stock_qty: 0
+};
 
 function WalkInSaleTab() {
   const qc = useQueryClient();
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'card' | 'credit' | 'pending'>('cash');
-  const [discount, setDiscount] = useState('');
+  const [globalDiscount, setGlobalDiscount] = useState('');
   const [items, setItems] = useState<WalkInItem[]>([{ ...EMPTY_ITEM }]);
   const [createdBill, setCreatedBill] = useState<BillData | null>(null);
-  const [suggestions, setSuggestions] = useState<Record<number, { id: string; medicine_name: string; unit?: string; mrp: number; gst_rate: number }[]>>({});
+  const [suggestions, setSuggestions] = useState<Record<number, { id: string; medicine_name: string; unit?: string; mrp: number; gst_rate: number; batch_number: string; expiry_date: string; stock_qty: number }[]>>({});
   const searchTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
   const [customerSearchResults, setCustomerSearchResults] = useState<{ customer_name: string | null; customer_phone: string }[]>([]);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
@@ -714,6 +804,7 @@ function WalkInSaleTab() {
   const unitSelectRefs = useRef<(HTMLSelectElement | null)[]>([]);
   const qtyRefs = useRef<(HTMLInputElement | null)[]>([]);
   const mrpRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const discountRefs = useRef<(HTMLInputElement | null)[]>([]);
   const addItemBtnRef = useRef<HTMLButtonElement | null>(null);
   const [customerHighlight, setCustomerHighlight] = useState(-1);
   const [suggHighlights, setSuggHighlights] = useState<Record<number, number>>({});
@@ -739,9 +830,25 @@ function WalkInSaleTab() {
     },
   });
 
+  useEffect(() => {
+    const handleGlobalKeys = (e: KeyboardEvent) => {
+      if (e.altKey && e.key === 'n') {
+        e.preventDefault();
+        addItem();
+        setTimeout(() => medicineInputRefs.current[items.length]?.focus(), 50);
+      }
+      if (e.altKey && e.key === 'g') {
+        e.preventDefault();
+        handleCreate();
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeys);
+    return () => window.removeEventListener('keydown', handleGlobalKeys);
+  }, [items, customerName, customerPhone, paymentMethod, globalDiscount]);
+
   const reset = () => {
     setCreatedBill(null); setCustomerName(''); setCustomerPhone('');
-    setPaymentMethod('cash'); setDiscount(''); setItems([{ ...EMPTY_ITEM }]);
+    setPaymentMethod('cash'); setGlobalDiscount(''); setItems([{ ...EMPTY_ITEM }]);
     setCustomerSearchResults([]); setShowCustomerDropdown(false); setCustomerHighlight(-1); setSuggHighlights({});
     createMutation.reset();
   };
@@ -757,7 +864,7 @@ function WalkInSaleTab() {
       }
       searchTimers.current[idx] = setTimeout(async () => {
         try {
-          const res = await inventoryApi.list({ q: value, limit: 8 });
+          const res = await inventoryApi.list({ q: value, limit: 12 });
           const invItems = res.data.data ?? [];
           if (invItems.length > 0) {
             setSuggestions((prev) => ({ ...prev, [idx]: invItems }));
@@ -769,6 +876,9 @@ function WalkInSaleTab() {
               unit: 'strip',
               mrp: 0,
               gst_rate: m.gst_rate ?? 12,
+              batch_number: 'N/A',
+              expiry_date: null,
+              stock_qty: 0,
             }));
             setSuggestions((prev) => ({ ...prev, [idx]: catalogItems }));
           }
@@ -778,13 +888,31 @@ function WalkInSaleTab() {
     }
   };
 
-  const selectSuggestion = (idx: number, inv: { medicine_name: string; unit?: string; mrp: number; gst_rate: number }) => {
+  const selectSuggestion = (idx: number, inv: any) => {
     setItems((prev) => prev.map((it, i) =>
-      i === idx ? { ...it, medicine_name: inv.medicine_name, unit: inv.unit ?? it.unit, mrp: String(inv.mrp), gst_rate: String(inv.gst_rate ?? 12) } : it
+      i === idx ? {
+        ...it,
+        medicine_name: inv.medicine_name,
+        unit: inv.unit ?? it.unit,
+        mrp: String(inv.mrp),
+        gst_rate: String(inv.gst_rate ?? 12),
+        discount_type: (inv.discount_type as any) ?? it.discount_type,
+        discount_value: String(inv.discount_value ?? 0),
+        batch_number: inv.batch_number ?? '',
+        expiry_date: inv.expiry_date ?? '',
+        inventory_id: inv.id,
+        stock_qty: inv.stock_qty ?? 0,
+      } : it
     ));
     setSuggestions((prev) => ({ ...prev, [idx]: [] }));
     setSuggHighlights((p) => ({ ...p, [idx]: -1 }));
-    setTimeout(() => unitSelectRefs.current[idx]?.focus(), 0);
+    setTimeout(() => {
+      if (inv.stock_qty > 0) {
+        qtyRefs.current[idx]?.focus();
+      } else {
+        mrpRefs.current[idx]?.focus();
+      }
+    }, 0);
   };
 
   const addItem = () => setItems((prev) => [...prev, { ...EMPTY_ITEM }]);
@@ -796,14 +924,29 @@ function WalkInSaleTab() {
     const mrp = Number(it.mrp) || 0;
     return s + qty * mrp;
   }, 0);
-  const calcDiscount = Number(discount) || 0;
+
+  const totalItemLevelDiscount = items.reduce((s, it) => {
+    const qty = Number(it.quantity) || 0;
+    const mrp = Number(it.mrp) || 0;
+    const dv = Number(it.discount_value) || 0;
+    if (it.discount_type === 'percentage') return s + (qty * mrp * dv) / 100;
+    return s + (qty * dv);
+  }, 0);
+
+  const calcGlobalDiscount = Number(globalDiscount) || 0;
+  const totalDiscountAmount = totalItemLevelDiscount + calcGlobalDiscount;
+
   const calcGst = isTaxInvoice ? items.reduce((s, it) => {
     const qty = Number(it.quantity) || 0;
     const mrp = Number(it.mrp) || 0;
-    const gst = Number(it.gst_rate) || 0;
-    return s + (qty * mrp * gst) / 100;
+    const dv = Number(it.discount_value) || 0;
+    const sub = (qty * mrp);
+    const disc = it.discount_type === 'percentage' ? (sub * dv) / 100 : (qty * dv);
+    const gstRate = Number(it.gst_rate) || 0;
+    return s + ((sub - disc) * gstRate) / 100;
   }, 0) : 0;
-  const calcTotal = calcSubtotal - calcDiscount + calcGst;
+
+  const calcTotal = calcSubtotal - totalDiscountAmount + calcGst;
 
   const handleCreate = () => {
     const validItems = items.filter((it) => it.medicine_name && Number(it.mrp) > 0 && Number(it.quantity) > 0);
@@ -812,12 +955,17 @@ function WalkInSaleTab() {
       customer_name: customerName || undefined,
       customer_phone: customerPhone || undefined,
       payment_method: paymentMethod,
-      discount_amount: calcDiscount,
+      discount_amount: calcGlobalDiscount,
       items: validItems.map((it) => ({
         medicine_name: it.medicine_name,
+        inventory_id: it.inventory_id,
+        batch_number: it.batch_number,
+        expiry_date: it.expiry_date,
         unit: it.unit || 'strip',
         mrp: Number(it.mrp),
         quantity: Number(it.quantity),
+        discount_type: it.discount_type,
+        discount_value: Number(it.discount_value),
         gst_rate: Number(it.gst_rate) || 12,
       })),
     });
@@ -909,7 +1057,7 @@ function WalkInSaleTab() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-5xl mx-auto">
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-7 space-y-6">
         {/* Customer Info */}
         <div>
@@ -1008,17 +1156,20 @@ function WalkInSaleTab() {
           </h3>
           <div className="space-y-2">
             {/* Header row */}
-            <div className="grid gap-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-1" style={{gridTemplateColumns: isTaxInvoice ? '3fr 1.2fr 1.2fr 1.5fr 1.5fr 0.7fr' : '3fr 1.2fr 1.2fr 1.5fr 0.7fr'}}>
+            <div className="grid gap-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-1" style={{gridTemplateColumns: isTaxInvoice ? '2fr 0.8fr 1fr 1fr 0.7fr 1.1fr 1.2fr 0.8fr 40px' : '2fr 0.8fr 1fr 1fr 0.7fr 1.2fr 1.2fr 40px'}}>
               <div>Medicine</div>
               <div>Unit</div>
+              <div>Batch</div>
+              <div>Exp</div>
               <div>Qty</div>
               <div>MRP (₹)</div>
-              {isTaxInvoice && <div>GST %</div>}
+              <div>Discount</div>
+              {isTaxInvoice && <div>GST%</div>}
               <div />
             </div>
             {items.map((item, idx) => (
               <div key={idx} className="relative">
-                <div className="grid gap-2 items-center" style={{gridTemplateColumns: isTaxInvoice ? '3fr 1.2fr 1.2fr 1.5fr 1.5fr 0.7fr' : '3fr 1.2fr 1.2fr 1.5fr 0.7fr'}}>
+                <div className="grid gap-2 items-center" style={{gridTemplateColumns: isTaxInvoice ? '2fr 0.8fr 1fr 1fr 0.7fr 1.1fr 1.2fr 0.8fr 40px' : '2fr 0.8fr 1fr 1fr 0.7fr 1.2fr 1.2fr 40px'}}>
                   <div className="relative">
                     <input
                       ref={(el) => { medicineInputRefs.current[idx] = el; }}
@@ -1035,20 +1186,35 @@ function WalkInSaleTab() {
                         else if (e.key === 'Enter' && (h < 0 || suggs.length === 0)) { e.preventDefault(); setSuggestions((p) => ({ ...p, [idx]: [] })); unitSelectRefs.current[idx]?.focus(); }
                         else if (e.key === 'Escape') { setSuggestions((p) => ({ ...p, [idx]: [] })); setSuggHighlights((p) => ({ ...p, [idx]: -1 })); }
                       }}
-                      className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                      className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 placeholder:text-gray-300"
                     />
                     {/* Autocomplete dropdown */}
                     {suggestions[idx] && suggestions[idx].length > 0 && (
-                      <div className="absolute z-20 top-full mt-1 left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                      <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden min-w-[340px]">
+                        <div className="bg-gray-50 px-3 py-1.5 border-b border-gray-100 flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-tight">
+                          <span>Medicine & Batch</span>
+                          <span>Stock | MRP</span>
+                        </div>
                         {suggestions[idx].map((s, si) => (
                           <button
                             key={s.id}
                             type="button"
-                            onClick={() => selectSuggestion(idx, s)}
-                            className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors ${si === (suggHighlights[idx] ?? -1) ? 'bg-violet-100' : 'hover:bg-violet-50'}`}
+                            onMouseDown={() => selectSuggestion(idx, s)}
+                            className={`w-full flex items-center justify-between px-3 py-3 text-sm text-left transition-colors border-b border-gray-50 last:border-0 ${si === (suggHighlights[idx] ?? -1) ? 'bg-violet-600 text-white shadow-inner' : 'hover:bg-violet-50'}`}
                           >
-                            <span className="text-gray-800">{s.medicine_name}</span>
-                            <span className="text-violet-600 font-medium text-xs">₹{s.mrp}</span>
+                            <div className="flex flex-col gap-0.5">
+                              <span className={`font-semibold ${si === (suggHighlights[idx] ?? -1) ? 'text-white' : 'text-gray-900'}`}>{s.medicine_name}</span>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[10px] px-1 rounded ${si === (suggHighlights[idx] ?? -1) ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'}`}>B: {s.batch_number || 'N/A'}</span>
+                                {s.expiry_date && <span className={`text-[10px] ${si === (suggHighlights[idx] ?? -1) ? 'text-violet-100' : 'text-orange-600'}`}>E: {fmtDate(s.expiry_date)}</span>}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className={`text-xs font-bold leading-tight ${si === (suggHighlights[idx] ?? -1) ? 'text-white' : s.stock_qty <= 5 ? 'text-red-500' : 'text-emerald-600'}`}>
+                                {s.stock_qty} <span className="font-normal text-[10px] opacity-70">Stocks</span>
+                              </div>
+                              <div className={`text-sm font-bold ${si === (suggHighlights[idx] ?? -1) ? 'text-white' : 'text-violet-600'}`}>₹{s.mrp}</div>
+                            </div>
                           </button>
                         ))}
                       </div>
@@ -1057,20 +1223,39 @@ function WalkInSaleTab() {
                   <div>
                     <select ref={(el) => { unitSelectRefs.current[idx] = el; }} value={item.unit} onChange={(e) => updateItem(idx, 'unit', e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); qtyRefs.current[idx]?.focus(); } }}
-                      className="w-full border border-gray-200 rounded-lg px-2 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 bg-white">
+                      className="w-full border border-gray-200 rounded-lg px-2 h-9 text-xs text-gray-700 outline-none focus:border-violet-500 bg-white cursor-pointer uppercase font-medium">
                       {Array.from(new Set(['strip', 'tablet', 'capsule', 'bottle', 'syrup', 'injection', 'vial', 'tube', 'cream', 'ointment', 'sachet', 'packet', 'piece', 'box', item.unit].filter(Boolean))).map((u) => <option key={u} value={u}>{u}</option>)}
                     </select>
                   </div>
+                  {/* Batch & Exp */}
                   <div>
+                    <input type="text" placeholder="Batch" value={item.batch_number} onChange={(e) => updateItem(idx, 'batch_number', e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-2 h-9 text-[11px] text-gray-900 outline-none focus:border-violet-500 font-mono" />
+                  </div>
+                  <div>
+                    <input type="text" placeholder="Exp" value={item.expiry_date ? fmtDate(item.expiry_date) : ''} readOnly
+                      className="w-full border border-gray-200 rounded-lg px-2 h-9 text-[11px] text-gray-500 outline-none bg-gray-50 text-center" />
+                  </div>
+                  <div className="relative">
                     <input
                       ref={(el) => { qtyRefs.current[idx] = el; }}
                       type="number"
                       min="1"
                       value={item.quantity}
                       onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); mrpRefs.current[idx]?.focus(); } }}
-                      className="w-full border border-gray-200 rounded-lg px-2 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 text-center"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          mrpRefs.current[idx]?.focus();
+                        }
+                      }}
+                      className={`w-full border rounded-lg px-2 h-9 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-violet-100 text-center transition-all ${item.stock_qty && Number(item.quantity) > item.stock_qty ? 'border-red-300 bg-red-50 focus:border-red-500' : 'border-gray-200 focus:border-violet-500'}`}
                     />
+                    {item.stock_qty && Number(item.quantity) > item.stock_qty && (
+                      <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-red-600 text-white text-[9px] px-1.5 py-0.5 rounded shadow-lg whitespace-nowrap animate-bounce z-10">
+                        Only {item.stock_qty} Left
+                      </div>
+                    )}
                   </div>
                   <div>
                     <input
@@ -1081,8 +1266,28 @@ function WalkInSaleTab() {
                       placeholder="0.00"
                       value={item.mrp}
                       onChange={(e) => updateItem(idx, 'mrp', e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); discountRefs.current[idx]?.focus(); } }}
+                      className="w-full border border-gray-200 rounded-lg px-2 h-9 text-sm font-semibold text-violet-700 outline-none focus:border-violet-500"
+                    />
+                  </div>
+                  <div className="flex items-center">
+                    <select
+                      value={item.discount_type}
+                      onChange={(e) => updateItem(idx, 'discount_type', e.target.value)}
+                      className="w-10 border border-r-0 border-gray-200 rounded-l-lg h-9 text-xs text-gray-600 outline-none focus:border-violet-500 bg-gray-50 text-center"
+                    >
+                      <option value="percentage">%</option>
+                      <option value="amount">₹</option>
+                    </select>
+                    <input
+                      ref={(el) => { discountRefs.current[idx] = el; }}
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={item.discount_value}
+                      onChange={(e) => updateItem(idx, 'discount_value', e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addItemBtnRef.current?.focus(); } }}
-                      className="w-full border border-gray-200 rounded-lg px-2 h-9 text-sm text-gray-900 outline-none focus:border-violet-500"
+                      className="flex-1 w-0 border border-gray-200 rounded-r-lg px-1.5 h-9 text-sm text-gray-900 outline-none focus:border-violet-500"
                     />
                   </div>
                   {isTaxInvoice && (
@@ -1100,16 +1305,24 @@ function WalkInSaleTab() {
                     <button
                       onClick={() => removeItem(idx)}
                       disabled={items.length === 1}
-                      className="w-7 h-7 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 flex items-center justify-center transition-colors"
+                      className="group/del w-8 h-8 rounded-full text-gray-300 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 flex items-center justify-center transition-all"
+                      title="Remove Row"
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                      <svg className="w-4 h-4 group-hover/del:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12h-15" /></svg>
                     </button>
                   </div>
                 </div>
                 {/* Line total hint */}
                 {Number(item.mrp) > 0 && Number(item.quantity) > 0 && (
-                  <div className="text-right text-xs text-violet-600 font-medium mt-0.5 pr-7">
-                    = {fmtCurrency(Number(item.mrp) * Number(item.quantity))}
+                  <div className="absolute right-0 -bottom-2 translate-y-full flex items-center gap-3 pr-10">
+                    <div className="text-[10px] text-gray-400 flex items-center gap-1.5">
+                      {item.batch_number && <span>Batch: <span className="text-gray-600 font-mono">{item.batch_number}</span></span>}
+                      {item.expiry_date && <span>Exp: <span className="text-orange-500">{fmtDate(item.expiry_date)}</span></span>}
+                      {item.stock_qty !== undefined && <span>Stock: <span className={item.stock_qty < 5 ? 'text-red-500' : 'text-emerald-600'}>{item.stock_qty}</span></span>}
+                    </div>
+                    <div className="text-xs font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-md border border-violet-100/50">
+                      Line Total: {fmtCurrency((Number(item.mrp) * Number(item.quantity)) - (item.discount_type === 'percentage' ? (Number(item.mrp) * Number(item.quantity) * Number(item.discount_value)) / 100 : (Number(item.quantity) * Number(item.discount_value))))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1136,8 +1349,8 @@ function WalkInSaleTab() {
               type="number"
               min="0"
               placeholder="0"
-              value={discount}
-              onChange={(e) => setDiscount(e.target.value)}
+              value={globalDiscount}
+              onChange={(e) => setGlobalDiscount(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
             />
           </div>
@@ -1165,14 +1378,31 @@ function WalkInSaleTab() {
         </div>
 
         {/* Live summary */}
-        <div className="bg-gradient-to-br from-violet-50 to-indigo-50 rounded-2xl p-5 border border-violet-100">
-          <h3 className="font-semibold text-gray-700 text-sm mb-3">Bill Summary</h3>
-          <div className="space-y-1.5 text-sm">
-            <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{fmtCurrency(calcSubtotal)}</span></div>
-            {calcDiscount > 0 && <div className="flex justify-between text-emerald-600"><span>Discount</span><span>−{fmtCurrency(calcDiscount)}</span></div>}
-            {calcGst > 0 && <div className="flex justify-between text-gray-600"><span>GST</span><span>{fmtCurrency(calcGst)}</span></div>}
-            <div className="flex justify-between font-bold text-violet-700 text-xl pt-2 border-t border-violet-200 mt-2">
-              <span>Total</span><span>{fmtCurrency(calcTotal)}</span>
+        <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-xl shadow-gray-200/40 relative overflow-hidden group">
+          <div className="absolute top-0 left-0 w-1 h-full bg-violet-600" />
+          <h3 className="font-bold text-gray-900 text-base mb-4 flex items-center gap-2">
+            <svg className="w-5 h-5 text-violet-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 14.25l1.25 1.25L13.75 12m4.5-3.375H9M9 8.25h.75m.75 0h.75m.75 0h.75m.75 0h.75M12 17.25h.75m.75 0h.75m.75 0h.75M12 21h.75m.75 0h.75m.75 0h.75M3.75 21h4.5c.621 0 1.125-.504 1.125-1.125s-.504-1.125-1.125-1.125h-4.5A1.125 1.125 0 012.625 17.625V4.875C2.625 4.254 3.129 3.75 3.75 3.75h16.5c.621 0 1.125.504 1.125 1.125v12.75c0 .621-.504 1.125-1.125 1.125h-4.5M16.5 21h4.5c.621 0 1.125-.504 1.125-1.125s-.504-1.125-1.125-1.125h-4.5C15.879 18.75 15.375 19.254 15.375 19.875S15.879 21 16.5 21z" /></svg>
+            Payment Summary
+          </h3>
+          <div className="grid grid-cols-2 gap-x-12 gap-y-3 px-1">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm text-gray-500"><span>Gross Subtotal</span><span className="font-medium text-gray-900">{fmtCurrency(calcSubtotal)}</span></div>
+              <div className="flex justify-between text-sm text-emerald-600"><span>Item Discounts</span><span>−{fmtCurrency(totalItemLevelDiscount)}</span></div>
+              {calcGlobalDiscount > 0 && <div className="flex justify-between text-sm text-emerald-600"><span>Global Discount</span><span>−{fmtCurrency(calcGlobalDiscount)}</span></div>}
+            </div>
+            <div className="space-y-2 border-l border-gray-100 pl-12">
+              <div className="flex justify-between text-sm text-gray-500"><span>Taxable Value</span><span className="font-medium text-gray-900">{fmtCurrency(calcSubtotal - totalDiscountAmount)}</span></div>
+              {calcGst > 0 && <div className="flex justify-between text-sm text-gray-500"><span>GST Amount</span><span className="font-medium text-gray-900">{fmtCurrency(calcGst)}</span></div>}
+            </div>
+          </div>
+          <div className="flex items-center justify-between border-t border-dashed border-gray-200 mt-5 pt-5 pb-1 px-1">
+            <div className="flex items-baseline gap-2">
+              <span className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Total Payable</span>
+              <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-700 to-indigo-700">{fmtCurrency(calcTotal)}</span>
+            </div>
+            <div className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 ${paymentMethod === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700'}`}>
+              <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
+              {paymentMethod.toUpperCase()} PAY
             </div>
           </div>
         </div>
@@ -1207,19 +1437,42 @@ type Tab = 'walkin' | 'new' | 'history';
 
 export default function BillingPage() {
   const [tab, setTab] = useState<Tab>('walkin');
+  const { data: stats } = useQuery({ queryKey: ['billing-today-stats'], queryFn: () => billApi.stats({ from_date: new Date().toISOString().split('T')[0] }).then(r => r.data.data) });
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-6 lg:p-8 bg-gray-50/30 min-h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between mb-7">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Billing</h1>
-          <p className="text-gray-400 text-sm mt-1">Walk-in sales, prescription bills and history</p>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Billing Center</h1>
+          <p className="text-gray-400 text-sm mt-1 font-medium italic">Efficient sales & prescription management</p>
+        </div>
+        
+        {/* Today's Mini Dashboard */}
+        <div className="flex gap-3">
+          <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 shadow-sm flex items-center gap-3">
+            <div className="w-10 h-10 bg-violet-50 text-violet-600 rounded-xl flex items-center justify-center font-bold">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Today's Revenue</p>
+              <p className="text-lg font-black text-gray-900">{fmtCurrency(stats?.total_revenue ?? 0)}</p>
+            </div>
+          </div>
+          <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 shadow-sm flex items-center gap-3">
+            <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center font-bold">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.375m1.875-3h1.875m-1.875 3h1.875M9 9h3.375m1.875-3h1.875m-1.875 3h1.875M9 18h3.375m1.875-3h1.875m-1.875 3h1.875" /></svg>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Bills Issued</p>
+              <p className="text-lg font-black text-gray-900">{stats?.total_bills ?? 0}</p>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 bg-gray-100/80 rounded-xl p-1 w-fit mb-7 border border-gray-200/50">
+      <div className="flex items-center gap-1 bg-white p-1 rounded-2xl w-fit mb-8 border border-gray-100 shadow-sm">
         {([
           {
             id: 'walkin' as Tab, label: 'Walk-in Sale',

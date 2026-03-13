@@ -49,6 +49,7 @@ COPY packages/shared/package.json ./packages/shared/
 
 # Copy backend production deps + dist
 COPY apps/backend/package.json ./apps/backend/
+ENV PRISMA_SKIP_POSTINSTALL_GENERATE=true
 RUN npm install --omit=dev --frozen-lockfile
 
 COPY --from=builder /app/apps/backend/dist/ ./apps/backend/dist/

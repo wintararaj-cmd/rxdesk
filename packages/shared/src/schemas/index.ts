@@ -195,6 +195,8 @@ export const addInventoryItemSchema = z.object({
   mrp: z.number().min(0),
   gst_rate: z.number().min(0).max(100).default(12),
   reorder_level: z.number().int().min(0).default(10),
+  discount_type: z.enum(['percentage', 'amount']).default('percentage'),
+  discount_value: z.number().min(0).default(0),
   // Fields below come from purchase invoice — optional on creation
   stock_qty: z.number().int().min(0).default(0),
   purchase_price: z.number().min(0).optional(),

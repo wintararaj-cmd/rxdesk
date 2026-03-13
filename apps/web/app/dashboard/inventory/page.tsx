@@ -31,6 +31,8 @@ interface InventoryItem {
   purchase_price?: number;
   expiry_date?: string;
   batch_number?: string;
+  discount_type: 'percentage' | 'amount';
+  discount_value: number;
 }
 
 interface Pagination {
@@ -48,6 +50,8 @@ const EMPTY_ADD_FORM = {
   gst_rate: '12',
   hsn_code: '',
   unit: 'strip',
+  discount_type: 'percentage',
+  discount_value: '0',
 };
 
 // Edit form — all fields (manual stock corrections + purchase-invoice fields)
@@ -62,6 +66,8 @@ const EMPTY_EDIT_FORM = {
   purchase_price: '',
   batch_number: '',
   expiry_date: '',
+  discount_type: 'percentage',
+  discount_value: '0',
 };
 
 export default function InventoryPage() {
@@ -148,6 +154,8 @@ export default function InventoryPage() {
       reorder_level: Number(form.reorder_level) || 10,
       mrp: Number(form.mrp),
       gst_rate: Number(form.gst_rate) || 12,
+      discount_type: form.discount_type,
+      discount_value: Number(form.discount_value) || 0,
       // stock starts at 0 — populated via purchase invoices
       stock_qty: 0,
     });
@@ -166,6 +174,8 @@ export default function InventoryPage() {
       purchase_price: item.purchase_price != null ? String(item.purchase_price) : '',
       batch_number: item.batch_number ?? '',
       expiry_date: item.expiry_date ? item.expiry_date.split('T')[0] : '',
+      discount_type: item.discount_type,
+      discount_value: String(item.discount_value),
     });
   };
 
@@ -184,6 +194,8 @@ export default function InventoryPage() {
         purchase_price: editForm.purchase_price ? Number(editForm.purchase_price) : undefined,
         batch_number: editForm.batch_number || undefined,
         expiry_date: editForm.expiry_date || undefined,
+        discount_type: editForm.discount_type,
+        discount_value: editForm.discount_value ? Number(editForm.discount_value) : undefined,
       },
     });
   };
@@ -198,6 +210,8 @@ export default function InventoryPage() {
     { key: 'gst_rate', label: 'GST Rate (%)', type: 'select', span: 1 },
     { key: 'hsn_code', label: 'HSN Code', type: 'text', span: 1, placeholder: 'e.g. 30049099' },
     { key: 'unit', label: 'Unit', type: 'select', span: 1 },
+    { key: 'discount_type', label: 'Disc. Type', type: 'select', span: 1 },
+    { key: 'discount_value', label: 'Disc. Val', type: 'number', span: 1 },
     { key: 'reorder_level', label: 'Reorder Level', type: 'number', span: 2, placeholder: 'Minimum stock before alert (default 10)' },
   ];
 
@@ -208,6 +222,8 @@ export default function InventoryPage() {
     { key: 'gst_rate', label: 'GST Rate (%)', type: 'select', span: 1 },
     { key: 'hsn_code', label: 'HSN Code', type: 'text', span: 1 },
     { key: 'unit', label: 'Unit', type: 'select', span: 1 },
+    { key: 'discount_type', label: 'Disc. Type', type: 'select', span: 1 },
+    { key: 'discount_value', label: 'Disc. Val', type: 'number', span: 1 },
     { key: 'reorder_level', label: 'Reorder Level', type: 'number', span: 2 },
     { key: 'stock_qty', label: 'Stock Qty', type: 'number', span: 1, note: 'Auto-updated from purchase invoices' },
     { key: 'purchase_price', label: 'Purchase Price (₹)', type: 'number', span: 1, note: 'Auto-updated from purchase invoices' },
@@ -377,6 +393,15 @@ export default function InventoryPage() {
                   >
                     {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
                   </select>
+                ) : type === 'select' && key === 'discount_type' ? (
+                  <select
+                    className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 bg-white"
+                    value={form.discount_type}
+                    onChange={(e) => setForm({ ...form, discount_type: e.target.value as any })}
+                  >
+                    <option value="percentage">Percentage (%)</option>
+                    <option value="amount">Amount (₹)</option>
+                  </select>
                 ) : (
                   <input
                     type={type}
@@ -438,6 +463,15 @@ export default function InventoryPage() {
                     >
                       {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
                     </select>
+                  ) : type === 'select' && key === 'discount_type' ? (
+                    <select
+                      className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 bg-white"
+                      value={editForm.discount_type ?? 'percentage'}
+                      onChange={(e) => setEditForm({ ...editForm, discount_type: e.target.value as any })}
+                    >
+                      <option value="percentage">Percentage (%)</option>
+                      <option value="amount">Amount (₹)</option>
+                    </select>
                   ) : (
                     <input
                       type={type}
@@ -476,7 +510,7 @@ export default function InventoryPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
-              {['Medicine', 'Stock', 'Reorder', 'Price', 'GST', 'Expiry', 'Actions'].map((h) => (
+              {['Medicine', 'Stock', 'Reorder', 'Price', 'Discount', 'GST', 'Expiry', 'Actions'].map((h) => (
                 <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
               ))}
             </tr>
@@ -501,6 +535,15 @@ export default function InventoryPage() {
                 </td>
                 <td className="px-4 py-3 text-gray-500">{item.reorder_level}</td>
                 <td className="px-4 py-3 text-gray-900">₹{item.mrp}</td>
+                <td className="px-4 py-3 text-gray-500">
+                  {item.discount_value > 0 ? (
+                    <span className="text-emerald-600 font-medium">
+                      {item.discount_type === 'percentage' ? `${item.discount_value}%` : `₹${item.discount_value}`}
+                    </span>
+                  ) : (
+                    <span className="text-gray-300">—</span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-gray-500">{item.gst_rate ?? 12}%</td>
                 <td className="px-4 py-3 text-gray-500">
                   {item.expiry_date ? new Date(item.expiry_date).toLocaleDateString('en-IN') : '—'}
