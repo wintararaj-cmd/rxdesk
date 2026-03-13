@@ -296,6 +296,8 @@ CREATE TABLE shop_inventory (
   stock_qty       INTEGER DEFAULT 0,
   reorder_level   INTEGER DEFAULT 10,           -- alert threshold
   unit            VARCHAR(20) DEFAULT 'strip',  -- strip, bottle, vial
+  discount_type   ENUM('percentage','amount') DEFAULT 'percentage',
+  discount_value  DECIMAL(10,2) DEFAULT 0,
   created_at      TIMESTAMP DEFAULT NOW(),
   updated_at      TIMESTAMP DEFAULT NOW(),
   UNIQUE(shop_id, medicine_id, batch_number)
@@ -343,7 +345,8 @@ CREATE TABLE bill_items (
   expiry_date     DATE,
   mrp             DECIMAL(10,2) NOT NULL,
   quantity        SMALLINT NOT NULL,
-  discount_pct    DECIMAL(5,2) DEFAULT 0,
+  discount_type   ENUM('percentage','amount') DEFAULT 'percentage',
+  discount_value  DECIMAL(10,2) DEFAULT 0,
   gst_rate        DECIMAL(5,2) DEFAULT 12.0,
   line_total      DECIMAL(12,2) NOT NULL
 );
