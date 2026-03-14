@@ -12,13 +12,14 @@ async function main() {
     prisma.subscriptionPlan.upsert({
       where: { name: 'Basic' },
       update: {
+        price_monthly: 799,
         max_doctors: 1,
         max_appointments_per_month: 50,
         max_sessions: 2,
       },
       create: {
         name: 'Basic',
-        price_monthly: 499,
+        price_monthly: 799,
         max_doctors: 1,
         max_appointments_per_month: 50,
         max_sessions: 2,
@@ -34,13 +35,14 @@ async function main() {
     prisma.subscriptionPlan.upsert({
       where: { name: 'Standard' },
       update: {
+        price_monthly: 1299,
         max_doctors: 5,
         max_appointments_per_month: 250,
         max_sessions: 5,
       },
       create: {
         name: 'Standard',
-        price_monthly: 999,
+        price_monthly: 1299,
         max_doctors: 5,
         max_appointments_per_month: 250,
         max_sessions: 5,
@@ -56,13 +58,14 @@ async function main() {
     prisma.subscriptionPlan.upsert({
       where: { name: 'Premium' },
       update: {
+        price_monthly: 2299,
         max_doctors: 15,
         max_appointments_per_month: 99999,
         max_sessions: 10,
       },
       create: {
         name: 'Premium',
-        price_monthly: 1999,
+        price_monthly: 2299,
         max_doctors: 15,
         max_appointments_per_month: 99999,
         max_sessions: 10,

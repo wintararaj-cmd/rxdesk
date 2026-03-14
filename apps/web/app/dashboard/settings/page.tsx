@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { shopApi, subscriptionApi, chamberApi } from '../../../lib/apiClient';
 import { useAuthStore } from '../../../store/authStore';
+import { Phone, Mail, Clock, X } from 'lucide-react';
 
 type GstType = 'unregistered' | 'composite' | 'regular';
 
@@ -89,7 +90,8 @@ export default function SettingsPage() {
   const [formError, setFormError] = useState('');
   const [showPlans, setShowPlans] = useState(false);
   const [subError, setSubError] = useState('');
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('1');
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('6');
+  const [showContactModal, setShowContactModal] = useState(false);
 
   const { user } = useAuthStore();
   const { data: shopRes, isLoading, isError: shopNotFound } = useQuery({
@@ -339,42 +341,75 @@ export default function SettingsPage() {
                   <option value="12">Yearly Recharge (12 Mo)</option>
                 </select>
               </div>
-              {subError && <p className="text-red-500 text-sm mb-3">{subError}</p>}
-              {plans.length === 0 ? (
-                <div className="flex items-center justify-center py-6">
-                  <div className="w-5 h-5 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {plans.map((plan) => {
-                    const months = Number(selectedPeriod);
-                    const totalAmount = plan.price_monthly * months;
-                    return (
-                      <div key={plan.id} className="border border-gray-200 rounded-xl p-4">
-                        <p className="font-semibold text-gray-900">{plan.name}</p>
-                        <p className="text-xl font-bold text-violet-600 mt-1">
-                          ₹{totalAmount}<span className="text-sm font-normal text-gray-400">/{months === 1 ? 'mo' : `${months} mo`}</span>
-                        </p>
-                        {months > 1 && (
-                          <p className="text-xs text-gray-500 mt-0.5">Base: ₹{plan.price_monthly}/mo</p>
-                        )}
-                        <ul className="mt-2 space-y-1 text-xs text-gray-600">
-                          <li>✓ Up to {plan.max_doctors} doctor{plan.max_doctors !== 1 ? 's' : ''}</li>
-                          <li>✓ {plan.max_appointments_per_month >= 99999 ? 'Unlimited' : plan.max_appointments_per_month} appointments/month</li>
-                          <li>✓ {plan.max_sessions} active session{plan.max_sessions !== 1 ? 's' : ''}</li>
-                        </ul>
-                        <button
-                          onClick={() => subscribeMutation.mutate({ planId: plan.id, period: selectedPeriod })}
-                          disabled={subscribeMutation.isPending}
-                          className="mt-3 w-full py-2 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 disabled:opacity-50"
-                        >
-                          {subscribeMutation.isPending ? 'Processing…' : 'Subscribe'}
-                        </button>
+
+              {/* Pricing Rules Helper */}
+              {(() => {
+                const getPricePerMonth = (planName: string, period: string) => {
+                  const p = period.toString();
+                  if (planName === 'Basic') {
+                    if (p === '1') return 799;
+                    if (p === '3') return 699;
+                    if (p === '6') return 599;
+                    if (p === '12') return 499;
+                  }
+                  if (planName === 'Standard') {
+                    if (p === '1') return 1299;
+                    if (p === '3') return 1199;
+                    if (p === '6') return 1099;
+                    if (p === '12') return 999;
+                  }
+                  if (planName === 'Premium') {
+                    if (p === '1') return 2299;
+                    if (p === '3') return 2199;
+                    if (p === '6') return 2099;
+                    if (p === '12') return 1999;
+                  }
+                  return 0;
+                };
+
+                return (
+                  <>
+                    {subError && <p className="text-red-500 text-sm mb-3">{subError}</p>}
+                    {plans.length === 0 ? (
+                      <div className="flex items-center justify-center py-6">
+                        <div className="w-5 h-5 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {plans.map((plan) => {
+                          const months = Number(selectedPeriod);
+                          const pricePerMonth = getPricePerMonth(plan.name, selectedPeriod) || (Number(plan.price_monthly));
+                          const totalAmount = pricePerMonth * months;
+                          return (
+                            <div key={plan.id} className="border border-gray-200 rounded-xl p-4 flex flex-col justify-between">
+                              <div>
+                                <p className="font-semibold text-gray-900">{plan.name}</p>
+                                <p className="text-xl font-bold text-violet-600 mt-1">
+                                  ₹{totalAmount}<span className="text-sm font-normal text-gray-400">/{months === 1 ? 'mo' : `${months} mo`}</span>
+                                </p>
+                                {months > 1 && (
+                                  <p className="text-xs text-gray-500 mt-0.5">Base: ₹{pricePerMonth}/mo</p>
+                                )}
+                                <ul className="mt-2 space-y-1 text-xs text-gray-600">
+                                  <li>✓ Up to {plan.max_doctors} doctor{plan.max_doctors !== 1 ? 's' : ''}</li>
+                                  <li>✓ {plan.max_appointments_per_month >= 99999 ? 'Unlimited' : plan.max_appointments_per_month} appointments/month</li>
+                                  <li>✓ {plan.max_sessions} active session{plan.max_sessions !== 1 ? 's' : ''}</li>
+                                </ul>
+                              </div>
+                              <button
+                                onClick={() => setShowContactModal(true)}
+                                className="mt-3 w-full py-2 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 transition-colors"
+                              >
+                                Subscribe
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -498,6 +533,77 @@ export default function SettingsPage() {
           </form>
         </div>
       </div>
+
+      {/* Contact Support Modal */}
+      {showContactModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="relative p-6 sm:p-8">
+              <button
+                onClick={() => setShowContactModal(false)}
+                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="mb-6">
+                <div className="w-12 h-12 bg-violet-100 rounded-2xl flex items-center justify-center mb-4">
+                  <Mail className="w-6 h-6 text-violet-600" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">Contact Support</h3>
+                <p className="text-gray-500 text-sm mt-1">
+                  To subscribe or upgrade your plan, please reach out to our team.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <a
+                  href="mailto:support@rxdesk.in"
+                  className="flex items-center gap-4 p-4 border border-gray-100 rounded-2xl hover:bg-violet-50 hover:border-violet-200 transition-all group"
+                >
+                  <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center group-hover:bg-white transition-colors">
+                    <Mail className="w-5 h-5 text-gray-400 group-hover:text-violet-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Email Us</p>
+                    <p className="text-sm font-bold text-gray-900">support@rxdesk.in</p>
+                  </div>
+                </a>
+
+                <a
+                  href="tel:+919830450252"
+                  className="flex items-center gap-4 p-4 border border-gray-100 rounded-2xl hover:bg-blue-50 hover:border-blue-200 transition-all group"
+                >
+                  <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center group-hover:bg-white transition-colors">
+                    <Phone className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Call Us</p>
+                    <p className="text-sm font-bold text-gray-900">+91 98304 50252</p>
+                  </div>
+                </a>
+
+                <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl">
+                  <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                    <Clock className="w-5 h-5 text-gray-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Support Hours</p>
+                    <p className="text-sm font-bold text-gray-700">5 to 9</p>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowContactModal(false)}
+                className="mt-8 w-full py-3 bg-gray-900 text-white text-sm font-bold rounded-2xl hover:bg-gray-800 transition-all shadow-lg shadow-gray-200"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
