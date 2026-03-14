@@ -37,6 +37,13 @@ export const useAuthStore = create<AuthState>()(
         set({ accessToken: null, refreshToken: null, user: null });
       },
     }),
-    { name: 'rxdesk-web-auth' }
+    {
+      name: 'rxdesk-web-auth',
+      onRehydrateStorage: () => (state) => {
+        if (state?.accessToken) {
+          document.cookie = `rxdesk-access-token=${state.accessToken}; path=/; max-age=604800; SameSite=Strict`;
+        }
+      },
+    }
   )
 );

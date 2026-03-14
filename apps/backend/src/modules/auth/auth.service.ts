@@ -55,7 +55,7 @@ async function enforceSessionLimit(userId: string, role: UserRole): Promise<void
   if (!shop) return;
 
   const activePlan = shop.subscriptions[0]?.plan;
-  const maxSessions = activePlan?.max_sessions ?? 2;
+  const maxSessions = activePlan?.max_sessions ?? 5;
   const planName = activePlan?.name ?? 'Basic';
 
   const sessionKeys = await redis.keys(`refresh:${userId}:*`);
