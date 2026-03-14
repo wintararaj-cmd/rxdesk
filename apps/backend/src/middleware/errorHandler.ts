@@ -26,13 +26,13 @@ export function errorHandler(
   _next: NextFunction
 ): void {
   // Zod validation error
-  if (err instanceof ZodError) {
+  if (err instanceof ZodError || err.name === 'ZodError') {
     const response: ApiErrorResponse = {
       success: false,
       error: {
         code: 'VALIDATION_ERROR',
         message: 'Request validation failed',
-        details: err.flatten().fieldErrors as Record<string, unknown>,
+        details: (err as ZodError).flatten().fieldErrors as Record<string, unknown>,
       },
     };
     res.status(422).json(response);
@@ -40,16 +40,16 @@ export function errorHandler(
   }
 
   // Known application error
-  if (err instanceof AppError) {
+  if (err instanceof AppError || (err as any).name === 'AppError') {
     const response: ApiErrorResponse = {
       success: false,
       error: {
-        code: err.code,
+        code: (err as any).code || 'APP_ERROR',
         message: err.message,
-        details: err.details,
+        details: (err as any).details,
       },
     };
-    res.status(err.statusCode).json(response);
+    res.status((err as any).statusCode || 400).json(response);
     return;
   }
 
