@@ -1043,7 +1043,7 @@ function PurchasesTab() {
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
                       <span className="font-bold text-gray-900">{p.supplier?.name ?? '—'}</span>
-                      <span className="text-[10px] text-gray-400 uppercase tracking-tight">{p.supplier?.city ?? 'Ad-hoc'}</span>
+                      <span className="text-[10px] text-gray-400 uppercase tracking-tight">{p.supplier ? 'Supplier' : 'Ad-hoc'}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
