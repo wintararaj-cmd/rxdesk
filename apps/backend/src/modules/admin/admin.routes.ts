@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireRole } from '../../middleware/auth';
 import prisma from '../../config/database';
+import redis from '../../config/redis';
 
 const router = Router();
 
@@ -166,6 +167,15 @@ router.post('/shops/:id/recharge', requireRole('admin'), async (req, res, next) 
     }
 
     res.json({ success: true, data: sub, message: `Recharged shop successfully for ${months} month(s)` });
+  } catch (err) { next(err); }
+});
+
+// POST /admin/sessions/flush — remove all refresh tokens (forces re-login)
+router.post('/sessions/flush', requireRole('admin'), async (_req, res, next) => {
+  try {
+    const keys = await redis.keys('refresh:*');
+    const deleted = keys.length ? await redis.del(...keys) : 0;
+    res.json({ success: true, data: { deleted }, message: `Cleared ${deleted} active session(s)` });
   } catch (err) { next(err); }
 });
 

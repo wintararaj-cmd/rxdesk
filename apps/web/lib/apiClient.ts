@@ -229,6 +229,7 @@ export const adminApi = {
     apiClient.patch(`/admin/shops/${id}/verify`, { status, rejection_reason }),
   getUsers: (role?: string) => apiClient.get('/admin/users', { params: role ? { role } : undefined }),
   rechargeShop: (id: string, data: { plan_id: string; months: number }) => apiClient.post(`/admin/shops/${id}/recharge`, data),
+  flushSessions: () => apiClient.post('/admin/sessions/flush'),
 };
 
 export const bannerApi = {

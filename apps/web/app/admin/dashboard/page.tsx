@@ -14,6 +14,8 @@ type Analytics = {
 export default function AdminOverviewPage() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [flushLoading, setFlushLoading] = useState(false);
+  const [flushMessage, setFlushMessage] = useState<string | null>(null);
 
   useEffect(() => {
     adminApi.getAnalytics()
@@ -21,6 +23,23 @@ export default function AdminOverviewPage() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  const handleFlushSessions = async () => {
+    if (flushLoading) return;
+    const confirmed = window.confirm('Force all users to re-login by clearing active sessions?');
+    if (!confirmed) return;
+    setFlushMessage(null);
+    setFlushLoading(true);
+    try {
+      const res = await adminApi.flushSessions();
+      const deleted = res.data.data?.deleted ?? 0;
+      setFlushMessage(res.data.message ?? `Cleared ${deleted} active session(s).`);
+    } catch (err: any) {
+      setFlushMessage(err?.response?.data?.error?.message ?? 'Failed to clear sessions.');
+    } finally {
+      setFlushLoading(false);
+    }
+  };
 
   const stats = analytics ? [
     {
@@ -106,7 +125,7 @@ export default function AdminOverviewPage() {
       {/* Quick Actions */}
       <div className="mb-6">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Quick Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
           <Link href="/admin/dashboard/doctors?status=pending"
             className="flex items-center gap-3 bg-white/[0.04] border border-white/[0.06] hover:border-rose-500/30 hover:bg-rose-500/5 text-white rounded-xl p-4 transition-all group">
             <div className="w-9 h-9 bg-rose-600/20 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-rose-600/30">
@@ -141,7 +160,26 @@ export default function AdminOverviewPage() {
               <p className="text-xs text-gray-500">View platform users</p>
             </div>
           </Link>
+          <button
+            onClick={handleFlushSessions}
+            disabled={flushLoading}
+            className="flex items-center gap-3 bg-white/[0.04] border border-white/[0.06] hover:border-rose-500/30 hover:bg-rose-500/5 text-white rounded-xl p-4 transition-all group disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <div className="w-9 h-9 bg-rose-600/20 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-rose-600/30">
+              <svg className="w-5 h-5 text-rose-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-3.75 0h7.5m-10.5 0a9 9 0 1118 0 9 9 0 01-18 0z" /></svg>
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold">Clear Active Sessions</p>
+              <p className="text-xs text-gray-500">
+                Forces all users to log in again
+              </p>
+              {flushLoading && <p className="text-xs text-rose-300 mt-1">Clearingâ€¦</p>}
+            </div>
+          </button>
         </div>
+        {flushMessage && (
+          <p className="text-xs text-gray-400 mt-2">{flushMessage}</p>
+        )}
       </div>
     </div>
   );
