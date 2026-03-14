@@ -767,7 +767,7 @@ export async function getGstSummary(userId: string, month: number, year: number)
   // Outward supplies — sales bills
   const billItems = await prisma.billItem.findMany({
     where: { bill: { shop_id: shop.id, payment_status: 'paid', created_at: { gte: start, lte: end } } },
-    select: { mrp: true, quantity: true, discount_pct: true, gst_rate: true, line_total: true },
+    select: { mrp: true, quantity: true, gst_rate: true, line_total: true },
   });
 
   // Group by GST rate
@@ -777,9 +777,9 @@ export async function getGstSummary(userId: string, month: number, year: number)
 
   for (const item of billItems) {
     const rate = String(Number(item.gst_rate));
-    const discountedBase = Number(item.mrp) * item.quantity * (1 - Number(item.discount_pct) / 100);
-    const gst = discountedBase * (Number(item.gst_rate) / (100 + Number(item.gst_rate)));
-    const taxable = discountedBase - gst;
+    // In our system, line_total is the taxable value (price after discount, before GST)
+    const taxable = Number(item.line_total);
+    const gst = taxable * (Number(item.gst_rate) / 100);
     if (!outwardByRate[rate]) outwardByRate[rate] = { taxable: 0, gst: 0, count: 0 };
     outwardByRate[rate].taxable += taxable;
     outwardByRate[rate].gst += gst;
