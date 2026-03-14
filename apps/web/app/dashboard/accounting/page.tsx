@@ -275,7 +275,7 @@ function ExpensesTab() {
 
   const CATS = ['rent', 'salary', 'electricity', 'water', 'phone', 'internet', 'maintenance', 'transport', 'advertising', 'miscellaneous'];
 
-  const { data, isLoading } = useQuery<{ expenses: Expense[]; total: number }>({
+  const { data, isLoading } = useQuery<{ items: Expense[]; total: number }>({
     queryKey: ['web-expenses'],
     queryFn: () => accountingApi.listExpenses().then((r) => r.data.data),
   });
@@ -396,7 +396,7 @@ function ExpensesTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {(data?.expenses ?? []).map((e) => (
+              {(data?.items ?? []).map((e) => (
                 <tr key={e.id} className="hover:bg-gray-50/50">
                   <td className="px-5 py-3 text-gray-600">
                     {new Date(e.entry_date).toLocaleDateString('en-IN')}
@@ -426,7 +426,7 @@ function ExpensesTab() {
               ))}
             </tbody>
           </table>
-          {(data?.expenses ?? []).length === 0 && (
+          {(data?.items ?? []).length === 0 && (
             <p className="text-center text-gray-400 py-10 text-sm">No expenses recorded</p>
           )}
         </div>
@@ -653,7 +653,13 @@ function PurchasesTab() {
     queryFn: () => accountingApi.listSuppliers().then((r) => r.data.data),
   });
 
-  const { data: listData, isLoading } = useQuery<{ items: Purchase[]; total: number }>({
+  const { data: listData, isLoading } = useQuery<{ 
+    items: Purchase[]; 
+    total: number;
+    total_amount_sum: number;
+    total_due_sum: number;
+    top_supplier: string;
+  }>({
     queryKey: ['web-purchases'],
     queryFn: () => accountingApi.listPurchases({ limit: 50 }).then((r) => r.data.data),
   });
