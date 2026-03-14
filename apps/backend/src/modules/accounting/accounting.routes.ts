@@ -23,7 +23,7 @@ router.post('/suppliers', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/suppliers/:id', shopAuth, async (req, res, next) => {
+router.get('/suppliers/:id/ledger', shopAuth, async (req, res, next) => {
   try {
     const data = await service.getSupplierWithLedger(req.user!.id, req.params.id);
     res.json({ success: true, data });
@@ -166,7 +166,7 @@ router.post('/credit-customers', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/credit-customers/:id', shopAuth, async (req, res, next) => {
+router.get('/credit-customers/:id/ledger', shopAuth, async (req, res, next) => {
   try {
     const data = await service.getCreditCustomerLedger(req.user!.id, req.params.id);
     res.json({ success: true, data });
@@ -177,6 +177,13 @@ router.post('/credit-customers/:id/payment', shopAuth, async (req, res, next) =>
   try {
     const data = await service.recordCreditPayment(req.user!.id, req.params.id, req.body);
     res.status(201).json({ success: true, data, message: 'Payment received and outstanding updated' });
+  } catch (err) { next(err); }
+});
+
+router.get('/outstandings', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.listOutstandings(req.user!.id);
+    res.json({ success: true, data });
   } catch (err) { next(err); }
 });
 

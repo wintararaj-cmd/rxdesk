@@ -172,6 +172,7 @@ export const accountingApi = {
   getCreditLedger: (id: string) => apiClient.get(`/accounting/credit-customers/${id}/ledger`),
   recordCreditPayment: (id: string, data: object) =>
     apiClient.post(`/accounting/credit-customers/${id}/payment`, data),
+  getOutstandings: () => apiClient.get('/accounting/outstandings'),
 
   // Reports
   getPL: (from: string, to: string) =>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, Fragment } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { accountingApi, inventoryApi, medicinesApi } from '../../../lib/apiClient';
 
@@ -123,7 +123,7 @@ function StatCard({ label, value, sub, icon, trend, color = 'violet', textColor 
 }
 
 // ── panel tabs ────────────────────────────────────────────────────────────────
-const TABS = ['P&L', 'Expenses', 'Suppliers', 'Purchases', 'Credit', 'GST', 'Sale Ret.', 'Pur. Ret.', 'Contra', 'Cashbook', 'Bankbook'] as const;
+const TABS = ['P&L', 'Expenses', 'Suppliers', 'Purchases', 'Outstandings', 'GST', 'Sale Ret.', 'Pur. Ret.', 'Contra', 'Cashbook', 'Bankbook'] as const;
 type Tab = (typeof TABS)[number];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1238,70 +1238,345 @@ function PurchaseDetailModal({ id, onClose }: { id: string; onClose: () => void 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Credit Tab
+//  Outstandings Tab
 // ─────────────────────────────────────────────────────────────────────────────
-function CreditTab() {
-  const { data: rawCredit, isLoading } = useQuery<{ customers: CreditCustomer[] }>({
-    queryKey: ['web-credit-customers'],
-    queryFn: () => accountingApi.listCreditCustomers().then((r) => r.data.data),
-  });
-  const data = rawCredit?.customers;
+function OutstandingsTab() {
+  const qc = useQueryClient();
+  const [search, setSearch] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedType, setExpandedType] = useState<'customer' | 'supplier' | null>(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payMethod, setPayMethod] = useState('cash');
 
-  const totalOutstanding = (data ?? []).reduce((s, c) => s + Number(c.total_outstanding), 0);
-  const overdueCount = (data ?? []).filter((c) => c.overdue).length;
+  const { data: out, isLoading, error, isError } = useQuery({
+    queryKey: ['web-outstandings'],
+    queryFn: () => accountingApi.getOutstandings().then((r) => r.data.data),
+  });
+
+  const { data: customerLedger } = useQuery({
+    queryKey: ['web-credit-ledger', expandedId],
+    queryFn: () => accountingApi.getCreditLedger(expandedId!).then((r) => r.data.data),
+    enabled: !!expandedId && expandedType === 'customer',
+  });
+
+  const { data: supplierLedger } = useQuery({
+    queryKey: ['web-supplier-ledger', expandedId],
+    queryFn: () => accountingApi.getSupplierLedger(expandedId!).then((r) => r.data.data),
+    enabled: !!expandedId && expandedType === 'supplier',
+  });
+
+  const payMutation = useMutation({
+    mutationFn: (d: { id: string; amount: number; method: string }) =>
+      expandedType === 'customer'
+        ? accountingApi.recordCreditPayment(d.id, { amount: d.amount, payment_method: d.method })
+        : accountingApi.recordSupplierPayment({ supplier_id: d.id, amount: d.amount, payment_method: d.method, payment_date: TODAY_STR }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['web-outstandings'] });
+      qc.invalidateQueries({ queryKey: ['web-pl'] });
+      if (expandedType === 'customer') qc.invalidateQueries({ queryKey: ['web-credit-ledger', expandedId] });
+      else qc.invalidateQueries({ queryKey: ['web-supplier-ledger', expandedId] });
+      setPayAmount('');
+    },
+  });
+
+  const receivables = (out?.receivables ?? []).filter((r: any) =>
+    (r.name || '').toLowerCase().includes(search.toLowerCase()) || (r.phone && r.phone.includes(search))
+  );
+
+  const payables = (out?.payables ?? []).filter((p: any) =>
+    (p.name || '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  const totalRec = (out?.receivables ?? []).reduce((s: number, r: any) => s + Number(r.total_outstanding || 0), 0);
+  const totalPay = (out?.payables ?? []).reduce((s: number, p: any) => s + Number(p.total_outstanding || 0), 0);
+
+  const toggleExpand = (id: string, type: 'customer' | 'supplier') => {
+    if (expandedId === id && expandedType === type) {
+      setExpandedId(null);
+      setExpandedType(null);
+    } else {
+      setExpandedId(id);
+      setExpandedType(type);
+      setPayAmount('');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 space-y-4">
+        <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-gray-500 text-sm font-medium animate-pulse">Fetching outstandings...</p>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="bg-red-50 border border-red-100 p-8 rounded-3xl text-center">
+        <div className="w-12 h-12 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-red-600">
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+        </div>
+        <h3 className="text-red-800 font-black mb-1">Failed to load data</h3>
+        <p className="text-red-600/70 text-sm mb-4">{(error as any)?.response?.data?.error?.message || (error as any)?.message || 'Connection error'}</p>
+        <button onClick={() => qc.invalidateQueries({ queryKey: ['web-outstandings'] })} className="bg-red-600 text-white px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-700 transition-colors">Try Again</button>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <StatCard label="Total Outstanding" value={fmt(totalOutstanding)} color="bg-orange-50" textColor="text-orange-700" />
-        <StatCard label="Customers" value={String(data?.length ?? 0)} sub={`${overdueCount} overdue`} />
+    <div className="space-y-6">
+      {/* Search and Summary */}
+      <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div className="relative w-full md:w-96 text-gray-900">
+          <input
+            type="text"
+            placeholder="Search customer or supplier..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-violet-400 focus:outline-none shadow-sm transition-all"
+          />
+          <svg className="absolute left-3.5 top-3 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <div className="flex gap-4 w-full md:w-auto">
+          <div className="bg-emerald-50 px-5 py-2.5 rounded-2xl border border-emerald-100 flex-1 md:flex-none">
+            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Receivables</p>
+            <p className="text-lg font-black text-emerald-700">{fmt(totalRec)}</p>
+          </div>
+          <div className="bg-rose-50 px-5 py-2.5 rounded-2xl border border-rose-100 flex-1 md:flex-none">
+            <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Payables</p>
+            <p className="text-lg font-black text-rose-700">{fmt(totalPay)}</p>
+          </div>
+        </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="w-7 h-7 border-4 border-orange-400 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 text-gray-500 text-xs uppercase">
-                <th className="text-left px-5 py-3">Customer</th>
-                <th className="text-left px-5 py-3">Phone</th>
-                <th className="text-left px-5 py-3">Last Transaction</th>
-                <th className="text-right px-5 py-3">Outstanding</th>
-                <th className="px-5 py-3">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {(data ?? []).map((c) => (
-                <tr key={c.id} className={`hover:bg-gray-50/50 ${c.overdue ? 'bg-red-50/30' : ''}`}>
-                  <td className="px-5 py-3 font-medium text-gray-800">{c.name}</td>
-                  <td className="px-5 py-3 text-gray-500">{c.phone ?? '—'}</td>
-                  <td className="px-5 py-3 text-gray-600">
-                    {c.updated_at
-                      ? new Date(c.updated_at).toLocaleDateString('en-IN')
-                      : '—'}
-                  </td>
-                  <td className={`px-5 py-3 text-right font-bold ${Number(c.total_outstanding) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                    {fmt(Number(c.total_outstanding))}
-                  </td>
-                  <td className="px-5 py-3">
-                    {c.overdue ? (
-                      <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs">Overdue</span>
-                    ) : (
-                      <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs">Active</span>
-                    )}
-                  </td>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        {/* Receivables Column */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-xs shadow-sm">IN</div>
+            <h3 className="font-black text-gray-800 tracking-tight uppercase text-xs">Customer Dues (Receivables)</h3>
+          </div>
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50/50 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
+                  <th className="text-left px-5 py-4">Customer</th>
+                  <th className="text-right px-5 py-4">Balance</th>
+                  <th className="w-10"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {(data ?? []).length === 0 && (
-            <p className="text-center text-gray-400 py-10 text-sm">No credit customers</p>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {receivables.map((c: any) => (
+                  <Fragment key={c.id}>
+                    <tr onClick={() => toggleExpand(c.id, 'customer')} className={`group cursor-pointer hover:bg-violet-50/30 transition-all ${expandedId === c.id ? 'bg-violet-50/50' : ''}`}>
+                      <td className="px-5 py-4">
+                        <p className="font-bold text-gray-800 group-hover:text-violet-700 transition-colors">{c.name}</p>
+                        <p className="text-[10px] text-gray-400 font-medium">{c.phone || 'No phone'}</p>
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <p className="font-black text-emerald-600">{fmt(c.total_outstanding)}</p>
+                        {c.overdue && <span className="text-[9px] font-black text-rose-500 uppercase tracking-tighter">Overdue</span>}
+                      </td>
+                      <td className="pr-4 text-gray-300 group-hover:text-violet-400 transition-colors">
+                        <svg className={`w-4 h-4 transition-transform ${expandedId === c.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </td>
+                    </tr>
+                    {expandedId === c.id && expandedType === 'customer' && (
+                      <tr>
+                        <td colSpan={3} className="bg-gray-50/80 p-6">
+                           <LedgerPanel 
+                            data={c} 
+                            type="customer" 
+                            ledger={customerLedger} 
+                            payAmount={payAmount} 
+                            setPayAmount={setPayAmount} 
+                            payMethod={payMethod} 
+                            setPayMethod={setPayMethod} 
+                            onPay={() => {
+                              const amt = parseFloat(payAmount);
+                              if (!amt || amt <= 0) return;
+                              payMutation.mutate({ id: c.id, amount: amt, method: payMethod });
+                            }} 
+                            isPending={payMutation.isPending}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+            {receivables.length === 0 && (
+              <div className="py-20 text-center"><p className="text-xs text-gray-400 font-medium">No matching customers</p></div>
+            )}
+          </div>
+        </div>
+
+        {/* Payables Column */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-xs shadow-sm">OUT</div>
+            <h3 className="font-black text-gray-800 tracking-tight uppercase text-xs">Supplier Dues (Payables)</h3>
+          </div>
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50/50 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
+                  <th className="text-left px-5 py-4">Supplier</th>
+                  <th className="text-right px-5 py-4">To Pay</th>
+                  <th className="w-10"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {payables.map((p: any) => (
+                  <Fragment key={p.id}>
+                    <tr onClick={() => toggleExpand(p.id, 'supplier')} className={`group cursor-pointer hover:bg-rose-50/30 transition-all ${expandedId === p.id ? 'bg-rose-50/50' : ''}`}>
+                      <td className="px-5 py-4">
+                        <p className="font-bold text-gray-800 group-hover:text-rose-700 transition-colors">{p.name}</p>
+                        <p className="text-[10px] text-gray-400 font-medium">{p.address || 'No address'}</p>
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <p className="font-black text-rose-600">{fmt(p.total_outstanding)}</p>
+                      </td>
+                      <td className="pr-4 text-gray-300 group-hover:text-rose-400 transition-colors">
+                        <svg className={`w-4 h-4 transition-transform ${expandedId === p.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </td>
+                    </tr>
+                    {expandedId === p.id && expandedType === 'supplier' && (
+                      <tr>
+                        <td colSpan={3} className="bg-gray-50/80 p-6">
+                          <LedgerPanel 
+                            data={p} 
+                            type="supplier" 
+                            ledger={supplierLedger} 
+                            payAmount={payAmount} 
+                            setPayAmount={setPayAmount} 
+                            payMethod={payMethod} 
+                            setPayMethod={setPayMethod} 
+                            onPay={() => {
+                              const amt = parseFloat(payAmount);
+                              if (!amt || amt <= 0) return;
+                              payMutation.mutate({ id: p.id, amount: amt, method: payMethod });
+                            }} 
+                            isPending={payMutation.isPending}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+            {payables.length === 0 && (
+              <div className="py-20 text-center"><p className="text-xs text-gray-400 font-medium">No matching suppliers</p></div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LedgerPanel({ data, type, ledger, payAmount, setPayAmount, payMethod, setPayMethod, onPay, isPending }: any) {
+  const transactions = type === 'customer' ? ledger?.transactions : [
+    ...(ledger?.purchases?.map((px: any) => ({ 
+      id: px.id, 
+      transaction_date: px.invoice_date, 
+      notes: `Purchase - ${px.invoice_number}`, 
+      type: 'credit_given', 
+      amount: px.total_amount 
+    })) ?? []),
+    ...(ledger?.payments?.map((py: any) => ({ 
+      id: py.id, 
+      transaction_date: py.payment_date, 
+      notes: 'Payment Made', 
+      type: 'payment_received', 
+      amount: py.amount 
+    })) ?? [])
+  ].sort((a, b) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime());
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div>
+        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Recent Activity</h4>
+        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 no-scrollbar">
+          {!ledger ? (
+            <div className="flex justify-center py-10"><div className="w-5 h-5 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" /></div>
+          ) : transactions.length === 0 ? (
+            <p className="text-center text-gray-400 py-10 text-[10px]">No transaction history</p>
+          ) : (
+            transactions.map((tx: any) => (
+              <div key={tx.id} className="bg-white rounded-2xl p-3 border border-gray-100 shadow-sm flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${tx.type === 'credit_given' ? (type === 'customer' ? 'bg-rose-50 text-rose-500' : 'bg-rose-50 text-rose-500') : 'bg-emerald-50 text-emerald-500'}`}>
+                    {tx.type === 'credit_given' ? (type === 'customer' ? '↑' : '↑') : '↓'}
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-gray-700 truncate max-w-[150px]">{tx.notes || (tx.type === 'credit_given' ? (type === 'customer' ? 'Credit Sale' : 'Purchase') : 'Payment Settlement')}</p>
+                    <p className="text-[9px] text-gray-400 font-bold uppercase">{new Date(tx.transaction_date).toLocaleDateString('en-IN')}</p>
+                  </div>
+                </div>
+                <p className={`text-xs font-black ${tx.type === 'credit_given' ? 'text-rose-500' : 'text-emerald-500'}`}>
+                  {tx.type === 'credit_given' ? '+' : '-'}{fmt(tx.amount)}
+                </p>
+              </div>
+            ))
           )}
         </div>
-      )}
+        <div className="mt-4">
+          <button
+            onClick={() => {
+              const msg = `Hello ${data.name},\n\nYour current outstanding balance is ${fmt(data.total_outstanding)}.\n\nPlease settle at your earliest convenience.\n\nThank you!`;
+              const url = `https://wa.me/${data.phone?.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`;
+              window.open(url, '_blank');
+            }}
+            disabled={!data.phone}
+            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${data.phone ? 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-100' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+          >
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.246 2.248 3.484 5.232 3.484 8.412-.003 6.557-5.338 11.892-11.893 11.892-1.997-.001-3.951-.5-5.688-1.448l-6.309 1.656zm6.224-3.82l.339.201c1.53 1.01 3.321 1.543 5.167 1.545l.006.001c5.82 0 10.555-4.735 10.558-10.555 0-2.819-1.098-5.471-3.091-7.465-1.993-1.993-4.644-3.092-7.463-3.093h-.008c-5.819 0-10.554 4.735-10.558 10.556 0 2.053.593 4.053 1.716 5.79l.244.379-1.025 3.746 3.834-1.005zm12.333-10.579l-1.423-.711-.336-.168c-.149-.074-.3-.112-.451-.112-.11 0-.22.02-.321.061-.091.037-.183.1-.264.18l-.946.945c-.092.092-.153.21-.173.336-.02.126-.002.253.051.373.491 1.076 1.111 2.067 1.841 2.943.08.096.165.188.254.277l.797.796.347.348c.15.15.344.225.541.225.12 0 .241-.028.35-.084l.215-.107 1.118-.559c.142-.071.25-.183.308-.323s.06-.296.002-.43l-.337-.768-.901-2.051c-.086-.197-.282-.322-.497-.322zm-3.692 3.693c-.49-.49-.96-.948-1.408-1.375l-.265-.252c-.426-.406-.827-.788-1.201-1.144-.127-.121-.241-.23-.339-.324-1.503-1.432-2.122-2.316-2.174-2.394-.052-.078-.052-.078-.052-.078s0 0 0 0l-.338-1.014c-.053-.159-.172-.288-.327-.357s-.332-.071-.489-.001l-.756.336-.339.151c-.098.044-.187.112-.266.197-.18.196-.3.428-.351.68-.13.626.059 1.42 1.489 3.197l.1.124.017.02c.032.039.064.079.098.118 1.48 1.761 3.518 3.55 5.518 4.316l.164.06c.306.111.64.129.957.05.295-.074.56-.231.751-.453l.945-.945c.291-.291.291-.763 0-1.054l-.797-.796z"/></svg>
+            Send WhatsApp Report
+          </button>
+        </div>
+      </div>
+      <div className="bg-white rounded-3xl p-5 border border-violet-100 shadow-md h-fit">
+        <h4 className="text-xs font-black text-gray-800 uppercase tracking-tight mb-4">{type === 'customer' ? 'Record Repayment' : 'Record Payment Made'}</h4>
+        <div className="space-y-4">
+          <div>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Amount (₹)</label>
+            <input
+              type="number"
+              value={payAmount}
+              onChange={(e) => setPayAmount(e.target.value)}
+              placeholder="0.00"
+              className="w-full border border-gray-100 bg-gray-50/50 rounded-2xl px-4 py-3 text-lg font-black text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-400 transition-all"
+            />
+            <button onClick={() => setPayAmount(String(data.total_outstanding))} className="text-[10px] text-violet-600 font-black hover:underline mt-1">Settle Full: {fmt(data.total_outstanding)}</button>
+          </div>
+          <div>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Method</label>
+            <div className="flex gap-2">
+              {['cash', 'upi', 'card'].map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setPayMethod(m)}
+                  className={`flex-1 py-2 rounded-xl text-[10px] font-black tracking-widest border transition-all ${payMethod === m ? 'bg-violet-600 text-white border-violet-600 shadow-lg shadow-violet-100' : 'bg-gray-50 text-gray-400 border-gray-100 hover:bg-gray-100'}`}
+                >
+                  {m.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button
+            onClick={onPay}
+            disabled={isPending || !payAmount}
+            className="w-full bg-gradient-to-br from-violet-600 to-indigo-700 text-white py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-violet-100 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
+          >
+            {isPending ? 'Saving...' : type === 'customer' ? 'Collect & Update Ledger' : 'Pay & Update Ledger'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -2160,7 +2435,7 @@ export default function AccountingPage() {
       {activeTab === 'Expenses' && <ExpensesTab />}
       {activeTab === 'Suppliers' && <SuppliersTab />}
       {activeTab === 'Purchases' && <PurchasesTab />}
-      {activeTab === 'Credit' && <CreditTab />}
+      {activeTab === 'Outstandings' && <OutstandingsTab />}
       {activeTab === 'GST' && <GSTTab />}
       {activeTab === 'Sale Ret.' && <SaleReturnTab />}
       {activeTab === 'Pur. Ret.' && <PurchaseReturnTab />}

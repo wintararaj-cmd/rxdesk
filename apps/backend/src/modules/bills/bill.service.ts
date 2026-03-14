@@ -283,7 +283,7 @@ export async function createManualBill(
       include: { items: true },
     });
 
-    // Auto-create IncomeEntry when paid immediately
+    // Auto-create IncomeEntry when paid immediately (not for credit)
     if (isPaid && paymentMethod !== 'credit') {
       await tx.incomeEntry.create({
         data: {
@@ -296,6 +296,51 @@ export async function createManualBill(
           notes: data.customer_name ? `Walk-in: ${data.customer_name}` : 'Walk-in sale',
           created_by: userId,
         },
+      });
+    }
+
+    // Handle credit sale immediately
+    if (isPaid && paymentMethod === 'credit') {
+      // 1. Try to find/create credit customer
+      let creditCustomer = await tx.creditCustomer.findFirst({
+        where: {
+          shop_id: shop.id,
+          OR: [
+            (data.customer_phone ? { phone: data.customer_phone } : {}),
+            { name: data.customer_name || 'Walk-in Customer' }
+          ].filter(o => Object.keys(o).length > 0) as any
+        }
+      });
+
+      if (!creditCustomer) {
+        creditCustomer = await tx.creditCustomer.create({
+          data: {
+            shop_id: shop.id,
+            name: data.customer_name || 'Walk-in Customer',
+            phone: data.customer_phone,
+            total_outstanding: 0,
+          }
+        });
+      }
+
+      // 2. Create transaction
+      await tx.creditTransaction.create({
+        data: {
+          customer_id: creditCustomer.id,
+          shop_id: shop.id,
+          type: 'credit_given',
+          amount: totalAmount,
+          notes: `Credit sale – Bill ${created.bill_number}`,
+          bill_id: created.id,
+          transaction_date: new Date(),
+          created_by: userId,
+        }
+      });
+
+      // 3. Update outstanding
+      await tx.creditCustomer.update({
+        where: { id: creditCustomer.id },
+        data: { total_outstanding: { increment: totalAmount } }
       });
     }
 
@@ -349,59 +394,63 @@ export async function markBillPaid(
       data: { payment_status: 'paid', payment_method: paymentMethod },
     });
 
-    // Auto-create IncomeEntry so revenue is tracked in accounting module
-    await tx.incomeEntry.create({
-      data: {
-        shop_id: shop.id,
-        entry_type: 'sale_income' as any,
-        amount: Number(bill.total_amount),
-        payment_method: (paymentMethod === 'credit' ? 'cash' : paymentMethod) as any,
-        reference_bill_id: billId,
-        entry_date: new Date(),
-        created_by: userId,
-      },
-    });
+    // Auto-create IncomeEntry so revenue is tracked in accounting module (not for credit)
+    if (paymentMethod !== 'credit') {
+      await tx.incomeEntry.create({
+        data: {
+          shop_id: shop.id,
+          entry_type: 'sale_income' as any,
+          amount: Number(bill.total_amount),
+          payment_method: paymentMethod as any,
+          reference_bill_id: billId,
+          entry_date: new Date(),
+          created_by: userId,
+        },
+      });
+    }
 
     // Credit sale: create CreditTransaction + update/create CreditCustomer
-    if (paymentMethod === 'credit' && bill.patient_id) {
-      const patient = await tx.patient.findUnique({
-        where: { id: bill.patient_id },
-        select: { id: true, full_name: true },
+    if (paymentMethod === 'credit') {
+      let creditCustomer = await tx.creditCustomer.findFirst({
+        where: {
+          shop_id: shop.id,
+          OR: [
+            (bill.patient_id ? { patient_id: bill.patient_id } : {}),
+            (bill.customer_phone ? { phone: bill.customer_phone } : {}),
+            { name: bill.customer_name || bill.patient?.full_name || 'Walk-in Customer' }
+          ].filter(o => Object.keys(o).length > 0) as any
+        },
       });
-      if (patient) {
-        let creditCustomer = await tx.creditCustomer.findFirst({
-          where: { shop_id: shop.id, patient_id: bill.patient_id },
-        });
 
-        if (!creditCustomer) {
-          creditCustomer = await tx.creditCustomer.create({
-            data: {
-              shop_id: shop.id,
-              patient_id: bill.patient_id,
-              name: patient.full_name,
-              total_outstanding: 0,
-            },
-          });
-        }
-
-        await tx.creditTransaction.create({
+      if (!creditCustomer) {
+        creditCustomer = await tx.creditCustomer.create({
           data: {
-            customer_id: creditCustomer.id,
             shop_id: shop.id,
-            type: 'credit_given',
-            amount: Number(bill.total_amount),
-            notes: `Credit sale – Bill ${bill.bill_number}`,
-            bill_id: billId,
-            transaction_date: new Date(),
-            created_by: userId,
+            patient_id: bill.patient_id,
+            name: bill.customer_name || bill.patient?.full_name || 'Walk-in Customer',
+            phone: bill.customer_phone,
+            total_outstanding: 0,
           },
         });
-
-        await tx.creditCustomer.update({
-          where: { id: creditCustomer.id },
-          data: { total_outstanding: { increment: Number(bill.total_amount) } },
-        });
       }
+
+      await tx.creditTransaction.create({
+        data: {
+          customer_id: creditCustomer.id,
+          shop_id: shop.id,
+          type: 'credit_given',
+          amount: Number(bill.total_amount),
+          notes: `Credit sale – Bill ${bill.bill_number}`,
+          bill_id: billId,
+          transaction_date: new Date(),
+          created_by: userId,
+        },
+      });
+
+      await tx.creditCustomer.update({
+        where: { id: creditCustomer.id },
+        data: { total_outstanding: { increment: Number(bill.total_amount) } },
+      });
     }
 
     return paid;

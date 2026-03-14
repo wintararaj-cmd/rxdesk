@@ -1,6 +1,7 @@
 import prisma from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { Prisma } from '@prisma/client';
+import logger from '../../utils/logger';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Helpers
@@ -617,12 +618,81 @@ export async function recordCreditPayment(userId: string, customerId: string, da
         created_by: userId,
       },
     });
+
+    await tx.incomeEntry.create({
+      data: {
+        shop_id: shop.id,
+        entry_type: 'sale_income' as any,
+        amount: data.amount,
+        payment_method: (data.payment_method ?? 'cash') as any,
+        entry_date: new Date(),
+        notes: `Credit Repayment - ${customer.name}`,
+        created_by: userId,
+      }
+    });
+
     await tx.creditCustomer.update({
       where: { id: customerId },
       data: { total_outstanding: { decrement: data.amount } },
     });
     return txn;
   });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Outstandings (Unified)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function listOutstandings(userId: string) {
+  try {
+    const shop = await getShopOrThrow(userId);
+
+    // 1. Credit Customers (Receivables)
+    const rawCustomers = await prisma.creditCustomer.findMany({
+      where: { shop_id: shop.id },
+      orderBy: { total_outstanding: 'desc' },
+    });
+
+    const customers = rawCustomers.map(c => ({
+      ...c,
+      total_outstanding: Number(c.total_outstanding || 0)
+    }));
+
+    // 2. Suppliers (Payables)
+    const suppliers = await prisma.supplier.findMany({
+      where: { shop_id: shop.id, is_active: true },
+      select: { id: true, name: true, phone: true, address: true, updated_at: true },
+    });
+
+    const purchaseSums = await prisma.purchaseEntry.groupBy({
+      by: ['supplier_id'],
+      where: { shop_id: shop.id, supplier_id: { not: null } },
+      _sum: { total_amount: true },
+    });
+
+    const paymentSums = await prisma.supplierPayment.groupBy({
+      by: ['supplier_id'],
+      where: { shop_id: shop.id },
+      _sum: { amount: true },
+    });
+
+    const suppliersWithStats = suppliers.map((s) => {
+      const totalPurchased = Number(purchaseSums.find((p) => p.supplier_id === s.id)?._sum.total_amount ?? 0);
+      const totalPaid = Number(paymentSums.find((p) => p.supplier_id === s.id)?._sum.amount ?? 0);
+      return {
+        ...s,
+        total_outstanding: totalPurchased - totalPaid,
+      };
+    }).filter(s => s.total_outstanding !== 0);
+
+    return {
+      receivables: customers,
+      payables: suppliersWithStats.sort((a, b) => b.total_outstanding - a.total_outstanding),
+    };
+  } catch (err) {
+    logger.error('Error in listOutstandings:', err);
+    throw err;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

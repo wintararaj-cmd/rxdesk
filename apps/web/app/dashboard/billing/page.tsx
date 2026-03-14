@@ -348,7 +348,7 @@ function NewBillTab() {
 
           {bill.payment_status !== 'paid' && (
             <div className="flex gap-2 mt-6">
-              {(['cash', 'upi', 'card'] as const).map((method) => (
+              {(['cash', 'upi', 'card', 'credit'] as const).map((method) => (
                 <button
                   key={method}
                   onClick={() => payMutation.mutate({ id: bill.id, method })}
@@ -480,7 +480,7 @@ function BillDetailModal({ bill, onClose, onPay }: {
             <div>
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">Record Final Payment</p>
               <div className="flex gap-2">
-                {(['cash', 'upi', 'card'] as const).map((m) => (
+                {(['cash', 'upi', 'card', 'credit'] as const).map((m) => (
                   <button key={m} onClick={() => onPay(bill.id, m)}
                     className="flex-1 border-2 border-gray-100 rounded-xl py-3 text-sm font-bold text-gray-700 hover:border-violet-600 hover:text-violet-600 hover:bg-violet-50 transition-all active:scale-95">
                     {METHOD_LABEL[m].icon} {m.toUpperCase()}
@@ -1021,7 +1021,7 @@ function WalkInSaleTab() {
             <div className="mb-4">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Record Payment</p>
               <div className="flex gap-2">
-                {(['cash', 'upi', 'card'] as const).map((m) => (
+                {(['cash', 'upi', 'card', 'credit'] as const).map((m) => (
                   <button key={m} onClick={() => payMutation.mutate({ id: createdBill.id, method: m })}
                     disabled={payMutation.isPending}
                     className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-semibold text-gray-700 hover:border-violet-400 hover:text-violet-600 hover:bg-violet-50 transition-all">
