@@ -3,9 +3,13 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../store/authStore';
+import { useConfigStore } from '../../store/configStore';
 import { authApi, shopApi } from '../../lib/apiClient';
+import { Shortcut, useKeyboardShortcuts } from '../../hooks/useShortcuts';
+import { ShortcutsHelp, ShortcutItem } from '../../components/dashboard/ShortcutsHelp';
+import { Keyboard } from 'lucide-react';
 
 const NAV = [
   {
@@ -54,7 +58,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const router = useRouter();
   const { user, clearAuth, accessToken } = useAuthStore();
+  const { financialYear, setFinancialYear, getAvailableFYs } = useConfigStore();
+  const qc = useQueryClient();
   const [hovered, setHovered] = useState<string | null>(null);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  const shortcuts: Shortcut[] = [
+    { key: 'd', altKey: true, label: 'Dashboard', category: 'Navigation', action: () => router.push('/dashboard') },
+    { key: 'a', altKey: true, label: 'Appointments', category: 'Navigation', action: () => router.push('/dashboard/appointments') },
+    { key: 'o', altKey: true, label: 'Doctors', category: 'Navigation', action: () => router.push('/dashboard/doctors') },
+    { key: 'i', altKey: true, label: 'Inventory', category: 'Navigation', action: () => router.push('/dashboard/inventory') },
+    { key: 'b', altKey: true, label: 'Billing', category: 'Navigation', action: () => router.push('/dashboard/billing') },
+    { key: 'r', altKey: true, label: 'Reports', category: 'Navigation', action: () => router.push('/dashboard/reports') },
+    { key: 'c', altKey: true, label: 'Accounting', category: 'Navigation', action: () => router.push('/dashboard/accounting') },
+    { key: 's', altKey: true, label: 'Settings', category: 'Navigation', action: () => router.push('/dashboard/settings') },
+    { key: 'k', altKey: true, label: 'Keyboard Shortcuts', category: 'System', action: () => setShowShortcuts(true) },
+    { key: 'Escape', label: 'Close Modal', category: 'System', action: () => setShowShortcuts(false) },
+  ];
+
+  const helpItems: ShortcutItem[] = shortcuts.map(s => ({
+    key: s.key,
+    combination: `${s.altKey ? 'Alt + ' : ''}${s.ctrlKey ? 'Ctrl + ' : ''}${s.shiftKey ? 'Shift + ' : ''}${s.key.toUpperCase()}`,
+    label: s.label,
+    category: s.category
+  }));
+
+  useKeyboardShortcuts(shortcuts);
 
   const { data: shop } = useQuery<{ shop_name: string }>({
     queryKey: ['web-shop'],
@@ -71,6 +100,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       router.replace('/login');
     }
   }, [accessToken, user, router]);
+
+  useEffect(() => {
+    if (accessToken) {
+      qc.invalidateQueries();
+    }
+  }, [financialYear, accessToken, qc]);
 
   if (!accessToken || user?.role !== 'shop_owner') {
     return (
@@ -96,13 +131,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Brand */}
         <div className="relative z-10 px-6 pt-7 pb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/25">
-              <span className="text-white font-bold text-sm tracking-tight">RX</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/25">
+                <span className="text-white font-bold text-sm tracking-tight">RX</span>
+              </div>
+              <div>
+                <p className="font-semibold text-white text-[15px] tracking-tight">RxDesk</p>
+                <p className="text-violet-300/60 text-[11px] font-medium">Shop Panel</p>
+              </div>
             </div>
-            <div>
-              <p className="font-semibold text-white text-[15px] tracking-tight">RxDesk</p>
-              <p className="text-violet-300/60 text-[11px] font-medium">Shop Panel</p>
+            
+            {/* Financial Year Selector */}
+            <div className="relative">
+              <select
+                value={financialYear}
+                onChange={(e) => setFinancialYear(e.target.value)}
+                className="appearance-none bg-white/[0.05] border border-white/10 text-[11px] font-bold text-violet-300 px-2 py-1 rounded-lg outline-none cursor-pointer hover:bg-white/[0.08] transition-colors pr-6"
+              >
+                {getAvailableFYs().map(fy => (
+                  <option key={fy} value={fy} className="bg-[#1a1a2e] text-white font-medium">
+                    FY {fy}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-violet-300/60">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+              </div>
             </div>
           </div>
         </div>
@@ -134,6 +191,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   {icon}
                 </span>
                 {label}
+                {isHovered && (
+                  <span className="ml-auto text-[10px] bg-white/10 px-1.5 py-0.5 rounded text-gray-400 font-bold group-hover:text-white transition-colors">
+                    Alt + {
+                      label === 'Dashboard' ? 'D' :
+                      label === 'Appointments' ? 'A' :
+                      label === 'Doctors' ? 'O' :
+                      label === 'Inventory' ? 'I' :
+                      label === 'Billing' ? 'B' :
+                      label === 'Reports' ? 'R' :
+                      label === 'Accounting' ? 'C' :
+                      label === 'Settings' ? 'S' : ''
+                    }
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -160,15 +231,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 text-[13px] text-gray-500 hover:text-red-400 py-2 rounded-lg hover:bg-red-500/10 transition-all duration-200"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg>
-            Sign out
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowShortcuts(true)}
+              title="Shortcut Keys (Alt+K)"
+              className="flex-1 flex items-center justify-center gap-2 text-[12px] text-gray-400 hover:text-violet-300 py-2 rounded-lg hover:bg-white/[0.04] transition-all duration-200"
+            >
+              <Keyboard className="w-4 h-4" />
+              Shortcuts
+            </button>
+            <button
+              onClick={handleLogout}
+              className="flex-1 flex items-center justify-center gap-2 text-[12px] text-gray-500 hover:text-red-400 py-2 rounded-lg hover:bg-red-500/10 transition-all duration-200"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg>
+              Sign out
+            </button>
+          </div>
         </div>
       </aside>
+
+      {/* Shortcuts Modal */}
+      <ShortcutsHelp
+        isOpen={showShortcuts}
+        onClose={() => setShowShortcuts(false)}
+        shortcuts={helpItems}
+      />
 
       {/* Main content */}
       <main className="flex-1 overflow-auto">{children}</main>

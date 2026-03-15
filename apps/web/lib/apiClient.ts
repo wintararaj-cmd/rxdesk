@@ -1,5 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../store/authStore';
+import { useConfigStore } from '../store/configStore';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1';
 
@@ -12,7 +13,9 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (typeof window !== 'undefined') {
     const token = useAuthStore.getState().accessToken;
+    const fy = useConfigStore.getState().financialYear;
     if (token) config.headers.set('Authorization', `Bearer ${token}`);
+    if (fy) config.headers.set('x-financial-year', fy);
   }
   return config;
 });
@@ -206,6 +209,10 @@ export const accountingApi = {
     apiClient.get('/accounting/reports/cashbook', { params: { from, to } }),
   getBankbook: (from: string, to: string, method?: string) =>
     apiClient.get('/accounting/reports/bankbook', { params: { from, to, method } }),
+
+  // Backup & Restore
+  backup: () => apiClient.get('/accounting/backup'),
+  restore: (data: object) => apiClient.post('/accounting/restore', data),
 };
 
 export const doctorApi = {

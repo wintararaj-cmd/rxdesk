@@ -1301,3 +1301,189 @@ export async function getBankbook(userId: string, opts: { from: string; to: stri
   const totalCredit = lines.reduce((s, l) => s + l.credit, 0);
   return { from: opts.from, to: opts.to, lines, total_debit: Math.round(totalDebit * 100) / 100, total_credit: Math.round(totalCredit * 100) / 100, net: Math.round((totalCredit - totalDebit) * 100) / 100 };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Backup & Restore
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function exportAccountingData(userId: string) {
+  const shop = await getShopOrThrow(userId);
+  const [
+    suppliers,
+    purchases,
+    payments,
+    income,
+    expenses,
+    customers,
+    cashRegisters,
+    saleReturns,
+    purchaseReturns,
+    contras
+  ] = await Promise.all([
+    prisma.supplier.findMany({ where: { shop_id: shop.id } }),
+    prisma.purchaseEntry.findMany({ where: { shop_id: shop.id }, include: { items: true } }),
+    prisma.supplierPayment.findMany({ where: { shop_id: shop.id } }),
+    prisma.incomeEntry.findMany({ where: { shop_id: shop.id } }),
+    prisma.expenseEntry.findMany({ where: { shop_id: shop.id } }),
+    prisma.creditCustomer.findMany({ where: { shop_id: shop.id }, include: { transactions: true } }),
+    prisma.dailyCashRegister.findMany({ where: { shop_id: shop.id } }),
+    prisma.saleReturn.findMany({ where: { shop_id: shop.id }, include: { items: true } }),
+    prisma.purchaseReturn.findMany({ where: { shop_id: shop.id }, include: { items: true } }),
+    prisma.contraEntry.findMany({ where: { shop_id: shop.id } }),
+  ]);
+
+  return {
+    version: '1.0',
+    timestamp: new Date().toISOString(),
+    shop_id: shop.id,
+    data: {
+      suppliers,
+      purchases,
+      payments,
+      income,
+      expenses,
+      customers,
+      cashRegisters,
+      saleReturns,
+      purchaseReturns,
+      contras
+    }
+  };
+}
+
+export async function restoreAccountingData(userId: string, backup: any) {
+  const shop = await getShopOrThrow(userId);
+  const data = backup.data;
+
+  if (!data) throw new AppError(400, 'VALIDATION_ERROR', 'Invalid backup format');
+
+  return prisma.$transaction(async (tx) => {
+    // 1. Delete ALL existing accounting records for this shop
+    // Order matters for foreign keys
+    await tx.saleReturnItem.deleteMany({ where: { return: { shop_id: shop.id } } });
+    await tx.saleReturn.deleteMany({ where: { shop_id: shop.id } });
+    await tx.purchaseReturnItem.deleteMany({ where: { return: { shop_id: shop.id } } });
+    await tx.purchaseReturn.deleteMany({ where: { shop_id: shop.id } });
+    await tx.contraEntry.deleteMany({ where: { shop_id: shop.id } });
+    await tx.dailyCashRegister.deleteMany({ where: { shop_id: shop.id } });
+    await tx.creditTransaction.deleteMany({ where: { shop_id: shop.id } });
+    await tx.creditCustomer.deleteMany({ where: { shop_id: shop.id } });
+    await tx.expenseEntry.deleteMany({ where: { shop_id: shop.id } });
+    await tx.incomeEntry.deleteMany({ where: { shop_id: shop.id } });
+    await tx.supplierPayment.deleteMany({ where: { shop_id: shop.id } });
+    await tx.purchaseItem.deleteMany({ where: { purchase: { shop_id: shop.id } } });
+    await tx.purchaseEntry.deleteMany({ where: { shop_id: shop.id } });
+    await tx.supplier.deleteMany({ where: { shop_id: shop.id } });
+
+    // 2. Restore data
+    
+    // Suppliers
+    if (data.suppliers?.length) {
+      await tx.supplier.createMany({
+        data: data.suppliers.map((s: any) => ({ ...s, shop_id: shop.id }))
+      });
+    }
+
+    // Purchase Entries & Items
+    if (data.purchases?.length) {
+      for (const p of data.purchases) {
+        const { items, ...entryData } = p;
+        await tx.purchaseEntry.create({
+          data: {
+            ...entryData,
+            shop_id: shop.id,
+            items: {
+              create: items.map((i: any) => ({ ...i, id: undefined, purchase_id: undefined }))
+            }
+          }
+        });
+      }
+    }
+
+    // Payments
+    if (data.payments?.length) {
+      await tx.supplierPayment.createMany({
+        data: data.payments.map((p: any) => ({ ...p, shop_id: shop.id }))
+      });
+    }
+
+    // Income
+    if (data.income?.length) {
+      await tx.incomeEntry.createMany({
+        data: data.income.map((i: any) => ({ ...i, shop_id: shop.id }))
+      });
+    }
+
+    // Expenses
+    if (data.expenses?.length) {
+      await tx.expenseEntry.createMany({
+        data: data.expenses.map((e: any) => ({ ...e, shop_id: shop.id }))
+      });
+    }
+
+    // Credit Customers & Transactions
+    if (data.customers?.length) {
+      for (const c of data.customers) {
+        const { transactions, ...customerData } = c;
+        await tx.creditCustomer.create({
+          data: {
+            ...customerData,
+            shop_id: shop.id,
+            transactions: {
+              create: transactions.map((t: any) => ({ ...t, id: undefined, customer_id: undefined, shop_id: shop.id }))
+            }
+          }
+        });
+      }
+    }
+
+    // Cash Registers
+    if (data.cashRegisters?.length) {
+      await tx.dailyCashRegister.createMany({
+        data: data.cashRegisters.map((cr: any) => ({ ...cr, shop_id: shop.id }))
+      });
+    }
+
+    // Sale Returns
+    if (data.saleReturns?.length) {
+      for (const sr of data.saleReturns) {
+        const { items, ...returnData } = sr;
+        await tx.saleReturn.create({
+          data: {
+            ...returnData,
+            shop_id: shop.id,
+            items: {
+              create: items.map((i: any) => ({ ...i, id: undefined, return_id: undefined }))
+            }
+          }
+        });
+      }
+    }
+
+    // Purchase Returns
+    if (data.purchaseReturns?.length) {
+      for (const pr of data.purchaseReturns) {
+        const { items, ...returnData } = pr;
+        await tx.purchaseReturn.create({
+          data: {
+            ...returnData,
+            shop_id: shop.id,
+            items: {
+              create: items.map((i: any) => ({ ...i, id: undefined, return_id: undefined }))
+            }
+          }
+        });
+      }
+    }
+
+    // Contras
+    if (data.contras?.length) {
+      await tx.contraEntry.createMany({
+        data: data.contras.map((c: any) => ({ ...c, shop_id: shop.id }))
+      });
+    }
+
+    return { message: 'Accounting data successfully restored' };
+  });
+}
+

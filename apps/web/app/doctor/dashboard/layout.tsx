@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '../../../store/authStore';
+import { useConfigStore } from '../../../store/configStore';
+import { useQueryClient } from '@tanstack/react-query';
 import { authApi } from '../../../lib/apiClient';
 
 const NAV = [
@@ -38,6 +40,8 @@ export default function DoctorDashboardLayout({ children }: { children: React.Re
   const pathname = usePathname();
   const router = useRouter();
   const { user, clearAuth, accessToken } = useAuthStore();
+  const { financialYear, setFinancialYear, getAvailableFYs } = useConfigStore();
+  const qc = useQueryClient();
   const [hovered, setHovered] = useState<string | null>(null);
 
   useEffect(() => {
@@ -47,6 +51,12 @@ export default function DoctorDashboardLayout({ children }: { children: React.Re
       router.replace('/doctor/login');
     }
   }, [accessToken, user, router]);
+
+  useEffect(() => {
+    if (accessToken) {
+      qc.invalidateQueries();
+    }
+  }, [financialYear, accessToken, qc]);
 
   if (!accessToken || user?.role !== 'doctor') {
     return (
@@ -71,13 +81,35 @@ export default function DoctorDashboardLayout({ children }: { children: React.Re
 
         {/* Brand */}
         <div className="relative z-10 px-6 pt-7 pb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/25">
-              <span className="text-white font-bold text-sm tracking-tight">RX</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/25">
+                <span className="text-white font-bold text-sm tracking-tight">RX</span>
+              </div>
+              <div>
+                <p className="text-white font-semibold text-sm tracking-tight">RxDesk</p>
+                <p className="text-emerald-400/70 text-xs">Doctor Panel</p>
+              </div>
             </div>
-            <div>
-              <p className="text-white font-semibold text-sm tracking-tight">RxDesk</p>
-              <p className="text-emerald-400/70 text-xs">Doctor Panel</p>
+
+            {/* Financial Year Selector */}
+            <div className="relative">
+              <select
+                value={financialYear}
+                onChange={(e) => setFinancialYear(e.target.value)}
+                className="appearance-none bg-white/[0.05] border border-white/10 text-[11px] font-bold text-emerald-300 px-2 py-1 rounded-lg outline-none cursor-pointer hover:bg-white/[0.08] transition-colors pr-6"
+              >
+                {getAvailableFYs().map(fy => (
+                  <option key={fy} value={fy} className="bg-[#0a0f0a] text-white font-medium">
+                    FY {fy}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-emerald-400/60">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+              </div>
             </div>
           </div>
         </div>

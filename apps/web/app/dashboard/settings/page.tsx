@@ -1,12 +1,10 @@
 'use client';
 
-'use client';
-
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { shopApi, subscriptionApi, chamberApi } from '../../../lib/apiClient';
+import { shopApi, subscriptionApi, chamberApi, accountingApi } from '../../../lib/apiClient';
 import { useAuthStore } from '../../../store/authStore';
-import { Phone, Mail, Clock, X } from 'lucide-react';
+import { Phone, Mail, Clock, X, Database, Download, Upload, AlertCircle, Check } from 'lucide-react';
 
 type GstType = 'unregistered' | 'composite' | 'regular';
 
@@ -531,6 +529,92 @@ export default function SettingsPage() {
               </button>
             </div>
           </form>
+        </div>
+
+        {/* Backup & Restore */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Database className="w-5 h-5 text-violet-600" />
+            <h2 className="text-base font-semibold text-gray-800">Accounting Backup & Restore</h2>
+          </div>
+          <p className="text-gray-500 text-sm mb-6">
+            Keep your financial records safe. Export all accounting data (Suppliers, Purchases, Expenses, Income, etc.) to a JSON file or restore from a previous backup.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4">
+            <button
+              onClick={async () => {
+                try {
+                  const res = await accountingApi.backup();
+                  const data = res.data.data;
+                  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `rxdesk-accounting-backup-${new Date().toISOString().split('T')[0]}.json`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                } catch (err) {
+                  alert('Failed to generate backup');
+                }
+              }}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Download Backup (JSON)
+            </button>
+
+            <div className="flex-1 relative">
+              <input
+                type="file"
+                accept=".json"
+                className="absolute inset-0 opacity-0 cursor-pointer"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+
+                  if (!confirm('WARNING: Restoring will OVERWRITE all current accounting data. This cannot be undone. Are you sure you want to proceed?')) {
+                    e.target.value = '';
+                    return;
+                  }
+
+                  try {
+                    const reader = new FileReader();
+                    reader.onload = async (event) => {
+                      try {
+                        const json = JSON.parse(event.target?.result as string);
+                        await accountingApi.restore(json);
+                        alert('Accounting data restored successfully!');
+                        qc.invalidateQueries();
+                      } catch (err: any) {
+                        alert('Restore failed: ' + (err.response?.data?.error?.message ?? 'Invalid file format'));
+                      }
+                    };
+                    reader.readAsText(file);
+                  } catch (err) {
+                    alert('Failed to read file');
+                  }
+                  e.target.value = '';
+                }}
+              />
+              <button className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors">
+                <Upload className="w-4 h-4" />
+                Upload & Restore
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-100 flex gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+            <div className="text-xs text-amber-800 leading-relaxed">
+              <strong>Note:</strong> Restore operation is destructive. It will remove all existing suppliers, 
+              purchases, and payment records for the current shop before importing the backup file. 
+              Inventory and Bill records are NOT affected, but links to accounting entries may be lost if 
+              they aren't part of the backup.
+            </div>
+          </div>
         </div>
       </div>
 

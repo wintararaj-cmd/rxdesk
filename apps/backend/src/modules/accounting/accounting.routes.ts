@@ -350,4 +350,20 @@ router.get('/reports/bankbook', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ─── Backup & Restore ─────────────────────────────────────────────────────────
+
+router.get('/backup', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.exportAccountingData(req.user!.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/restore', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.restoreAccountingData(req.user!.id, req.body);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 export default router;

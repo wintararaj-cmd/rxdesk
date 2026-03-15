@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '../../../store/authStore';
+import { useConfigStore } from '../../../store/configStore';
+import { useQueryClient } from '@tanstack/react-query';
 import { authApi } from '../../../lib/apiClient';
 
 const NAV = [
@@ -39,8 +41,9 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
   const pathname = usePathname();
   const router = useRouter();
   const { user, clearAuth, accessToken } = useAuthStore();
+  const { financialYear, setFinancialYear, getAvailableFYs } = useConfigStore();
+  const qc = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
-
   useEffect(() => {
     if (!accessToken) {
       router.replace('/admin/login');
@@ -48,6 +51,12 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
       router.replace('/admin/login');
     }
   }, [accessToken, user, router]);
+
+  useEffect(() => {
+    if (accessToken) {
+      qc.invalidateQueries();
+    }
+  }, [financialYear, accessToken, qc]);
 
   if (!accessToken || user?.role !== 'admin') {
     return (
@@ -140,11 +149,33 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
               {NAV.find((n) => isActive(n.href))?.label ?? 'Admin'}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs bg-rose-600/20 text-rose-400 px-2.5 py-1 rounded-full font-medium border border-rose-500/20">
-              ADMIN
-            </span>
-            <span className="text-xs text-gray-600 font-mono">{user?.phone}</span>
+          <div className="flex items-center gap-4">
+            {/* Financial Year Selector */}
+            <div className="relative">
+              <select
+                value={financialYear}
+                onChange={(e) => setFinancialYear(e.target.value)}
+                className="appearance-none bg-white/[0.05] border border-white/10 text-[11px] font-bold text-gray-400 px-3 py-1.5 rounded-lg outline-none cursor-pointer hover:bg-white/[0.08] transition-colors pr-8"
+              >
+                {getAvailableFYs().map(fy => (
+                  <option key={fy} value={fy} className="bg-[#1a1a2e] text-white font-medium">
+                    FY {fy}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-600">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs bg-rose-600/20 text-rose-400 px-2.5 py-1 rounded-full font-medium border border-rose-500/20">
+                ADMIN
+              </span>
+              <span className="text-xs text-gray-600 font-mono">{user?.phone}</span>
+            </div>
           </div>
         </header>
         <div className="p-6">
