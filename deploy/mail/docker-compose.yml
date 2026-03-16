@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   maddy:
     image: foxcpp/maddy:0.7
@@ -24,7 +22,7 @@ services:
       - mail-network
 
   alps:
-    image: foxcpp/alps:latest
+    image: ghcr.io/foxcpp/alps:latest
     container_name: mail_alps
     restart: unless-stopped
     ports:
