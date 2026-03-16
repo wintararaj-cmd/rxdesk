@@ -22,12 +22,14 @@ services:
       - mail-network
 
   alps:
-    build: ./alps
+    image: alphajack/alps:latest
     container_name: mail_alps
     restart: unless-stopped
     ports:
       - "${ALPS_PORT:-8081}:80"
-    command: -theme alps -addr 0.0.0.0:80 -login-key "${ALPS_LOGIN_KEY:-docnear_secret_key_123}" imap://maddy:143 smtps://maddy:587
+    environment:
+      - ALPS_LOGIN_KEY=${ALPS_LOGIN_KEY:-docnear_secret_key_123}
+    command: -addr 0.0.0.0:80 imap://maddy:143 smtps://maddy:587
     depends_on:
       - maddy
     networks:
