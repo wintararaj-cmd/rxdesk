@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  maddy:
+    image: foxcpp/maddy:0.7
+    container_name: mail_maddy
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - MADDY_HOSTNAME=${MADDY_HOSTNAME:-mx.example.com}
+      - MADDY_DOMAIN=${MADDY_DOMAIN:-example.com}
+    ports:
+      - "25:25"     # SMTP
+      - "587:587"   # Submission
+      - "993:993"   # IMAPS
+      - "143:143"   # IMAP (internal or for Alps)
+      - "465:465"   # SMTPS
+    volumes:
+      - ./maddy/data:/data
+      - ./maddy/maddy.conf:/data/maddy.conf:ro
+      # Uncomment if you have certificates
+      # - /etc/letsencrypt:/etc/letsencrypt:ro
+    networks:
+      - mail-network
+
+  alps:
+    image: foxcpp/alps:latest
+    container_name: mail_alps
+    restart: unless-stopped
+    ports:
+      - "${ALPS_PORT:-8081}:80"
+    command: -theme docnear imap://maddy:143 smtps://maddy:587
+    depends_on:
+      - maddy
+    networks:
+      - mail-network
+
+networks:
+  mail-network:
+    driver: bridge
