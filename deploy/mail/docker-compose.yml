@@ -22,12 +22,12 @@ services:
       - mail-network
 
   alps:
-    image: ghcr.io/foxcpp/alps:latest
+    build: ./alps
     container_name: mail_alps
     restart: unless-stopped
     ports:
       - "${ALPS_PORT:-8081}:80"
-    command: -theme docnear imap://maddy:143 smtps://maddy:587
+    command: -theme alps -addr 0.0.0.0:80 -login-key "${ALPS_LOGIN_KEY:-docnear_secret_key_123}" imap://maddy:143 smtps://maddy:587
     depends_on:
       - maddy
     networks:
