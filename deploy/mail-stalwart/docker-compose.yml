@@ -17,6 +17,18 @@ services:
     volumes:
       - ./data:/opt/stalwart-mail
 
+  # Add SnappyMail Webmail
+  webmail:
+    image: szupan/snappymail:latest
+    container_name: snappymail
+    restart: unless-stopped
+    ports:
+      - "8081:8888"
+    networks:
+      - stalwart-network
+    volumes:
+      - ./snappymail:/var/www/html/data
+
 networks:
   stalwart-network:
     driver: bridge

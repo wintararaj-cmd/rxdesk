@@ -11,6 +11,16 @@ Stalwart is a modern, all-in-one mail server written in Rust. It includes SMTP, 
 
 ## 🔑 Initial Setup
 
-- After starting, check the **Coolify Logs** for the container.
-- You will see a message like: `ADMIN PASSWORD: [random_string]`.
-- Go to `https://mail.rxdesk.in` (assuming you set up the domain) or `http://[IP]:8080` and log in with user `admin` and that password.
+- Go to `https://mail.rxdesk.in` (mapped to **8082**) and log in with user `admin` and the password from the logs. This is the **Management UI**.
+
+## 📧 Webmail Access (User Inbox)
+
+I have added **SnappyMail** to the setup to provide your user inbox.
+1. Map a domain (like `webmail.rxdesk.in`) to port **8081** in Coolify.
+2. Go to that URL in your browser.
+3. Log in with the email account you created (e.g., `support@rxdesk.in`).
+4. **Login Configuration**:
+   - **User**: `support@rxdesk.in`
+   - **Password**: The password you set in the Stalwart UI.
+   - **IMAP Host**: `stalwart` (Port 143)
+   - **SMTP Host**: `stalwart` (Port 587)
