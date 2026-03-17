@@ -543,6 +543,7 @@ export default function SettingsPage() {
           
           <div className="flex flex-col sm:flex-row gap-4">
             <button
+              disabled={sub?.status === 'trial'}
               onClick={async () => {
                 try {
                   const res = await accountingApi.backup();
@@ -560,7 +561,7 @@ export default function SettingsPage() {
                   alert('Failed to generate backup');
                 }
               }}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Download className="w-4 h-4" />
               Download Backup (JSON)
@@ -570,7 +571,8 @@ export default function SettingsPage() {
               <input
                 type="file"
                 accept=".json"
-                className="absolute inset-0 opacity-0 cursor-pointer"
+                disabled={sub?.status === 'trial'}
+                className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
@@ -599,12 +601,21 @@ export default function SettingsPage() {
                   e.target.value = '';
                 }}
               />
-              <button className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors">
+              <button 
+                disabled={sub?.status === 'trial'}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              >
                 <Upload className="w-4 h-4" />
                 Upload & Restore
               </button>
             </div>
           </div>
+
+          {sub?.status === 'trial' && (
+            <p className="mt-3 text-[11px] text-violet-600 font-bold bg-violet-50 px-3 py-1.5 rounded-lg border border-violet-100 italic">
+              ✨ Backup & Restore features are available only for subscribed users. Upgrade to unlock!
+            </p>
+          )}
 
           <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-100 flex gap-3">
             <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
