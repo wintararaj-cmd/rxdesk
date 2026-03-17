@@ -72,7 +72,10 @@ function printThermalReceipt(bill: BillData, shopName = 'Medical Shop') {
   const cur = (v: number | string) => `Rs.${Number(v).toFixed(2)}`;
   const itemRows = bill.items.map(it =>
     `<tr>
-      <td style="padding:2px 0;word-break:break-word">${it.medicine_name}</td>
+      <td style="padding:2px 0;word-break:break-word">
+        ${it.medicine_name}
+        ${it.batch_number ? `<div style="font-size:8px;color:#666;margin-top:1px">Batch: ${it.batch_number}</div>` : ''}
+      </td>
       <td style="text-align:center;padding:2px 4px;white-space:nowrap">${it.quantity}</td>
       <td style="text-align:right;padding:2px 0;white-space:nowrap">${cur(it.mrp)}</td>
       <td style="text-align:right;padding:2px 0;white-space:nowrap">${cur(it.line_total)}</td>
@@ -806,8 +809,11 @@ function WalkInSaleTab() {
   const mrpRefs = useRef<(HTMLInputElement | null)[]>([]);
   const discountRefs = useRef<(HTMLInputElement | null)[]>([]);
   const addItemBtnRef = useRef<HTMLButtonElement | null>(null);
+  const globalDiscountRef = useRef<HTMLInputElement | null>(null);
   const [customerHighlight, setCustomerHighlight] = useState(-1);
   const [suggHighlights, setSuggHighlights] = useState<Record<number, number>>({});
+  const [triedToSubmit, setTriedToSubmit] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const { data: shopData } = useQuery({ queryKey: ['shop-me'], queryFn: () => shopApi.getMyShop().then(r => r.data.data), staleTime: 5 * 60 * 1000 });
   const shopName = (shopData as any)?.shop_name ?? 'Medical Shop';
   const isTaxInvoice = (shopData as any)?.gst_type === 'regular';
@@ -850,6 +856,7 @@ function WalkInSaleTab() {
     setCreatedBill(null); setCustomerName(''); setCustomerPhone('');
     setPaymentMethod('cash'); setGlobalDiscount(''); setItems([{ ...EMPTY_ITEM }]);
     setCustomerSearchResults([]); setShowCustomerDropdown(false); setCustomerHighlight(-1); setSuggHighlights({});
+    setTriedToSubmit(false); setValidationError(null);
     createMutation.reset();
   };
 
@@ -949,8 +956,24 @@ function WalkInSaleTab() {
   const calcTotal = calcSubtotal - totalDiscountAmount + calcGst;
 
   const handleCreate = () => {
-    const validItems = items.filter((it) => it.medicine_name && Number(it.mrp) > 0 && Number(it.quantity) > 0);
-    if (validItems.length === 0) return;
+    setTriedToSubmit(true);
+    setValidationError(null);
+
+    const activeItems = items.filter(it => it.medicine_name.trim() !== '' || Number(it.mrp) > 0 || Number(it.quantity) > 0);
+    
+    if (activeItems.length === 0) {
+      setValidationError('Please add at least one medicine item');
+      return;
+    }
+
+    const hasIncompleteRow = activeItems.some(it => !it.medicine_name.trim());
+    if (hasIncompleteRow) {
+      setValidationError('Medicine name cannot be blank for any added item');
+      return;
+    }
+
+    const validItems = activeItems.filter((it) => it.medicine_name.trim() && Number(it.mrp) > 0 && Number(it.quantity) > 0);
+    
     createMutation.mutate({
       customer_name: customerName || undefined,
       customer_phone: customerPhone || undefined,
@@ -1000,8 +1023,11 @@ function WalkInSaleTab() {
             {createdBill.items.map((item, i) => (
               <div key={item.id} className={`flex justify-between py-2 text-sm ${i > 0 ? 'border-t border-gray-100' : ''}`}>
                 <div>
-                  <span className="text-gray-900 font-medium">{item.medicine_name}</span>
-                  <span className="text-gray-400 text-xs ml-2">× {item.quantity} @ ₹{item.mrp}</span>
+                  <div className="text-gray-900 font-medium">{item.medicine_name}</div>
+                  <div className="flex gap-2 text-[10px] items-center">
+                    <span className="text-gray-400">× {item.quantity} @ ₹{item.mrp}</span>
+                    {item.batch_number && <span className="bg-gray-100 text-gray-500 px-1 rounded">Batch: {item.batch_number}</span>}
+                  </div>
                 </div>
                 <span className="font-semibold text-gray-900">{fmtCurrency(item.line_total)}</span>
               </div>
@@ -1183,10 +1209,29 @@ function WalkInSaleTab() {
                         if (e.key === 'ArrowDown') { e.preventDefault(); setSuggHighlights((p) => ({ ...p, [idx]: Math.min(h + 1, suggs.length - 1) })); }
                         else if (e.key === 'ArrowUp') { e.preventDefault(); setSuggHighlights((p) => ({ ...p, [idx]: Math.max(h - 1, 0) })); }
                         else if (e.key === 'Enter' && h >= 0 && suggs[h]) { e.preventDefault(); selectSuggestion(idx, suggs[h]); }
-                        else if (e.key === 'Enter' && (h < 0 || suggs.length === 0)) { e.preventDefault(); setSuggestions((p) => ({ ...p, [idx]: [] })); unitSelectRefs.current[idx]?.focus(); }
-                        else if (e.key === 'Escape') { setSuggestions((p) => ({ ...p, [idx]: [] })); setSuggHighlights((p) => ({ ...p, [idx]: -1 })); }
+                        else if (e.key === 'Enter' && (h < 0 || suggs.length === 0)) { 
+                          e.preventDefault(); 
+                          if (!item.medicine_name.trim()) {
+                            setTriedToSubmit(true);
+                            setValidationError('Medicine name cannot be blank');
+                          } else {
+                            setSuggestions((p) => ({ ...p, [idx]: [] })); 
+                            unitSelectRefs.current[idx]?.focus(); 
+                          }
+                        }
+                        else if (e.key === 'Escape') { 
+                          if ((suggestions[idx]?.length ?? 0) > 0) {
+                            setSuggestions((p) => ({ ...p, [idx]: [] })); 
+                            setSuggHighlights((p) => ({ ...p, [idx]: -1 })); 
+                          } else {
+                            if (!item.medicine_name.trim() && items.length > 1) {
+                              removeItem(idx);
+                            }
+                            globalDiscountRef.current?.focus();
+                          }
+                        }
                       }}
-                      className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 placeholder:text-gray-300"
+                      className={`w-full border rounded-lg px-3 h-9 text-sm text-gray-900 outline-none transition-all placeholder:text-gray-300 ${triedToSubmit && !item.medicine_name.trim() ? 'border-red-500 bg-red-50 focus:ring-red-100' : 'border-gray-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-100'}`}
                     />
                     {/* Autocomplete dropdown */}
                     {suggestions[idx] && suggestions[idx].length > 0 && (
@@ -1346,6 +1391,7 @@ function WalkInSaleTab() {
               Discount (₹) <span className="text-gray-400 font-normal">(optional)</span>
             </h3>
             <input
+              ref={globalDiscountRef}
               type="number"
               min="0"
               placeholder="0"
@@ -1407,10 +1453,10 @@ function WalkInSaleTab() {
           </div>
         </div>
 
-        {createMutation.isError && (
-          <div className="flex items-center gap-2 text-red-600 bg-red-50 px-4 py-3 rounded-xl text-sm">
+        {(createMutation.isError || validationError) && (
+          <div className="flex items-center gap-2 text-red-600 bg-red-50 px-4 py-3 rounded-xl text-sm mt-4">
             <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
-            {(createMutation.error as any)?.response?.data?.error?.message ?? 'Failed to create bill. Please try again.'}
+            {createMutation.isError ? ((createMutation.error as any)?.response?.data?.error?.message ?? 'Failed to create bill. Please try again.') : validationError}
           </div>
         )}
 

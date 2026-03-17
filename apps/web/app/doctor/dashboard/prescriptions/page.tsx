@@ -45,6 +45,7 @@ export default function DoctorPrescriptionsPage() {
   const [advice, setAdvice] = useState('');
   const [followUp, setFollowUp] = useState('');
   const [formError, setFormError] = useState('');
+  const [triedToSubmit, setTriedToSubmit] = useState(false);
 
   const openModal = () => {
     setApptId('');
@@ -54,6 +55,7 @@ export default function DoctorPrescriptionsPage() {
     setAdvice('');
     setFollowUp('');
     setFormError('');
+    setTriedToSubmit(false);
     setShowModal(true);
   };
 
@@ -85,16 +87,22 @@ export default function DoctorPrescriptionsPage() {
   };
 
   const handleSubmit = () => {
+    setTriedToSubmit(true);
     if (!apptId) { setFormError('Please select an appointment.'); return; }
     if (!diagnosis.trim()) { setFormError('Diagnosis is required.'); return; }
-    const validItems = items.filter((it) => it.medicine_name.trim());
-    if (validItems.length === 0) { setFormError('Add at least one medicine.'); return; }
+    
+    const activeItems = items.filter(it => it.medicine_name.trim() || it.dosage || it.frequency || it.duration);
+    if (activeItems.length === 0) { setFormError('Add at least one medicine.'); return; }
+
+    const hasBlankMedicine = activeItems.some(it => !it.medicine_name.trim());
+    if (hasBlankMedicine) { setFormError('Medicine name cannot be blank for any added item.'); return; }
+
     setFormError('');
     createMutation.mutate({
       appointment_id: apptId,
       diagnosis: diagnosis.trim(),
       chief_complaint: complaint.trim() || undefined,
-      items: validItems,
+      items: activeItems,
       advice: advice.trim() || undefined,
       follow_up_date: followUp || undefined,
     });
@@ -252,7 +260,7 @@ export default function DoctorPrescriptionsPage() {
                             value={item.medicine_name}
                             onChange={(e) => updateItem(idx, 'medicine_name', e.target.value)}
                             placeholder="e.g. Paracetamol 500mg"
-                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                            className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none transition-all ${triedToSubmit && !item.medicine_name.trim() ? 'border-red-500 bg-red-50 focus:ring-2 focus:ring-red-300' : 'border-gray-200 focus:ring-2 focus:ring-emerald-300'}`}
                           />
                         </div>
                         <div>

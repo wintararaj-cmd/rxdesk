@@ -178,6 +178,12 @@ export async function createManualBill(
     throw new AppError(400, 'VALIDATION_ERROR', 'At least one item is required');
   }
 
+  for (const item of data.items) {
+    if (!item.medicine_name || !item.medicine_name.trim()) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Medicine name cannot be blank for any item');
+    }
+  }
+
   const billItems: {
     inventory_id?: string;
     medicine_name: string;
@@ -192,65 +198,111 @@ export async function createManualBill(
   }[] = [];
 
   for (const item of data.items) {
-    let invId = item.inventory_id;
-    let batchNumber: string | undefined;
-    let expiryDate: Date | undefined;
+    let remainingQty = item.quantity;
+    const itemBatches: typeof billItems = [];
+    const usedInventoryIds = new Set<string>();
 
-    // Auto-resolve inventory if not provided
-    if (!invId) {
-      const inv = await prisma.shopInventory.findFirst({
+    // 1. Try to fulfill from the specifically selected batch first
+    if (item.inventory_id) {
+      const inv = await prisma.shopInventory.findUnique({ where: { id: item.inventory_id } });
+      if (inv) {
+        const take = Math.min(inv.stock_qty, remainingQty);
+        const discAmt = (item.discount_type === 'percentage') 
+          ? (item.mrp * take * item.discount_value) / 100 
+          : (take * item.discount_value);
+        
+        itemBatches.push({
+          inventory_id: inv.id,
+          medicine_name: item.medicine_name,
+          batch_number: inv.batch_number || undefined,
+          expiry_date: inv.expiry_date || undefined,
+          mrp: item.mrp,
+          quantity: take,
+          discount_type: item.discount_type,
+          discount_value: item.discount_value,
+          gst_rate: isTaxInvoice ? (item.gst_rate ?? 12) : 0,
+          line_total: (item.mrp * take) - discAmt,
+        });
+        remainingQty -= take;
+        usedInventoryIds.add(inv.id);
+      }
+    }
+
+    // 2. Clear out other available batches (FEFO) if quantity still remains
+    if (remainingQty > 0) {
+      const otherBatches = await prisma.shopInventory.findMany({
         where: {
           shop_id: shop.id,
-          medicine_name: { contains: item.medicine_name, mode: 'insensitive' },
+          id: { notIn: Array.from(usedInventoryIds) },
+          medicine_name: { equals: item.medicine_name, mode: 'insensitive' },
           stock_qty: { gt: 0 },
         },
         orderBy: { expiry_date: 'asc' },
       });
-      if (inv) {
-        invId = inv.id;
-        batchNumber = inv.batch_number ?? undefined;
-        expiryDate = inv.expiry_date ?? undefined;
+
+      for (const b of otherBatches) {
+        if (remainingQty <= 0) break;
+        const take = Math.min(b.stock_qty, remainingQty);
+        const discAmt = (item.discount_type === 'percentage') 
+          ? (item.mrp * take * item.discount_value) / 100 
+          : (take * item.discount_value);
+
+        itemBatches.push({
+          inventory_id: b.id,
+          medicine_name: item.medicine_name,
+          batch_number: b.batch_number || undefined,
+          expiry_date: b.expiry_date || undefined,
+          mrp: item.mrp,
+          quantity: take,
+          discount_type: item.discount_type,
+          discount_value: item.discount_value,
+          gst_rate: isTaxInvoice ? (item.gst_rate ?? 12) : 0,
+          line_total: (item.mrp * take) - discAmt,
+        });
+        remainingQty -= take;
+        usedInventoryIds.add(b.id);
       }
     }
 
-    const gstRate = isTaxInvoice ? (item.gst_rate ?? 12) : 0;
-    const discType = item.discount_type ?? 'percentage';
-    const discVal = item.discount_value ?? 0;
-    const sub = item.mrp * item.quantity;
-    const discAmt = discType === 'percentage' ? (sub * discVal) / 100 : (item.quantity * discVal);
-    const lineTotal = sub - discAmt;
+    // 3. Absolute Fallback: if quantity still left, add the remainder to the last known batch (or generic)
+    if (remainingQty > 0) {
+      const discAmt = (item.discount_type === 'percentage') 
+        ? (item.mrp * remainingQty * item.discount_value) / 100 
+        : (remainingQty * item.discount_value);
 
-    billItems.push({
-      inventory_id: invId,
-      medicine_name: item.medicine_name,
-      batch_number: batchNumber,
-      expiry_date: expiryDate,
-      mrp: item.mrp,
-      quantity: item.quantity,
-      discount_type: discType as any,
-      discount_value: discVal,
-      gst_rate: gstRate,
-      line_total: lineTotal,
-    });
-
-    // Deduct stock
-    if (invId) {
-      const updatedInv = await prisma.shopInventory.update({
-        where: { id: invId },
-        data: { stock_qty: { decrement: item.quantity } },
+      itemBatches.push({
+        medicine_name: item.medicine_name,
+        mrp: item.mrp,
+        quantity: remainingQty,
+        discount_type: item.discount_type,
+        discount_value: item.discount_value,
+        gst_rate: isTaxInvoice ? (item.gst_rate ?? 12) : 0,
+        line_total: (item.mrp * remainingQty) - discAmt,
       });
-      if (updatedInv.stock_qty <= updatedInv.reorder_level) {
-        prisma.notification.create({
-          data: {
-            user_id: userId,
-            title: 'Low Stock Alert',
-            body: `${updatedInv.medicine_name} is running low — only ${updatedInv.stock_qty} unit(s) left.`,
-            type: 'push',
-            category: 'stock_alert',
-            reference_id: updatedInv.id,
-            reference_type: 'inventory',
-          },
-        }).catch((e) => logger.warn(`Low-stock alert (manual bill) failed: ${e?.message}`));
+    }
+
+    // Deduct stock and add items to final list
+    for (const ib of itemBatches) {
+      billItems.push(ib);
+      if (ib.inventory_id) {
+        const updatedInv = await prisma.shopInventory.update({
+          where: { id: ib.inventory_id },
+          data: { stock_qty: { decrement: ib.quantity } },
+        });
+        
+        if (updatedInv.stock_qty <= updatedInv.reorder_level) {
+          prisma.notification.create({
+            data: {
+              user_id: userId,
+              title: 'Low Stock Alert',
+              body: `${updatedInv.medicine_name} is running low — only ${updatedInv.stock_qty} unit(s) left.`,
+              type: 'push',
+              category: 'stock_alert',
+              reference_id: updatedInv.id,
+              reference_type: 'inventory',
+            },
+          }).catch((e) => logger.warn(`Low-stock alert failed: ${e?.message}`));
+        }
       }
     }
   }

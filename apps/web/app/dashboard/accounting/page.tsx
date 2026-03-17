@@ -643,10 +643,15 @@ function PurchasesTab() {
   const piFreeQtyRefs = useRef<(HTMLInputElement | null)[]>([]);
   const piCostRefs = useRef<(HTMLInputElement | null)[]>([]);
   const piMrpRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const piDiscRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const piGstRefs = useRef<(HTMLSelectElement | null)[]>([]);
   const piAddRowBtnRef = useRef<HTMLButtonElement | null>(null);
   const piInvoiceNoRef = useRef<HTMLInputElement | null>(null);
   const piInvDateRef = useRef<HTMLInputElement | null>(null);
   const piReceivedDateRef = useRef<HTMLInputElement | null>(null);
+  const piNotesRef = useRef<HTMLInputElement | null>(null);
+  const [triedToSubmit, setTriedToSubmit] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const { data: suppliersData } = useQuery<{ id: string; name: string }[]>({
     queryKey: ['web-suppliers'],
@@ -670,6 +675,8 @@ function PurchasesTab() {
       qc.invalidateQueries({ queryKey: ['web-purchases'] });
       resetForm();
       setShowForm(false);
+      setTriedToSubmit(false);
+      setFormError(null);
     },
   });
 
@@ -709,11 +716,17 @@ function PurchasesTab() {
 
   const selectSuggestion = (idx: number, inv: { medicine_name: string; mrp: number; gst_rate: number; unit?: string }) => {
     setPiItems((prev) => prev.map((it, i) =>
-      i === idx ? { ...it, medicine_name: inv.medicine_name, mrp: String(inv.mrp), gst_rate: String(inv.gst_rate ?? 12), unit: inv.unit ?? it.unit } : it
+      i === idx ? { ...it, medicine_name: inv.medicine_name, mrp: String(inv.mrp || ''), gst_rate: String(inv.gst_rate ?? 12), unit: inv.unit ?? it.unit } : it
     ));
     setSuggestions((p) => ({ ...p, [idx]: [] }));
     setSuggHighlights((p) => ({ ...p, [idx]: -1 }));
-    setTimeout(() => piUnitRefs.current[idx]?.focus(), 0);
+    setTimeout(() => {
+      if (!piItems[idx].unit) {
+        piUnitRefs.current[idx]?.focus();
+      } else {
+        piBatchRefs.current[idx]?.focus();
+      }
+    }, 0);
   };
 
   const addPiItem = () => setPiItems((p) => [...p, { ...EMPTY_PI_ITEM }]);
@@ -737,8 +750,22 @@ function PurchasesTab() {
   const calcTotal = piItems.reduce((s, it) => s + lineTotal(it), 0);
 
   const handleSubmit = () => {
-    const validItems = piItems.filter((it) => it.medicine_name && it.batch_number && it.expiry_date && Number(it.purchase_price) > 0 && Number(it.quantity) > 0);
-    if (!validItems.length || !invoiceDate) return;
+    setTriedToSubmit(true);
+    setFormError(null);
+
+    const validItems = piItems.filter((it) => it.medicine_name.trim() !== '' || Number(it.purchase_price) > 0 || Number(it.quantity) > 0);
+    
+    if (!validItems.length) {
+      setFormError('Please add at least one medicine item');
+      return;
+    }
+
+    const hasIncomplete = validItems.some(it => !it.medicine_name.trim() || !it.batch_number.trim() || !it.expiry_date || Number(it.purchase_price) <= 0);
+    if (hasIncomplete) {
+      setFormError('Please fill missing Medicine, Batch, Expiry, and Cost for all rows');
+      return;
+    }
+
     createMutation.mutate({
       supplier_id: supplierId || undefined,
       invoice_number: invoiceNumber || undefined,
@@ -746,9 +773,9 @@ function PurchasesTab() {
       received_date: receivedDate || invoiceDate,
       notes: notes || undefined,
       items: validItems.map((it) => ({
-        medicine_name: it.medicine_name,
+        medicine_name: it.medicine_name.trim(),
         unit: it.unit || 'strip',
-        batch_number: it.batch_number,
+        batch_number: it.batch_number.trim(),
         expiry_date: it.expiry_date,
         quantity: Number(it.quantity),
         free_qty: Number(it.free_qty) || 0,
@@ -885,9 +912,18 @@ function PurchasesTab() {
                           else if (e.key === 'ArrowUp') { e.preventDefault(); setSuggHighlights((p) => ({ ...p, [idx]: Math.max(h - 1, 0) })); }
                           else if (e.key === 'Enter' && h >= 0 && suggs[h]) { e.preventDefault(); selectSuggestion(idx, suggs[h]); }
                           else if (e.key === 'Enter' && (h < 0 || suggs.length === 0)) { e.preventDefault(); setSuggestions((p) => ({ ...p, [idx]: [] })); piUnitRefs.current[idx]?.focus(); }
-                          else if (e.key === 'Escape') { setSuggestions((p) => ({ ...p, [idx]: [] })); setSuggHighlights((p) => ({ ...p, [idx]: -1 })); }
+                          else if (e.key === 'Escape') { 
+                            setSuggestions((p) => ({ ...p, [idx]: [] })); 
+                            setSuggHighlights((p) => ({ ...p, [idx]: -1 })); 
+                            if (!item.medicine_name.trim()) {
+                              if (piItems.length > 1) {
+                                removePiItem(idx);
+                              }
+                              setTimeout(() => piNotesRef.current?.focus(), 0);
+                            }
+                          }
                         }}
-                        className="w-full border border-gray-200 rounded-xl px-3 h-10 text-sm text-gray-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 placeholder:text-gray-300 transition-all font-medium"
+                        className={`w-full border rounded-xl px-3 h-10 text-sm text-gray-900 outline-none transition-all placeholder:text-gray-300 font-medium ${triedToSubmit && !item.medicine_name.trim() ? 'border-red-500 bg-red-50 focus:ring-red-100' : 'border-gray-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-100'}`}
                       />
                       {suggestions[idx]?.length > 0 && (
                         <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto ring-1 ring-black/5 animate-in fade-in slide-in-from-top-1">
@@ -914,12 +950,12 @@ function PurchasesTab() {
                       <input ref={(el) => { piBatchRefs.current[idx] = el; }} type="text" placeholder="Batch" value={item.batch_number}
                         onChange={(e) => updatePiItem(idx, 'batch_number', e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piExpiryRefs.current[idx]?.focus(); } }}
-                        className="w-full border border-gray-200 rounded-xl px-3 h-10 text-xs text-gray-900 outline-none focus:border-violet-500 shadow-sm font-mono placeholder:text-gray-300"
+                        className={`w-full border rounded-xl px-3 h-10 text-xs text-gray-900 outline-none transition-all font-mono placeholder:text-gray-300 ${triedToSubmit && !item.batch_number.trim() ? 'border-red-500 bg-red-50 focus:border-red-400' : 'border-gray-200 focus:border-violet-500'}`}
                       />
                       <input ref={(el) => { piExpiryRefs.current[idx] = el; }} type="date" value={item.expiry_date}
                         onChange={(e) => updatePiItem(idx, 'expiry_date', e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piQtyRefs.current[idx]?.focus(); } }}
-                        className="w-full border border-gray-200 rounded-xl px-2 h-10 text-xs text-gray-900 outline-none focus:border-violet-500 shadow-sm"
+                        className={`w-full border rounded-xl px-2 h-10 text-xs text-gray-900 outline-none transition-all ${triedToSubmit && !item.expiry_date ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-violet-500'}`}
                       />
                     </div>
                     <div>
@@ -935,20 +971,31 @@ function PurchasesTab() {
                     <div>
                       <input ref={(el) => { piCostRefs.current[idx] = el; }} type="number" min="0" step="0.01" placeholder="0.00" value={item.purchase_price} onChange={(e) => updatePiItem(idx, 'purchase_price', e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piMrpRefs.current[idx]?.focus(); } }}
-                        className="w-full border border-gray-200 rounded-xl px-2 h-10 text-sm font-bold text-indigo-600 outline-none focus:border-indigo-500 shadow-sm" />
+                        className={`w-full border rounded-xl px-2 h-10 text-sm font-bold outline-none transition-all ${triedToSubmit && Number(item.purchase_price) <= 0 ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-indigo-600 focus:border-indigo-500'}`} />
                     </div>
                     <div>
                       <input ref={(el) => { piMrpRefs.current[idx] = el; }} type="number" min="0" step="0.01" placeholder="0.00" value={item.mrp} onChange={(e) => updatePiItem(idx, 'mrp', e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piAddRowBtnRef.current?.focus(); } }}
+                        onKeyDown={(e) => { 
+                          if (e.key === 'Enter') { 
+                            e.preventDefault(); 
+                            if (idx === piItems.length - 1) {
+                              addPiItem();
+                              setTimeout(() => piMedRefs.current[idx + 1]?.focus(), 0);
+                            } else {
+                              piMedRefs.current[idx + 1]?.focus();
+                            }
+                          } 
+                        }}
                         className="w-full border border-gray-200 rounded-xl px-2 h-10 text-sm font-black text-violet-700 outline-none focus:border-violet-500 shadow-sm" />
                     </div>
                     <div>
-                      <input type="number" min="0" max="100" placeholder="0" value={item.discount_pct} onChange={(e) => updatePiItem(idx, 'discount_pct', e.target.value)}
+                      <input ref={(el) => { piDiscRefs.current[idx] = el; }} type="number" min="0" max="100" placeholder="0" value={item.discount_pct} onChange={(e) => updatePiItem(idx, 'discount_pct', e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piGstRefs.current[idx]?.focus(); } }}
                         className="w-full border border-gray-200 rounded-xl px-1 h-10 text-sm text-center text-emerald-600 font-bold outline-none focus:border-emerald-500 shadow-sm" />
                     </div>
                     <div>
-                      <select value={item.gst_rate} onChange={(e) => updatePiItem(idx, 'gst_rate', e.target.value)}
-                        className="w-full border border-gray-200 rounded-xl px-1 h-10 text-xs text-gray-900 outline-none focus:border-violet-500 bg-white font-semibold">
+                      <select ref={(el) => { piGstRefs.current[idx] = el; }} value={item.gst_rate} onChange={(e) => updatePiItem(idx, 'gst_rate', e.target.value)}
+                        className="w-full border border-gray-200 rounded-xl px-1 h-10 text-xs text-gray-900 outline-none focus:border-violet-500 bg-white font-semibold shadow-sm">
                         {GST_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
                       </select>
                     </div>
@@ -976,7 +1023,7 @@ function PurchasesTab() {
           {/* Notes */}
           <div>
             <label className="text-xs font-medium text-gray-500 block mb-1">Notes (optional)</label>
-            <input type="text" placeholder="e.g. Credit 30 days" value={notes} onChange={(e) => setNotes(e.target.value)}
+            <input ref={piNotesRef} type="text" placeholder="e.g. Credit 30 days" value={notes} onChange={(e) => setNotes(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400" />
           </div>
 
@@ -1009,10 +1056,11 @@ function PurchasesTab() {
               </button>
             </div>
           </div>
-          {createMutation.isError && (
-            <p className="text-red-500 text-xs mt-1">
-              {(createMutation.error as any)?.response?.data?.error?.message ?? 'Failed to save. Please check all fields.'}
-            </p>
+          {(createMutation.isError || formError) && (
+            <div className="flex items-center gap-2 text-red-600 bg-red-50 px-4 py-3 rounded-xl text-sm mt-4">
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+              {createMutation.isError ? ((createMutation.error as any)?.response?.data?.error?.message ?? 'Failed to save. Please try again.') : formError}
+            </div>
           )}
         </div>
       )}

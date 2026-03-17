@@ -17,6 +17,16 @@ export async function createPrescription(
     follow_up_date?: string;
   }
 ) {
+  if (!data.items || data.items.length === 0) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'At least one medicine is required');
+  }
+
+  for (const item of data.items) {
+    if (!item.medicine_name || !item.medicine_name.trim()) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Medicine name cannot be blank');
+    }
+  }
+
   const doctor = await prisma.doctor.findUnique({ where: { user_id: userId } });
   if (!doctor) throw new AppError(403, 'FORBIDDEN', 'Only doctors can create prescriptions');
 

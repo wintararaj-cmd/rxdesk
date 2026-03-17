@@ -77,6 +77,7 @@ export default function InventoryPage() {
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
   const [form, setForm] = useState<typeof EMPTY_ADD_FORM>(EMPTY_ADD_FORM);
   const [editForm, setEditForm] = useState<Partial<typeof EMPTY_EDIT_FORM>>({});
+  const [triedToSubmit, setTriedToSubmit] = useState(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
@@ -138,6 +139,7 @@ export default function InventoryPage() {
       qc.invalidateQueries({ queryKey: ['inventory', page, search] });
       setEditItem(null);
       setEditForm({});
+      setTriedToSubmit(false);
     },
   });
 
@@ -181,6 +183,10 @@ export default function InventoryPage() {
 
   const handleUpdate = () => {
     if (!editItem) return;
+    if (!editForm.medicine_name?.trim()) {
+      alert('Medicine name is required');
+      return;
+    }
     updateMutation.mutate({
       id: editItem.id,
       data: {
@@ -464,7 +470,7 @@ export default function InventoryPage() {
                   ) : (
                     <input
                       type={type}
-                      className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500"
+                      className={`w-full border rounded-lg px-3 h-9 text-sm text-gray-900 outline-none transition-all ${triedToSubmit && !editForm.medicine_name?.trim() && key === 'medicine_name' ? 'border-red-500 bg-red-50 focus:ring-2 focus:ring-red-100' : 'border-gray-200 focus:border-violet-500'}`}
                       value={editForm[key] ?? ''}
                       onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}
                     />
