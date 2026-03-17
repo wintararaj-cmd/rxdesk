@@ -19,7 +19,7 @@ services:
 
   # Add SnappyMail Webmail
   webmail:
-    image: szupan/snappymail:latest
+    image: djmaze/snappymail:latest
     container_name: snappymail
     restart: unless-stopped
     ports:
