@@ -21,6 +21,7 @@ services:
   webmail:
     image: djmaze/snappymail:latest
     container_name: snappymail
+    user: root
     restart: unless-stopped
     ports:
       - "8081:8888"
@@ -30,7 +31,7 @@ services:
       - SNAPPYMAIL_ADMIN_USER=admin
       - SNAPPYMAIL_ADMIN_PASS=Admin123!
     volumes:
-      - ./snappymail:/var/www/html/data
+      - ./snappymail:/var/lib/snappymail
 
 networks:
   stalwart-network:
