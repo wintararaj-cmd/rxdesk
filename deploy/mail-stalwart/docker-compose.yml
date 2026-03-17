@@ -26,6 +26,9 @@ services:
       - "8081:8888"
     networks:
       - stalwart-network
+    environment:
+      - SNAPPYMAIL_ADMIN_USER=admin
+      - SNAPPYMAIL_ADMIN_PASS=Admin123!
     volumes:
       - ./snappymail:/var/www/html/data
 

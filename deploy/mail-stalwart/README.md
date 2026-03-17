@@ -20,7 +20,20 @@ I have added **SnappyMail** to the setup to provide your user inbox.
 2. Go to that URL in your browser.
 3. Log in with the email account you created (e.g., `support@rxdesk.in`).
 4. **Login Configuration**:
-   - **User**: `support@rxdesk.in`
-   - **Password**: The password you set in the Stalwart UI.
-   - **IMAP Host**: `stalwart` (Port 143)
    - **SMTP Host**: `stalwart` (Port 587)
+
+## 🔧 Configuring SnappyMail (One-time Setup)
+
+If you get a "cannot connect" error on the login screen, you need to tell SnappyMail where the server is:
+1. Go to `http://192.99.167.217:8081/?admin`
+2. **User**: `admin`
+3. **Password**: `Admin123!`
+4. Go to **Domains** -> **Add Domain**.
+5. **Name**: `rxdesk.in`
+6. **IMAP**:
+   - Server: `stalwart`
+   - Port: `143`
+7. **SMTP**:
+   - Server: `stalwart`
+   - Port: `587`
+8. Click **Add**. Now you can log in on the normal page!
