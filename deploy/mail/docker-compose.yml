@@ -19,7 +19,10 @@ services:
       # Uncomment if you have certificates
       # - /etc/letsencrypt:/etc/letsencrypt:ro
     networks:
-      - mail-network
+      mail-network:
+        aliases:
+          - ${MADDY_HOSTNAME:-mx.example.com}
+          - maddy
 
   alps:
     image: alphajack/alps:latest
@@ -29,7 +32,7 @@ services:
       - "${ALPS_PORT:-8081}:80"
     environment:
       - ALPS_LOGIN_KEY=${ALPS_LOGIN_KEY:-docnear_secret_key_123}
-    command: -addr 0.0.0.0:80 imap://maddy:143 smtps://maddy:587
+    command: -addr 0.0.0.0:80 -insecure imap://maddy:143 smtp://maddy:587
     depends_on:
       - maddy
     networks:
