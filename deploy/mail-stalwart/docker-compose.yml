@@ -1,0 +1,22 @@
+services:
+  stalwart:
+    image: stalwartlabs/mail-server:latest
+    container_name: mail_stalwart
+    restart: unless-stopped
+    hostname: mx.rxdesk.in
+    networks:
+      - stalwart-network
+    ports:
+      - "25:25"      # SMTP
+      - "465:465"    # SMTPS
+      - "587:587"    # Submission
+      - "143:143"    # IMAP
+      - "993:993"    # IMAPS
+      - "4190:4190"  # ManageSieve
+      - "8080:8080"  # Web Admin / Webmail
+    volumes:
+      - ./data:/opt/stalwart-mail
+
+networks:
+  stalwart-network:
+    driver: bridge
