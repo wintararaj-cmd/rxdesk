@@ -7,7 +7,7 @@ Stalwart is a modern, all-in-one mail server written in Rust. It includes SMTP, 
 1. Delete the old mail resource in Coolify.
 2. Create a new **Docker Compose** resource.
 3. Copy the contents of `docker-compose.yml` into Coolify.
-4. Point `mail.rxdesk.in` to port `8080` in the Coolify domain settings.
+4. Point `mail.rxdesk.in` to port `8082` in the Coolify domain settings.
 
 ## 🔑 Initial Setup
 

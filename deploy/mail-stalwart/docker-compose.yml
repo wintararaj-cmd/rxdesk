@@ -13,7 +13,7 @@ services:
       - "143:143"    # IMAP
       - "993:993"    # IMAPS
       - "4190:4190"  # ManageSieve
-      - "8080:8080"  # Web Admin / Webmail
+      - "8082:8080"  # Web Admin / Webmail
     volumes:
       - ./data:/opt/stalwart-mail
 
