@@ -32,9 +32,7 @@ services:
       - "${ALPS_PORT:-8081}:80"
     environment:
       - ALPS_LOGIN_KEY=${ALPS_LOGIN_KEY:-docnear_secret_key_123}
-      - IMAP_INSECURE=true
-      - SMTP_INSECURE=true
-    command: -addr 0.0.0.0:80 -debug imap://maddy:143 smtp://maddy:587
+    command: -addr 0.0.0.0:80 -debug imap+insecure://maddy:143 smtp+insecure://maddy:587
     depends_on:
       - maddy
     networks:
