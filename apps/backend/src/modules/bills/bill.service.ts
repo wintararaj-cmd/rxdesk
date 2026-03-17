@@ -202,14 +202,17 @@ export async function createManualBill(
     const itemBatches: typeof billItems = [];
     const usedInventoryIds = new Set<string>();
 
+    const itemDiscountType = item.discount_type ?? 'percentage';
+    const itemDiscountValue = item.discount_value ?? 0;
+
     // 1. Try to fulfill from the specifically selected batch first
     if (item.inventory_id) {
       const inv = await prisma.shopInventory.findUnique({ where: { id: item.inventory_id } });
       if (inv) {
         const take = Math.min(inv.stock_qty, remainingQty);
-        const discAmt = (item.discount_type === 'percentage') 
-          ? (item.mrp * take * item.discount_value) / 100 
-          : (take * item.discount_value);
+        const discAmt = (itemDiscountType === 'percentage') 
+          ? (item.mrp * take * itemDiscountValue) / 100 
+          : (take * itemDiscountValue);
         
         itemBatches.push({
           inventory_id: inv.id,
@@ -218,8 +221,8 @@ export async function createManualBill(
           expiry_date: inv.expiry_date || undefined,
           mrp: item.mrp,
           quantity: take,
-          discount_type: item.discount_type,
-          discount_value: item.discount_value,
+          discount_type: itemDiscountType,
+          discount_value: itemDiscountValue,
           gst_rate: isTaxInvoice ? (item.gst_rate ?? 12) : 0,
           line_total: (item.mrp * take) - discAmt,
         });
@@ -243,9 +246,9 @@ export async function createManualBill(
       for (const b of otherBatches) {
         if (remainingQty <= 0) break;
         const take = Math.min(b.stock_qty, remainingQty);
-        const discAmt = (item.discount_type === 'percentage') 
-          ? (item.mrp * take * item.discount_value) / 100 
-          : (take * item.discount_value);
+        const discAmt = (itemDiscountType === 'percentage') 
+          ? (item.mrp * take * itemDiscountValue) / 100 
+          : (take * itemDiscountValue);
 
         itemBatches.push({
           inventory_id: b.id,
@@ -254,8 +257,8 @@ export async function createManualBill(
           expiry_date: b.expiry_date || undefined,
           mrp: item.mrp,
           quantity: take,
-          discount_type: item.discount_type,
-          discount_value: item.discount_value,
+          discount_type: itemDiscountType,
+          discount_value: itemDiscountValue,
           gst_rate: isTaxInvoice ? (item.gst_rate ?? 12) : 0,
           line_total: (item.mrp * take) - discAmt,
         });
@@ -266,16 +269,16 @@ export async function createManualBill(
 
     // 3. Absolute Fallback: if quantity still left, add the remainder to the last known batch (or generic)
     if (remainingQty > 0) {
-      const discAmt = (item.discount_type === 'percentage') 
-        ? (item.mrp * remainingQty * item.discount_value) / 100 
-        : (remainingQty * item.discount_value);
+      const discAmt = (itemDiscountType === 'percentage') 
+        ? (item.mrp * remainingQty * itemDiscountValue) / 100 
+        : (remainingQty * itemDiscountValue);
 
       itemBatches.push({
         medicine_name: item.medicine_name,
         mrp: item.mrp,
         quantity: remainingQty,
-        discount_type: item.discount_type,
-        discount_value: item.discount_value,
+        discount_type: itemDiscountType,
+        discount_value: itemDiscountValue,
         gst_rate: isTaxInvoice ? (item.gst_rate ?? 12) : 0,
         line_total: (item.mrp * remainingQty) - discAmt,
       });
