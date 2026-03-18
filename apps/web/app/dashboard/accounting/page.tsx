@@ -2537,11 +2537,13 @@ function SettingsTab() {
 
   const [autoBackup, setAutoBackup] = useState(false);
   const [backupTime, setBackupTime] = useState('00:00');
+  const [backupPath, setBackupPath] = useState('/rxdesk');
 
   useEffect(() => {
     if (shop) {
       setAutoBackup(!!shop.auto_backup_enabled);
       setBackupTime(shop.backup_time || '00:00');
+      setBackupPath(shop.backup_path || '/rxdesk');
     }
   }, [shop]);
 
@@ -2592,7 +2594,7 @@ function SettingsTab() {
             </button>
           </div>
 
-          <div className={`space-y-6 transition-all duration-500 ${autoBackup ? 'opacity-100 scale-100' : 'opacity-40 grayscale pointer-events-none scale-[0.98]'}`}>
+          <div className={`space-y-10 transition-all duration-500 ${autoBackup ? 'opacity-100 scale-100' : 'opacity-40 grayscale pointer-events-none scale-[0.98]'}`}>
             <div>
               <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-4 ml-1">Daily Execution Time (24h)</label>
               <div className="flex items-center gap-4 bg-gray-50/50 p-2 rounded-3xl border border-gray-100">
@@ -2603,16 +2605,32 @@ function SettingsTab() {
                   className="bg-white border-0 rounded-2xl px-6 py-4 text-2xl font-black text-gray-900 focus:ring-4 focus:ring-violet-100 transition-all outline-none w-full shadow-sm"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-4 ml-1">Storage Destination (Local Drive Path)</label>
+              <div className="bg-gray-50/50 p-2 rounded-3xl border border-gray-100 flex items-center gap-1">
+                 <div className="pl-5 text-gray-400">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.625-5.25l1.625-1.625A1.5 1.5 0 0013.626 4H6.375A1.5 1.5 0 004.875 5.5v11.25c0 .414.336.75.75.75H21a.75.75 0 00.75-.75V7.5a.75.75 0 00-.75-.75h-9.375z" /></svg>
+                 </div>
+                 <input 
+                  type="text" 
+                  value={backupPath}
+                  onChange={(e) => setBackupPath(e.target.value)}
+                  placeholder="e.g. D:\RxDesk\Backups"
+                  className="bg-white border-0 rounded-2xl px-6 py-4 text-sm font-bold text-gray-900 focus:ring-4 focus:ring-violet-100 transition-all outline-none w-full shadow-sm"
+                />
+              </div>
               <p className="text-[11px] text-gray-400 font-bold mt-4 ml-1 flex items-start gap-2">
                 <svg className="w-4 h-4 text-violet-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
-                <span>Backups are stored in the local <code className="text-violet-600 bg-violet-50 px-1 rounded">/rxdesk</code> folder. The system will automatically keep the most recent three backups.</span>
+                <span>The system will create a shop-specific folder at this location. We automatically rotate and keep the 3 most recent backups.</span>
               </p>
             </div>
           </div>
 
           <div className="pt-4">
             <button
-              onClick={() => updateMutation.mutate({ auto_backup_enabled: autoBackup, backup_time: backupTime })}
+              onClick={() => updateMutation.mutate({ auto_backup_enabled: autoBackup, backup_time: backupTime, backup_path: backupPath })}
               disabled={updateMutation.isPending}
               className={`w-full bg-gradient-to-br from-violet-600 to-indigo-700 text-white py-5 rounded-3xl text-sm font-black uppercase tracking-widest shadow-2xl shadow-violet-200 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 ${updateMutation.isSuccess ? 'from-emerald-500 to-teal-600' : ''}`}
             >

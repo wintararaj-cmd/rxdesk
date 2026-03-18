@@ -48,8 +48,14 @@ async function performAutoBackup(shop: any) {
   try {
     const data = await exportAccountingData(shop.owner_user_id);
     // Sanitize shop name for folder creation
-    const sanitizedName = shop.shop_name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const shopFolder = path.join(BACKUP_ROOT, sanitizedName);
+    const sanitizedName = (shop.shop_name || 'shop').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    
+    // Resolve backup path: use shop.backup_path if available, otherwise fallback to /rxdesk
+    const customPath = (shop.backup_path || '/rxdesk').trim();
+    // On Windows, /rxdesk resolves to the root of the current drive. 
+    // If the user provides a full path like D:\Backups, path.resolve will preserve it.
+    const resolvedRoot = path.isAbsolute(customPath) ? customPath : path.resolve(customPath);
+    const shopFolder = path.join(resolvedRoot, sanitizedName);
     
     // Ensure shop folder exists
     await fs.mkdir(shopFolder, { recursive: true });

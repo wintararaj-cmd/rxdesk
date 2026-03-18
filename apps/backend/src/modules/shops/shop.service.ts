@@ -181,6 +181,7 @@ export async function updateShop(
     gst_type?: 'unregistered' | 'composite' | 'regular';
     auto_backup_enabled?: boolean;
     backup_time?: string;
+    backup_path?: string;
   }
 ) {
   const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });
@@ -206,6 +207,7 @@ export async function updateShop(
       ...(data.gst_type !== undefined && { gst_type: data.gst_type }),
       ...(data.auto_backup_enabled !== undefined && { auto_backup_enabled: data.auto_backup_enabled }),
       ...(data.backup_time !== undefined && { backup_time: data.backup_time }),
+      ...(data.backup_path !== undefined && { backup_path: data.backup_path }),
     },
   });
 }
