@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, Fragment, useEffect } from 'react';
+import React, { useState, useRef, Fragment, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { accountingApi, inventoryApi, medicinesApi, shopApi } from '../../../lib/apiClient';
 
@@ -2532,7 +2532,7 @@ function SettingsTab() {
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: backups, refetch: refetchBackups, isLoading: loadingBackups } = useQuery<any>({
+  const { data: backups, refetch: refetchBackups } = useQuery<any>({
     queryKey: ['web-backups'],
     queryFn: () => accountingApi.getBackupList().then(r => r.data.data),
   });
@@ -2576,7 +2576,7 @@ function SettingsTab() {
     <div className="max-w-4xl space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Backup Card */}
-        <div className="bg-white rounded-[2.5rem] p-8 md:p-10 border border-gray-100 shadow-xl shadow-gray-200/50 flex flex-col items-start gap-6">
+        <div className="bg-white rounded-[2.5rem] p-10 border border-gray-100 shadow-xl shadow-gray-200/50 flex flex-col items-start gap-6">
           <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 shadow-sm">
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -2595,7 +2595,7 @@ function SettingsTab() {
         </div>
 
         {/* Restore Card */}
-        <div className="bg-white rounded-[2.5rem] p-8 md:p-10 border border-gray-100 shadow-xl shadow-gray-200/50 flex flex-col items-start gap-6">
+        <div className="bg-white rounded-[2.5rem] p-10 border border-gray-100 shadow-xl shadow-gray-200/50 flex flex-col items-start gap-6">
           <div className="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-600 shadow-sm">
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
@@ -2605,13 +2605,7 @@ function SettingsTab() {
             <h3 className="text-xl font-black text-gray-900 tracking-tight mb-2">Restore Data</h3>
             <p className="text-sm text-gray-500 font-medium leading-relaxed">Upload an RxDesk backup file (.json) to restore your accounting data.</p>
           </div>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleRestore} 
-            accept=".json" 
-            className="hidden" 
-          />
+          <input type="file" ref={fileInputRef} onChange={handleRestore} accept=".json" className="hidden" />
           <button 
             onClick={() => fileInputRef.current?.click()}
             className="w-full bg-rose-500 hover:bg-rose-600 text-white py-4 rounded-3xl text-sm font-black uppercase tracking-widest shadow-lg shadow-rose-100 transition-all hover:scale-[1.02] active:scale-95 mt-auto"
@@ -2621,7 +2615,7 @@ function SettingsTab() {
         </div>
       </div>
 
-      {/* Cloud Backups Helper (Optional list of server-side backups) */}
+      {/* Server Backups */}
       <div className="bg-gray-50/50 rounded-[2.5rem] p-8 border border-gray-100">
         <div className="flex items-center justify-between mb-6 px-2">
           <div>
@@ -2631,54 +2625,25 @@ function SettingsTab() {
           <button onClick={() => refetchBackups()} className="w-10 h-10 rounded-full bg-white text-gray-400 flex items-center justify-center hover:text-violet-600 shadow-sm transition-all italic font-black">↻</button>
         </div>
         
-            <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-6 ml-1">Local Backup Options</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-               <button 
-                onClick={handleManualDownload}
-                className="bg-white border border-gray-100 p-8 rounded-[2.5rem] hover:shadow-xl transition-all text-left group flex flex-col items-start gap-4"
-               >
-                  <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
-                    <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
-                  </div>
-                  <div>
-                    <h5 className="text-base font-black text-gray-900 mb-1">Backup to this Computer</h5>
-                    <p className="text-[10px] text-gray-400 font-bold leading-relaxed uppercase tracking-wide">Download your data instantly to your machine.</p>
-                  </div>
-               </button>
-
-               <div className="bg-gray-50/50 rounded-[2.5rem] p-6 border border-gray-100 flex flex-col">
-                  <h5 className="text-xs font-black text-gray-900 mb-4 px-2 flex items-center justify-between uppercase tracking-widest">
-                    Recent Server Backups
-                    <button onClick={() => refetchBackups()} className="w-8 h-8 rounded-full hover:bg-white text-gray-400 flex items-center justify-center transition-all bg-white/50">↻</button>
-                  </h5>
-                  <div className="space-y-3 overflow-y-auto max-h-[160px] no-scrollbar">
-                    {backups?.length ? backups.slice(0, 5).map((b: any) => (
-                      <div key={b.filename} className="flex items-center justify-between bg-white p-3.5 rounded-2xl shadow-sm border border-gray-50 group hover:border-violet-100 transition-all">
-                         <div className="min-w-0 pl-1">
-                            <p className="text-[10px] font-black text-gray-900 truncate" title={b.filename}>{b.filename}</p>
-                            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tight">{new Date(b.date).toLocaleString()} • {(b.size / 1024).toFixed(1)} KB</p>
-                         </div>
-                         <button 
-                          onClick={() => {
-                            const url = `${process.env.NEXT_PUBLIC_API_URL || 'https://backend.rxdesk.in'}/api/v1/accounting/backups/download/${b.filename}`;
-                            window.open(url, '_blank');
-                          }}
-                          className="w-9 h-9 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center hover:bg-violet-600 hover:text-white transition-all shadow-sm grow-0 shrink-0"
-                         >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
-                         </button>
-                      </div>
-                    )) : (
-                      <div className="py-10 text-center flex flex-col items-center gap-2">
-                         <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-gray-200">∅</div>
-                         <p className="text-[10px] text-gray-400 font-bold uppercase">No records found</p>
-                      </div>
-                    )}
-                  </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {backups?.length ? backups.slice(0, 4).map((b: any) => (
+            <div key={b.filename} className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex items-center justify-between group hover:border-violet-200 transition-all">
+               <div className="min-w-0 pl-1">
+                  <p className="text-[11px] font-black text-gray-900 truncate mb-0.5">{b.filename}</p>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">{new Date(b.date).toLocaleDateString()} • {(b.size / 1024).toFixed(1)} KB</p>
                </div>
+               <button 
+                  onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL || 'https://backend.rxdesk.in'}/api/v1/accounting/backups/download/${b.filename}`, '_blank')}
+                  className="w-10 h-10 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center hover:bg-violet-600 hover:text-white transition-all shadow-sm shrink-0"
+               >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+               </button>
             </div>
-          </div>
-          </div>
+          )) : (
+            <div className="col-span-full py-12 text-center flex flex-col items-center gap-3">
+               <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">No server-side backups found</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
