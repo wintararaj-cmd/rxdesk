@@ -2555,6 +2555,28 @@ function SettingsTab() {
     }
   }, [shop]);
 
+  const { data: backups, refetch: refetchBackups } = useQuery<any>({
+    queryKey: ['web-backups'],
+    queryFn: () => accountingApi.getBackupList().then(r => r.data.data),
+    enabled: true
+  });
+
+  const handleManualDownload = async () => {
+    try {
+      const res = await accountingApi.backup(); 
+      const data = res.data.data;
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `rxdesk_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Local backup failed. Please check your connection.');
+    }
+  };
+
   const updateMutation = useMutation({
     mutationFn: (data: any) => shopApi.updateProfile(data),
     onSuccess: () => {
@@ -2709,6 +2731,56 @@ function SettingsTab() {
             >
               {updateMutation.isPending ? 'Saving Preferences...' : updateMutation.isSuccess ? 'Preferences Saved!' : 'Apply Settings'}
             </button>
+          </div>
+
+          <div className="pt-10 border-t border-gray-100 mt-10">
+            <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-6 ml-1">Local Backup Options</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+               <button 
+                onClick={handleManualDownload}
+                className="bg-white border border-gray-100 p-8 rounded-[2.5rem] hover:shadow-xl transition-all text-left group flex flex-col items-start gap-4"
+               >
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
+                    <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                  </div>
+                  <div>
+                    <h5 className="text-base font-black text-gray-900 mb-1">Backup to this Computer</h5>
+                    <p className="text-[10px] text-gray-400 font-bold leading-relaxed uppercase tracking-wide">Download your data instantly to your machine.</p>
+                  </div>
+               </button>
+
+               <div className="bg-gray-50/50 rounded-[2.5rem] p-6 border border-gray-100 flex flex-col">
+                  <h5 className="text-xs font-black text-gray-900 mb-4 px-2 flex items-center justify-between uppercase tracking-widest">
+                    Recent Server Backups
+                    <button onClick={() => refetchBackups()} className="w-8 h-8 rounded-full hover:bg-white text-gray-400 flex items-center justify-center transition-all bg-white/50">↻</button>
+                  </h5>
+                  <div className="space-y-3 overflow-y-auto max-h-[160px] no-scrollbar">
+                    {backups?.length ? backups.slice(0, 5).map((b: any) => (
+                      <div key={b.filename} className="flex items-center justify-between bg-white p-3.5 rounded-2xl shadow-sm border border-gray-50 group hover:border-violet-100 transition-all">
+                         <div className="min-w-0 pl-1">
+                            <p className="text-[10px] font-black text-gray-900 truncate" title={b.filename}>{b.filename}</p>
+                            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tight">{new Date(b.date).toLocaleString()} • {(b.size / 1024).toFixed(1)} KB</p>
+                         </div>
+                         <button 
+                          onClick={() => {
+                            const url = `${process.env.NEXT_PUBLIC_API_URL || 'https://backend.rxdesk.in'}/api/v1/accounting/backups/download/${b.filename}`;
+                            window.open(url, '_blank');
+                          }}
+                          className="w-9 h-9 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center hover:bg-violet-600 hover:text-white transition-all shadow-sm grow-0 shrink-0"
+                         >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                         </button>
+                      </div>
+                    )) : (
+                      <div className="py-10 text-center flex flex-col items-center gap-2">
+                         <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-gray-200">∅</div>
+                         <p className="text-[10px] text-gray-400 font-bold uppercase">No records found</p>
+                      </div>
+                    )}
+                  </div>
+               </div>
+            </div>
+          </div>
           </div>
         </div>
       </div>

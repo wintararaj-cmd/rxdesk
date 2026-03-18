@@ -214,6 +214,8 @@ export const accountingApi = {
   // Backup & Restore
   backup: () => apiClient.get('/accounting/backup'),
   restore: (data: object) => apiClient.post('/accounting/restore', data),
+  getBackupList: () => apiClient.get('/accounting/backups/list'),
+  triggerServerBackup: () => apiClient.post('/accounting/backups/trigger'),
 };
 
 export const doctorApi = {

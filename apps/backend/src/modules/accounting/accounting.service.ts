@@ -2,6 +2,8 @@ import prisma from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { Prisma } from '@prisma/client';
 import logger from '../../utils/logger';
+import path from 'path';
+import fs from 'fs/promises';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Helpers
@@ -1485,5 +1487,68 @@ export async function restoreAccountingData(userId: string, backup: any) {
 
     return { message: 'Accounting data successfully restored' };
   });
+}
+
+// ─── Local Drive Backups (Server-side files) ──────────────────────────────────
+
+export async function getShopBackupFolder(userId: string) {
+  const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });
+  if (!shop) throw new AppError(404, 'NOT_FOUND', 'Shop not found');
+  
+  const sanitizedName = (shop.shop_name || 'shop').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  const customPath = (shop.backup_path || '/rxdesk').trim();
+  const resolvedRoot = path.isAbsolute(customPath) ? customPath : path.resolve(customPath);
+  return path.join(resolvedRoot, sanitizedName);
+}
+
+export async function listLocalBackups(userId: string) {
+  const shopFolder = await getShopBackupFolder(userId);
+  try {
+    const files = await fs.readdir(shopFolder);
+    const backups = files
+      .filter(f => f.startsWith('rxdesk_backup_') && f.endsWith('.json'))
+      .sort((a, b) => b.localeCompare(a));
+    
+    const details = await Promise.all(backups.map(async f => {
+      try {
+        const stats = await fs.stat(path.join(shopFolder, f));
+        return {
+          filename: f,
+          size: stats.size,
+          date: stats.mtime
+        };
+      } catch { return null; }
+    }));
+    return details.filter(Boolean);
+  } catch (e) {
+    return [];
+  }
+}
+
+export async function getBackupFilePath(userId: string, filename: string) {
+  const shopFolder = await getShopBackupFolder(userId);
+  const filePath = path.join(shopFolder, filename);
+  // Security check: ensure file is within the shop folder
+  const resolved = path.resolve(filePath);
+  const resolvedFolder = path.resolve(shopFolder);
+  if (!resolved.startsWith(resolvedFolder)) throw new AppError(403, 'FORBIDDEN', 'Invalid file path');
+  await fs.access(filePath);
+  return filePath;
+}
+
+export async function triggerManualLocalBackup(userId: string) {
+  const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });
+  if (!shop) throw new AppError(404, 'NOT_FOUND', 'Shop not found');
+  
+  const data = await exportAccountingData(userId);
+  const shopFolder = await getShopBackupFolder(userId);
+  await fs.mkdir(shopFolder, { recursive: true });
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const fileName = `rxdesk_backup_${timestamp}_manual.json`;
+  const filePath = path.join(shopFolder, fileName);
+  
+  await fs.writeFile(filePath, JSON.stringify(data, null, 2));
+  return { filename: fileName, path: filePath };
 }
 

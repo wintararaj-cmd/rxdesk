@@ -359,10 +359,26 @@ router.get('/backup', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/restore', shopAuth, async (req, res, next) => {
+// ─── Local Drive Backups (Server-side files) ──────────────────────────────────
+
+router.get('/backups/list', shopAuth, async (req, res, next) => {
   try {
-    const data = await service.restoreAccountingData(req.user!.id, req.body);
+    const data = await service.listLocalBackups(req.user!.id);
     res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/backups/download/:filename', shopAuth, async (req, res, next) => {
+  try {
+    const filePath = await service.getBackupFilePath(req.user!.id, req.params.filename);
+    res.download(filePath);
+  } catch (err) { next(err); }
+});
+
+router.post('/backups/trigger', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.triggerManualLocalBackup(req.user!.id);
+    res.json({ success: true, message: 'Backup created on server', data });
   } catch (err) { next(err); }
 });
 
