@@ -2539,6 +2539,14 @@ function SettingsTab() {
   const [backupTime, setBackupTime] = useState('00:00');
   const [backupPath, setBackupPath] = useState('/rxdesk');
 
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickerPath, setPickerPath] = useState('');
+  const { data: folderRes, isLoading: loadingFolders } = useQuery<any>({
+    queryKey: ['web-browse-folders', pickerPath],
+    queryFn: () => shopApi.browseFolders(pickerPath).then(r => r.data),
+    enabled: showPicker
+  });
+
   useEffect(() => {
     if (shop) {
       setAutoBackup(!!shop.auto_backup_enabled);
@@ -2610,15 +2618,17 @@ function SettingsTab() {
             <div>
               <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-4 ml-1">Storage Destination (Local Drive Path)</label>
               <div className="bg-gray-50/50 p-2 rounded-3xl border border-gray-100 flex items-center gap-1">
-                 <div className="pl-5 text-gray-400">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.625-5.25l1.625-1.625A1.5 1.5 0 0013.626 4H6.375A1.5 1.5 0 004.875 5.5v11.25c0 .414.336.75.75.75H21a.75.75 0 00.75-.75V7.5a.75.75 0 00-.75-.75h-9.375z" /></svg>
-                 </div>
+                 <button 
+                  onClick={() => { setPickerPath(backupPath); setShowPicker(true); }}
+                  className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-gray-400 hover:text-violet-600 hover:shadow-md transition-all group" title="Browse Folders">
+                    <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.625-5.25l1.625-1.625A1.5 1.5 0 0013.626 4H6.375A1.5 1.5 0 004.875 5.5v11.25c0 .414.336.75.75.75H21a.75.75 0 00.75-.75V7.5a.75.75 0 00-.75-.75h-9.375z" /></svg>
+                 </button>
                  <input 
                   type="text" 
                   value={backupPath}
                   onChange={(e) => setBackupPath(e.target.value)}
                   placeholder="e.g. D:\RxDesk\Backups"
-                  className="bg-white border-0 rounded-2xl px-6 py-4 text-sm font-bold text-gray-900 focus:ring-4 focus:ring-violet-100 transition-all outline-none w-full shadow-sm"
+                  className="bg-transparent border-0 px-4 py-4 text-sm font-bold text-gray-900 focus:outline-none w-full"
                 />
               </div>
               <p className="text-[11px] text-gray-400 font-bold mt-4 ml-1 flex items-start gap-2">
@@ -2627,6 +2637,63 @@ function SettingsTab() {
               </p>
             </div>
           </div>
+
+          {showPicker && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-300">
+              <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-300">
+                 <div className="px-8 py-6 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-black text-gray-900 tracking-tight">Select Folder</h3>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5 max-w-[300px] truncate" title={folderRes?.currentPath}>{folderRes?.currentPath || 'Root / Drives'}</p>
+                    </div>
+                    <button onClick={() => setShowPicker(false)} className="w-10 h-10 rounded-full hover:bg-white hover:shadow-md text-gray-400 hover:text-gray-600 transition-all flex items-center justify-center font-bold">✕</button>
+                 </div>
+                 <div className="p-4 max-h-[350px] overflow-y-auto no-scrollbar bg-white/50">
+                    {loadingFolders ? (
+                      <div className="flex items-center justify-center py-20"><div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" /></div>
+                    ) : (
+                      <div className="space-y-1">
+                        {folderRes?.parentPath !== null && (
+                          <button 
+                            onClick={() => setPickerPath(folderRes.parentPath)}
+                            className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-violet-50 text-violet-600 group transition-all"
+                          >
+                            <div className="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center group-hover:scale-110 transition-transform">
+                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                            </div>
+                            <span className="text-xs font-black uppercase tracking-wider">Up one level</span>
+                          </button>
+                        )}
+                        {folderRes?.data?.length === 0 && (
+                          <div className="py-10 text-center text-gray-400 font-medium text-xs">No subfolders found</div>
+                        )}
+                        {folderRes?.data?.map((f: any) => (
+                          <button 
+                             key={f.path}
+                             onClick={() => setPickerPath(f.path)}
+                             className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-gray-50 text-gray-700 group transition-all"
+                          >
+                            <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center group-hover:bg-violet-100 group-hover:text-violet-600 transition-all">
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.625-5.25l1.625-1.625A1.5 1.5 0 0013.626 4H6.375A1.5 1.5 0 004.875 5.5v11.25c0 .414.336.75.75.75H21a.75.75 0 00.75-.75V7.5a.75.75 0 00-.75-.75h-9.375z" /></svg>
+                            </div>
+                            <span className="text-sm font-bold truncate">{f.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                 </div>
+                 <div className="p-6 bg-gray-50/50 border-t border-gray-100">
+                    <button 
+                      onClick={() => { setBackupPath(folderRes?.currentPath || ''); setShowPicker(false); }}
+                      disabled={!folderRes?.currentPath}
+                      className="w-full bg-gradient-to-br from-violet-600 to-indigo-700 text-white py-4 rounded-3xl text-xs font-black uppercase tracking-widest shadow-xl shadow-violet-100 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
+                    >
+                      Confirm Selection
+                    </button>
+                 </div>
+              </div>
+            </div>
+          )}
 
           <div className="pt-4">
             <button

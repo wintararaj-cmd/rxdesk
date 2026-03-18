@@ -87,6 +87,7 @@ export const shopApi = {
   updateProfile: (data: object) => apiClient.put('/shops/me', data),
   search: (params: { q?: string; city?: string; pin_code?: string }) =>
     apiClient.get('/shops/search', { params }),
+  browseFolders: (path?: string) => apiClient.get('/shops/me/browse-folders', { params: { path } }),
 };
 
 export const subscriptionApi = {
