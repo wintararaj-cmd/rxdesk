@@ -129,7 +129,20 @@ router.get('/me/browse-folders', requireRole('shop_owner'), async (req, res, nex
     }
 
     const absPath = path.resolve(currentPath);
-    const items = await fs.readdir(absPath, { withFileTypes: true });
+    let items: any[] = [];
+    try {
+      items = await fs.readdir(absPath, { withFileTypes: true });
+    } catch (e: any) {
+      // If folder cannot be accessed (e.g. drive not ready, permission denied), return empty data
+      const parent = path.dirname(absPath);
+      return res.json({ 
+        success: true, 
+        data: [], 
+        currentPath: absPath,
+        parentPath: parent !== absPath ? parent : (process.platform === 'win32' ? '' : null),
+        error: e.message 
+      });
+    }
     
     const data = items
       .filter(dirent => dirent.isDirectory())

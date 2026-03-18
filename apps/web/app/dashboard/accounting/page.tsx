@@ -2653,7 +2653,13 @@ function SettingsTab() {
                       <div className="flex items-center justify-center py-20"><div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" /></div>
                     ) : (
                       <div className="space-y-1">
-                        {folderRes?.parentPath !== null && (
+                        {folderRes?.error && (
+                          <div className="bg-red-50 p-4 rounded-2xl mb-4 text-red-600 text-[10px] font-bold border border-red-100 flex items-center gap-3 animate-in slide-in-from-top-1 duration-300">
+                             <div className="w-6 h-6 rounded-lg bg-red-100 flex items-center justify-center text-red-600 shrink-0 font-black">!</div>
+                             <span>{folderRes.error}</span>
+                          </div>
+                        )}
+                        {folderRes && folderRes.parentPath !== null && (
                           <button 
                             onClick={() => setPickerPath(folderRes.parentPath)}
                             className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-violet-50 text-violet-600 group transition-all"
