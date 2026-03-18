@@ -1,6 +1,4 @@
 import { Router } from 'express';
-import path from 'path';
-import fs from 'fs/promises';
 import { requireRole, authenticate } from '../../middleware/auth';
 import { createShopSchema } from '@rxdesk/shared';
 import * as service from './shop.service';
@@ -102,65 +100,6 @@ router.get('/:id', async (req, res, next) => {
   try {
     const shop = await service.getShopById(req.params.id);
     res.json({ success: true, data: shop });
-  } catch (err) { next(err); }
-});
-
-// GET /shops/me/browse-folders?path=
-router.get('/me/browse-folders', requireRole('shop_owner'), async (req, res, next) => {
-  try {
-    let currentPath = (req.query.path as string) || '';
-    
-    // Windows Drive Listing
-    if (process.platform === 'win32' && !currentPath) {
-      const drives: any[] = [];
-      const driveLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      for (const char of driveLetters) {
-        const d = char + ':';
-        try {
-          await fs.access(d + '\\');
-          drives.push({ name: d, path: d + '\\', isSub: true });
-        } catch {}
-      }
-      return res.json({ success: true, data: drives, currentPath: '', parentPath: null });
-    }
-
-    if (!currentPath) {
-      currentPath = process.platform === 'win32' ? 'C:\\' : '/';
-    }
-
-    const absPath = path.resolve(currentPath);
-    let items: any[] = [];
-    try {
-      items = await fs.readdir(absPath, { withFileTypes: true });
-    } catch (e: any) {
-      // If folder cannot be accessed (e.g. drive not ready, permission denied), return empty data
-      const parent = path.dirname(absPath);
-      return res.json({ 
-        success: true, 
-        data: [], 
-        currentPath: absPath,
-        parentPath: parent !== absPath ? parent : (process.platform === 'win32' ? '' : null),
-        error: e.message 
-      });
-    }
-    
-    const data = items
-      .filter(dirent => dirent.isDirectory())
-      .map(dirent => ({
-        name: dirent.name,
-        path: path.join(absPath, dirent.name),
-        isSub: true
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-
-    const parent = path.dirname(absPath);
-
-    res.json({ 
-      success: true, 
-      data, 
-      currentPath: absPath,
-      parentPath: parent !== absPath ? parent : (process.platform === 'win32' ? '' : null)
-    });
   } catch (err) { next(err); }
 });
 

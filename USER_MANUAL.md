@@ -38,22 +38,25 @@ The **Financial Center** is your command hub for all monetary transactions. Acce
 
 ---
 
-## 3. Automated Daily Backup (New ✨)
-Ensure your business data is always safe with our new automated local backup system.
+## 3. Manual Backup & Restore
+RxDesk provides a simple way to secure your financial data by downloading backups to your computer and restoring them whenever needed.
 
-### 3.1 Configuring Auto-Backup
-To set up your automated backup schedule:
+### 3.1 How to Backup Data
+To save a copy of your records:
 1.  Navigate to the **Settings** tab within the Financial Center.
-2.  Switch the **Enable Daily Auto-Backup** toggle to **ON**.
-3.  Select an **Execution Time** (e.g., `22:00` for a nightly backup after shop closing).
-4.  Specify a **Backup Destination Path** (Click the **Browse (📁)** icon to visually select a folder on your drive).
-5.  Click **Apply Settings**.
+2.  Click the **Download Backup** button.
+3.  A `.json` file containing all your Suppliers, Purchases, Expenses, and Ledgers will be saved to your computer's **Downloads** folder.
+4.  Keep this file safe (e.g., on a USB drive or cloud storage) for future use.
 
-### 3.2 How it Works
-*   **Local Storage**: Every day at your chosen time, the system exports all accounting data (Suppliers, Purchases, Expenses, etc.) to your local drive.
-*   **Location**: Backups are stored in the folder you specified. If you enter an absolute path like `D:\Backups`, the system will create a shop-specific subfolder there.
-*   **Rotation**: To save disk space, the system automatically keeps only the **top 3 most recent backups**. Older backups are automatically pruned.
-*   **Manual Backup**: You can still trigger a manual download at any time if needed.
+### 3.2 How to Restore Data
+If you need to restore your data from a previous backup:
+1.  Navigate to the **Settings** tab.
+2.  Click the **Upload & Restore** button.
+3.  Select your RxDesk backup file (`.json`) from your computer.
+4.  **Confirm the restoration**: This will overwrite your current accounting data with the data from the backup file.
+
+### 3.3 Server-Side Records
+The system also maintains a list of **Recent Server Records** within the Settings tab. These are manual backups that you've triggered on the server. You can download these at any time by clicking the **Download (⬇️)** icon next to the record.
 
 ---
 

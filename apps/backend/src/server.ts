@@ -8,7 +8,6 @@ import prisma from './config/database';
 import redis from './config/redis';
 import logger from './utils/logger';
 import { registerSocketHandlers } from './modules/realtime/socket.handlers';
-import { initAccountingScheduler } from './modules/accounting/accounting.scheduler';
 
 const server = http.createServer(app);
 
@@ -71,7 +70,6 @@ async function bootstrap(): Promise<void> {
     logger.info('Database: Connected');
 
     // Start schedulers
-    initAccountingScheduler();
 
     server.listen(env.PORT, () => {
       logger.info(`🚀 RxDesk API running on port ${env.PORT} [${env.NODE_ENV}]`);

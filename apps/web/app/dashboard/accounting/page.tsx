@@ -2530,35 +2530,11 @@ function BankbookTab() {
 // ─────────────────────────────────────────────────────────────────────────────
 function SettingsTab() {
   const qc = useQueryClient();
-  const { data: shop, isLoading } = useQuery<any>({
-    queryKey: ['web-shop-profile'],
-    queryFn: () => shopApi.getMyShop().then((r) => r.data.data),
-  });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [autoBackup, setAutoBackup] = useState(false);
-  const [backupTime, setBackupTime] = useState('00:00');
-  const [backupPath, setBackupPath] = useState('/rxdesk');
-
-  const [showPicker, setShowPicker] = useState(false);
-  const [pickerPath, setPickerPath] = useState('');
-  const { data: folderRes, isLoading: loadingFolders } = useQuery<any>({
-    queryKey: ['web-browse-folders', pickerPath],
-    queryFn: () => shopApi.browseFolders(pickerPath).then(r => r.data),
-    enabled: showPicker
-  });
-
-  useEffect(() => {
-    if (shop) {
-      setAutoBackup(!!shop.auto_backup_enabled);
-      setBackupTime(shop.backup_time || '00:00');
-      setBackupPath(shop.backup_path || '/rxdesk');
-    }
-  }, [shop]);
-
-  const { data: backups, refetch: refetchBackups } = useQuery<any>({
+  const { data: backups, refetch: refetchBackups, isLoading: loadingBackups } = useQuery<any>({
     queryKey: ['web-backups'],
     queryFn: () => accountingApi.getBackupList().then(r => r.data.data),
-    enabled: true
   });
 
   const handleManualDownload = async () => {
@@ -2577,163 +2553,84 @@ function SettingsTab() {
     }
   };
 
-  const updateMutation = useMutation({
-    mutationFn: (data: any) => shopApi.updateProfile(data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['web-shop-profile'] });
-    },
-  });
+  const handleRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  if (isLoading) return (
-    <div className="flex items-center justify-center py-20">
-      <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
+    if (!confirm('This will OVERWRITE your current accounting data. Are you sure you want to continue?')) {
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      await accountingApi.restore(data);
+      alert('Data successfully restored!');
+      qc.invalidateQueries();
+    } catch (err) {
+      alert('Restore failed. Please ensure the file is a valid RxDesk backup.');
+    }
+  };
 
   return (
-    <div className="max-w-2xl space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="bg-white rounded-[2.5rem] p-8 md:p-12 border border-gray-100 shadow-xl shadow-gray-200/50">
-        <div className="flex items-center gap-4 mb-8">
-           <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-400">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.132l.773.774c.39.389.44 1.002.132 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.894.15c.542.09.94.56.94 1.109v1.094c0 .55-.398 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738a1.125 1.125 0 01-.132 1.45l-.774.773a1.125 1.125 0 01-1.449.132l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527a1.125 1.125 0 01-1.45-.132l-.773-.774a1.125 1.125 0 01-.132-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 01.132-1.45l.774-.773a1.125 1.125 0 011.45-.132l.737.527c.35.25.807.272 1.204.107.398-.165.71-.505.78-.929l.15-.894z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-           </div>
-           <div>
-              <h3 className="text-xl font-black text-gray-900 tracking-tight">Accounting Settings</h3>
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Automated Maintenance & Backups</p>
-           </div>
+    <div className="max-w-4xl space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Backup Card */}
+        <div className="bg-white rounded-[2.5rem] p-8 md:p-10 border border-gray-100 shadow-xl shadow-gray-200/50 flex flex-col items-start gap-6">
+          <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 shadow-sm">
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-xl font-black text-gray-900 tracking-tight mb-2">Backup Data</h3>
+            <p className="text-sm text-gray-500 font-medium leading-relaxed">Download a complete copy of your accounting records to your local computer.</p>
+          </div>
+          <button 
+            onClick={handleManualDownload}
+            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-3xl text-sm font-black uppercase tracking-widest shadow-lg shadow-emerald-100 transition-all hover:scale-[1.02] active:scale-95 mt-auto"
+          >
+            Download Backup
+          </button>
+        </div>
+
+        {/* Restore Card */}
+        <div className="bg-white rounded-[2.5rem] p-8 md:p-10 border border-gray-100 shadow-xl shadow-gray-200/50 flex flex-col items-start gap-6">
+          <div className="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-600 shadow-sm">
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-xl font-black text-gray-900 tracking-tight mb-2">Restore Data</h3>
+            <p className="text-sm text-gray-500 font-medium leading-relaxed">Upload an RxDesk backup file (.json) to restore your accounting data.</p>
+          </div>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleRestore} 
+            accept=".json" 
+            className="hidden" 
+          />
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full bg-rose-500 hover:bg-rose-600 text-white py-4 rounded-3xl text-sm font-black uppercase tracking-widest shadow-lg shadow-rose-100 transition-all hover:scale-[1.02] active:scale-95 mt-auto"
+          >
+            Upload & Restore
+          </button>
+        </div>
+      </div>
+
+      {/* Cloud Backups Helper (Optional list of server-side backups) */}
+      <div className="bg-gray-50/50 rounded-[2.5rem] p-8 border border-gray-100">
+        <div className="flex items-center justify-between mb-6 px-2">
+          <div>
+            <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">Recent Server Records</h4>
+            <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">Manual backups saved on your server disk</p>
+          </div>
+          <button onClick={() => refetchBackups()} className="w-10 h-10 rounded-full bg-white text-gray-400 flex items-center justify-center hover:text-violet-600 shadow-sm transition-all italic font-black">↻</button>
         </div>
         
-        <div className="space-y-10">
-          <div className="flex items-center justify-between p-6 bg-violet-50/50 rounded-[2rem] border border-violet-100/50 group hover:bg-violet-50 transition-all">
-            <div className="flex items-center gap-5">
-              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${autoBackup ? 'bg-violet-600 text-white shadow-lg shadow-violet-200 ring-4 ring-violet-100' : 'bg-white text-gray-400 border border-gray-100'}`}>
-                <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm font-black text-gray-900">Enable Daily Auto-Backup</p>
-                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-1">Status: {autoBackup ? 'Active' : 'Disabled'}</p>
-              </div>
-            </div>
-            <button 
-              onClick={() => setAutoBackup(!autoBackup)}
-              className={`w-16 h-8 rounded-full relative transition-all duration-300 ${autoBackup ? 'bg-violet-600 shadow-inner' : 'bg-gray-200'}`}
-            >
-              <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-lg transition-all transform duration-300 ${autoBackup ? 'left-9' : 'left-1'}`} />
-            </button>
-          </div>
-
-          <div className={`space-y-10 transition-all duration-500 ${autoBackup ? 'opacity-100 scale-100' : 'opacity-40 grayscale pointer-events-none scale-[0.98]'}`}>
-            <div>
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-4 ml-1">Daily Execution Time (24h)</label>
-              <div className="flex items-center gap-4 bg-gray-50/50 p-2 rounded-3xl border border-gray-100">
-                 <input 
-                  type="time" 
-                  value={backupTime}
-                  onChange={(e) => setBackupTime(e.target.value)}
-                  className="bg-white border-0 rounded-2xl px-6 py-4 text-2xl font-black text-gray-900 focus:ring-4 focus:ring-violet-100 transition-all outline-none w-full shadow-sm"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-4 ml-1">Storage Destination (Local Drive Path)</label>
-              <div className="bg-gray-50/50 p-2 rounded-3xl border border-gray-100 flex items-center gap-1">
-                 <button 
-                  onClick={() => { setPickerPath(backupPath); setShowPicker(true); }}
-                  className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-gray-400 hover:text-violet-600 hover:shadow-md transition-all group" title="Browse Folders">
-                    <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.625-5.25l1.625-1.625A1.5 1.5 0 0013.626 4H6.375A1.5 1.5 0 004.875 5.5v11.25c0 .414.336.75.75.75H21a.75.75 0 00.75-.75V7.5a.75.75 0 00-.75-.75h-9.375z" /></svg>
-                 </button>
-                 <input 
-                  type="text" 
-                  value={backupPath}
-                  onChange={(e) => setBackupPath(e.target.value)}
-                  placeholder="e.g. D:\RxDesk\Backups"
-                  className="bg-transparent border-0 px-4 py-4 text-sm font-bold text-gray-900 focus:outline-none w-full"
-                />
-              </div>
-              <p className="text-[11px] text-gray-400 font-bold mt-4 ml-1 flex items-start gap-2">
-                <svg className="w-4 h-4 text-violet-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
-                <span>The system will create a shop-specific folder at this location. We automatically rotate and keep the 3 most recent backups.</span>
-              </p>
-            </div>
-          </div>
-
-          {showPicker && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-300">
-              <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-300">
-                 <div className="px-8 py-6 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-black text-gray-900 tracking-tight">Select Folder</h3>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5 max-w-[300px] truncate" title={folderRes?.currentPath}>{folderRes?.currentPath || 'Root / Drives'}</p>
-                    </div>
-                    <button onClick={() => setShowPicker(false)} className="w-10 h-10 rounded-full hover:bg-white hover:shadow-md text-gray-400 hover:text-gray-600 transition-all flex items-center justify-center font-bold">✕</button>
-                 </div>
-                 <div className="p-4 max-h-[350px] overflow-y-auto no-scrollbar bg-white/50">
-                    {loadingFolders ? (
-                      <div className="flex items-center justify-center py-20"><div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" /></div>
-                    ) : (
-                      <div className="space-y-1">
-                        {folderRes?.error && (
-                          <div className="bg-red-50 p-4 rounded-2xl mb-4 text-red-600 text-[10px] font-bold border border-red-100 flex items-center gap-3 animate-in slide-in-from-top-1 duration-300">
-                             <div className="w-6 h-6 rounded-lg bg-red-100 flex items-center justify-center text-red-600 shrink-0 font-black">!</div>
-                             <span>{folderRes.error}</span>
-                          </div>
-                        )}
-                        {folderRes && folderRes.parentPath !== null && (
-                          <button 
-                            onClick={() => setPickerPath(folderRes.parentPath)}
-                            className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-violet-50 text-violet-600 group transition-all"
-                          >
-                            <div className="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center group-hover:scale-110 transition-transform">
-                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-                            </div>
-                            <span className="text-xs font-black uppercase tracking-wider">Up one level</span>
-                          </button>
-                        )}
-                        {folderRes?.data?.length === 0 && (
-                          <div className="py-10 text-center text-gray-400 font-medium text-xs">No subfolders found</div>
-                        )}
-                        {folderRes?.data?.map((f: any) => (
-                          <button 
-                             key={f.path}
-                             onClick={() => setPickerPath(f.path)}
-                             className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-gray-50 text-gray-700 group transition-all"
-                          >
-                            <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center group-hover:bg-violet-100 group-hover:text-violet-600 transition-all">
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.625-5.25l1.625-1.625A1.5 1.5 0 0013.626 4H6.375A1.5 1.5 0 004.875 5.5v11.25c0 .414.336.75.75.75H21a.75.75 0 00.75-.75V7.5a.75.75 0 00-.75-.75h-9.375z" /></svg>
-                            </div>
-                            <span className="text-sm font-bold truncate">{f.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                 </div>
-                 <div className="p-6 bg-gray-50/50 border-t border-gray-100">
-                    <button 
-                      onClick={() => { setBackupPath(folderRes?.currentPath || ''); setShowPicker(false); }}
-                      disabled={!folderRes?.currentPath}
-                      className="w-full bg-gradient-to-br from-violet-600 to-indigo-700 text-white py-4 rounded-3xl text-xs font-black uppercase tracking-widest shadow-xl shadow-violet-100 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
-                    >
-                      Confirm Selection
-                    </button>
-                 </div>
-              </div>
-            </div>
-          )}
-
-          <div className="pt-4">
-            <button
-              onClick={() => updateMutation.mutate({ auto_backup_enabled: autoBackup, backup_time: backupTime, backup_path: backupPath })}
-              disabled={updateMutation.isPending}
-              className={`w-full bg-gradient-to-br from-violet-600 to-indigo-700 text-white py-5 rounded-3xl text-sm font-black uppercase tracking-widest shadow-2xl shadow-violet-200 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 ${updateMutation.isSuccess ? 'from-emerald-500 to-teal-600' : ''}`}
-            >
-              {updateMutation.isPending ? 'Saving Preferences...' : updateMutation.isSuccess ? 'Preferences Saved!' : 'Apply Settings'}
-            </button>
-          </div>
-
-          <div className="pt-10 border-t border-gray-100 mt-10">
             <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-6 ml-1">Local Backup Options</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                <button 
