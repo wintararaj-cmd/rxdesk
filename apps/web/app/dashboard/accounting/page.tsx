@@ -1145,12 +1145,30 @@ function PurchasesTab() {
 }
 
 function PurchaseDetailModal({ id, onClose }: { id: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [payAmount, setPayAmount] = useState('');
+  const [payMethod, setPayMethod] = useState('cash');
+  const [showPayForm, setShowPayForm] = useState(false);
+
   const { data: p, isLoading } = useQuery<any>({
     queryKey: ['web-purchase-detail', id],
     queryFn: () => accountingApi.getPurchaseById(id).then((r) => r.data.data),
   });
 
-  if (isLoading) return null; // or small loader overlay
+  const payMutation = useMutation({
+    mutationFn: (d: any) => accountingApi.recordSupplierPayment(d),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['web-purchase-detail', id] });
+      qc.invalidateQueries({ queryKey: ['web-purchases'] });
+      qc.invalidateQueries({ queryKey: ['web-outstandings'] });
+      setPayAmount('');
+      setShowPayForm(false);
+    },
+  });
+
+  if (isLoading) return null;
+
+  const balanceDue = Math.max(0, Number(p?.total_amount) - Number(p?.amount_paid));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
@@ -1227,27 +1245,101 @@ function PurchaseDetailModal({ id, onClose }: { id: string; onClose: () => void 
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Payments History */}
-            {p?.payments?.length > 0 && (
-              <div>
-                <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 ml-1">Payment History</h4>
-                <div className="space-y-3">
-                  {p.payments.map((pm: any) => (
-                    <div key={pm.id} className="flex items-center justify-between p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-emerald-600 shadow-sm">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+            {/* Payments History & Action */}
+            <div className="space-y-6">
+              {p?.payments?.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 ml-1">Payment History</h4>
+                  <div className="space-y-3">
+                    {p.payments.map((pm: any) => (
+                      <div key={pm.id} className="flex items-center justify-between p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-emerald-600 shadow-sm">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-gray-900 capitalize">{pm.payment_method}</p>
+                            <p className="text-[10px] text-gray-400">{new Date(pm.payment_date).toLocaleDateString()}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-xs font-bold text-gray-900 capitalize">{pm.payment_method}</p>
-                          <p className="text-[10px] text-gray-400">{new Date(pm.payment_date).toLocaleDateString()}</p>
-                        </div>
+                        <p className="text-sm font-black text-emerald-700">{fmt(pm.amount)}</p>
                       </div>
-                      <p className="text-sm font-black text-emerald-700">{fmt(pm.amount)}</p>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+
+              {balanceDue > 0 && (
+                <div className="bg-gray-50 rounded-[2rem] p-6 border border-gray-100 shadow-inner">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-xs font-black text-gray-800 uppercase tracking-tight">Quick Payment</h4>
+                    {!showPayForm && (
+                      <button onClick={() => { setShowPayForm(true); setPayAmount(String(balanceDue)); }} className="text-[10px] font-black text-violet-600 uppercase tracking-widest hover:underline">Record Payment</button>
+                    )}
+                  </div>
+
+                  {showPayForm ? (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <div>
+                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1 ml-1">Amount (₹)</label>
+                        <input
+                          type="number"
+                          value={payAmount}
+                          onChange={(e) => setPayAmount(e.target.value)}
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 h-11 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-violet-400 outline-none transition-all"
+                        />
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {['cash', 'upi', 'card'].map((m) => (
+                          <button
+                            key={m}
+                            onClick={() => setPayMethod(m)}
+                            className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${payMethod === m ? 'bg-violet-600 text-white shadow-lg shadow-violet-100' : 'bg-white text-gray-400 border border-gray-100 hover:bg-gray-50'}`}
+                          >
+                            {m}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          onClick={() => {
+                            const amt = parseFloat(payAmount);
+                            if (!amt || amt <= 0) return;
+                            payMutation.mutate({
+                              supplier_id: p.supplier_id,
+                              purchase_id: id,
+                              amount: amt,
+                              payment_method: payMethod,
+                              payment_date: TODAY_STR,
+                            });
+                          }}
+                          disabled={payMutation.isPending}
+                          className="flex-1 bg-gradient-to-r from-violet-600 to-indigo-600 text-white h-11 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-violet-100 hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all"
+                        >
+                          {payMutation.isPending ? 'Processing...' : 'Confirm Payment'}
+                        </button>
+                        <button onClick={() => setShowPayForm(false)} className="px-4 h-11 rounded-xl text-[10px] font-black text-gray-400 uppercase tracking-widest hover:bg-white transition-all">Cancel</button>
+                      </div>
+                      {payMutation.isError && (
+                        <div className="bg-red-50 text-red-600 p-3 rounded-xl text-[10px] font-bold border border-red-100 animate-in fade-in slide-in-from-top-1">
+                          {(payMutation.error as any)?.response?.data?.error?.message || 'Failed to record payment'}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-gray-50">
+                      <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center">
+                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Remaining Balance</p>
+                        <p className="text-base font-black text-gray-900">{fmt(balanceDue)}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Final Summary Card */}
             <div className="bg-gradient-to-br from-violet-600 to-indigo-700 rounded-3xl p-8 text-white shadow-xl shadow-violet-200 ml-auto w-full max-w-sm">

@@ -2,25 +2,26 @@
 
 Stalwart is a modern, all-in-one mail server written in Rust. It includes SMTP, IMAP, and a Web Admin UI.
 
-## 🚀 Deployment
+## 🚀 Deployment (Coolify)
 
-1. Delete the old mail resource in Coolify.
-2. Create a new **Docker Compose** resource.
+1. Delete any old mail resource in Coolify.
+2. Create a new **Docker Compose** resource named `mail-system`.
 3. Copy the contents of `docker-compose.yml` into Coolify.
-4. Point `mail.rxdesk.in` to port `8082` in the Coolify domain settings.
+4. **Port Configuration**:
+   - In the Coolify UI, for the `stalwart` service, the **Proxy Port** should be `8080`.
+   - In the Coolify UI, for the `webmail` service, the **Proxy Port** should be `8888`.
+5. Ensure you have a Docker network on your VPS named `coolify` (this is the default for Coolify).
 
 ## 🔑 Initial Setup
 
-- Go to `https://mail.rxdesk.in` (mapped to **8082**) and log in with user `admin` and the password from the logs. This is the **Management UI**.
+- **Management UI**: Go to `https://mail.rxdesk.in` (which proxies to internal port `8080`) and log in with user `admin` and the password from the logs. 
 
 ## 📧 Webmail Access (User Inbox)
 
 I have added **SnappyMail** to the setup to provide your user inbox.
-1. Map a domain (like `webmail.rxdesk.in`) to port **8081** in Coolify.
-2. Go to that URL in your browser.
+1. Map `webmail.rxdesk.in` to port **8888** (Proxy Port) in Coolify.
+2. Go to `https://webmail.rxdesk.in` in your browser.
 3. Log in with the email account you created (e.g., `support@rxdesk.in`).
-4. **Login Configuration**:
-   - **SMTP Host**: `stalwart` (Port 587)
 
 ## 🔧 Configuring SnappyMail (One-time Setup)
 

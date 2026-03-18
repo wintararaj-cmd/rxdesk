@@ -6,6 +6,7 @@ services:
     hostname: mx.rxdesk.in
     networks:
       - stalwart-network
+      - coolify
     ports:
       - "25:25"      # SMTP
       - "465:465"    # SMTPS
@@ -13,7 +14,11 @@ services:
       - "143:143"    # IMAP
       - "993:993"    # IMAPS
       - "4190:4190"  # ManageSieve
-      - "8082:8080"  # Web Admin / Webmail
+      - "8082:8080"  # Web Admin / Management UI
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mail-rxdesk.rule=Host(`mail.rxdesk.in`)"
+      - "traefik.http.services.mail-rxdesk.loadbalancer.server.port=8080"
     volumes:
       - ./data:/opt/stalwart-mail
 
@@ -27,12 +32,19 @@ services:
       - "8081:8888"
     networks:
       - stalwart-network
+      - coolify
     environment:
       - SNAPPYMAIL_ADMIN_USER=admin
       - SNAPPYMAIL_ADMIN_PASS=Admin123!
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.webmail-rxdesk.rule=Host(`webmail.rxdesk.in`)"
+      - "traefik.http.services.webmail-rxdesk.loadbalancer.server.port=8888"
     volumes:
       - ./snappymail:/var/lib/snappymail
 
 networks:
   stalwart-network:
     driver: bridge
+  coolify:
+    external: true
