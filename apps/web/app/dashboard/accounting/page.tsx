@@ -2532,7 +2532,7 @@ function SettingsTab() {
   const qc = useQueryClient();
   const { data: shop, isLoading } = useQuery<any>({
     queryKey: ['web-shop-profile'],
-    queryFn: () => shopApi.getProfile().then((r) => r.data.data),
+    queryFn: () => shopApi.getMyShop().then((r) => r.data.data),
   });
 
   const [autoBackup, setAutoBackup] = useState(false);
