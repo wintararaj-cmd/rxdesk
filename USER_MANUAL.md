@@ -46,7 +46,7 @@ To set up your automated backup schedule:
 1.  Navigate to the **Settings** tab within the Financial Center.
 2.  Switch the **Enable Daily Auto-Backup** toggle to **ON**.
 3.  Select an **Execution Time** (e.g., `22:00` for a nightly backup after shop closing).
-4.  Specify a **Backup Destination Path** (e.g., `D:\MyBackups` or `/rxdesk`).
+4.  Specify a **Backup Destination Path** (Click the **Browse (📁)** icon to visually select a folder on your drive).
 5.  Click **Apply Settings**.
 
 ### 3.2 How it Works
