@@ -1504,6 +1504,28 @@ function OutstandingsTab() {
     },
   });
 
+  const importCustomersMutation = useMutation({
+    mutationFn: (items: any[]) => accountingApi.importCreditCustomers(items),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['web-outstandings'] });
+      alert('Customers imported successfully!');
+    },
+    onError: (err: any) => alert(err.response?.data?.error?.message || 'Import failed'),
+  });
+
+  const handleImportCustomers = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      let items = [];
+      if (file.name.endsWith('.json')) items = JSON.parse(text);
+      else items = parseCsv(text);
+      if (items.length > 0) importCustomersMutation.mutate(items);
+    } catch (err) { alert('Failed to parse file'); }
+    if (e.target) e.target.value = '';
+  };
+
   const receivables = (out?.receivables ?? []).filter((r: any) =>
     (r.name || '').toLowerCase().includes(search.toLowerCase()) || (r.phone && r.phone.includes(search))
   );
@@ -1547,28 +1569,6 @@ function OutstandingsTab() {
       </div>
     );
   }
-
-  const importCustomersMutation = useMutation({
-    mutationFn: (items: any[]) => accountingApi.importCreditCustomers(items),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['web-outstandings'] });
-      alert('Customers imported successfully!');
-    },
-    onError: (err: any) => alert(err.response?.data?.error?.message || 'Import failed'),
-  });
-
-  const handleImportCustomers = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const text = await file.text();
-      let items = [];
-      if (file.name.endsWith('.json')) items = JSON.parse(text);
-      else items = parseCsv(text);
-      if (items.length > 0) importCustomersMutation.mutate(items);
-    } catch (err) { alert('Failed to parse file'); }
-    if (e.target) e.target.value = '';
-  };
 
   return (
     <div className="space-y-6">
