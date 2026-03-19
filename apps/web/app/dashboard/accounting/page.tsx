@@ -1799,22 +1799,25 @@ function OutstandingsTab() {
 }
 
 function LedgerPanel({ data, type, ledger, payAmount, setPayAmount, payMethod, setPayMethod, onPay, isPending }: any) {
-  const transactions = (type === 'customer' ? ledger?.transactions : [
-    ...(ledger?.purchases?.map((px: any) => ({ 
-      id: px.id, 
-      transaction_date: px.invoice_date, 
-      notes: `Purchase - ${px.invoice_number}`, 
-      type: 'credit_given', 
-      amount: px.total_amount 
-    })) ?? []),
-    ...(ledger?.payments?.map((py: any) => ({ 
-      id: py.id, 
-      transaction_date: py.payment_date, 
-      notes: 'Payment Made', 
-      type: 'payment_received', 
-      amount: py.amount 
-    })) ?? [])
-  ] ?? []).sort((a: any, b: any) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime());
+  const transactions = (type === 'customer' 
+    ? (ledger?.transactions ?? []) 
+    : [
+        ...(ledger?.purchases?.map((px: any) => ({ 
+          id: px.id, 
+          transaction_date: px.invoice_date, 
+          notes: `Purchase - ${px.invoice_number}`, 
+          type: 'credit_given', 
+          amount: px.total_amount 
+        })) ?? []),
+        ...(ledger?.payments?.map((py: any) => ({ 
+          id: py.id, 
+          transaction_date: py.payment_date, 
+          notes: 'Payment Made', 
+          type: 'payment_received', 
+          amount: py.amount 
+        })) ?? [])
+      ]
+  ).sort((a: any, b: any) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime());
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
