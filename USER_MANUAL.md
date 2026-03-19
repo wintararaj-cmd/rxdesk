@@ -66,39 +66,24 @@ The system also maintains a list of **Recent Server Records** within the Setting
 
 ---
 
-## 5. Data Migration (Bulk Import)
-If you are migrating from another software, you can bulk import your existing data (Suppliers, Stocks, and Outstandings) using the following methods.
+## 5. Data Migration (Bulk Import) ✨
+If you are migrating from another software, you can bulk import your existing data (Suppliers, Stocks, and Outstandings) using the **Bulk Import** buttons.
 
-### 5.1 Importing Stocks (Inventory)
-1.  Navigate to the **Inventory** link in the sidebar.
-2.  Click the **Bulk Import** button (top right).
-3.  Upload a JSON or CSV file with the following columns:
-    *   `medicine_name` (Required)
-    *   `mrp` (Required)
-    *   `stock_qty`
-    *   `purchase_price`
-    *   `batch_number`
-    *   `expiry_date` (YYYY-MM-DD)
-    *   `gst_rate`
-    *   `unit` (strip/bottle/etc.)
+### 5.1 Download Official CSV Templates
+To ensure your data is in the correct format, please use these templates:
+*   [📦 Inventory Import Template](templates/inventory_import_template.csv)
+*   [🚛 Suppliers Import Template](templates/suppliers_import_template.csv)
+*   [👤 Customers & Outstandings Template](templates/customers_import_template.csv)
 
-### 5.2 Importing Suppliers & Opening Balances
-You can bulk import your distributors and their current outstanding balances.
-1.  Go to **Accounting** > **Suppliers**.
-2.  Click **Import Suppliers**.
-3.  Provide a JSON array with:
-    *   `name` (Required)
-    *   `phone`, `email`, `address`, `gst_number`
-    *   `opening_balance`: The amount you currently owe this supplier.
+### 5.2 How to Import
+1.  **Stocks (Inventory)**: Navigate to **Inventory** and click **Bulk Import** (top right).
+2.  **Suppliers**: Go to **Accounting** > **Suppliers** and click **Bulk Import**.
+3.  **Credit Customers**: Go to **Accounting** > **Outstandings** and click **Bulk Import**.
 
-### 5.3 Importing Credit Customers (Outstandings)
-Import patients or customers who have a pending balance with you.
-1.  Go to **Accounting** > **Outstandings**.
-2.  Click **Import Customers**.
-3.  Provide a JSON array with:
-    *   `name` (Required)
-    *   `phone`, `address`
-    *   `opening_balance`: The amount this customer currently owes you.
+> [!TIP]
+> **Opening Balances**: When importing suppliers or customers, you can include an `opening_balance` column to instantly set their current outstanding amounts.
+
+---
 
 ---
 
