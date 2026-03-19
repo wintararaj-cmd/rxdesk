@@ -96,7 +96,10 @@ const EMPTY_EDIT_FORM = {
 
 export default function InventoryPage() {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<'stock' | 'catalog'>('stock');
+  const [tab, setTab] = useState<'stock' | 'catalog' | 'finder'>('stock');
+  const [finderQuery, setFinderQuery] = useState('');
+  const [finderInput, setFinderInput] = useState('');
+  const finderDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
   const [form, setForm] = useState<typeof EMPTY_ADD_FORM>(EMPTY_ADD_FORM);
@@ -292,7 +295,9 @@ export default function InventoryPage() {
           <p className="text-gray-500 text-sm mt-1">
             {tab === 'stock'
               ? (pagination ? `${pagination.total.toLocaleString()} items in stock` : '…')
-              : (catalogPagination ? `${catalogPagination.total.toLocaleString()} medicines in catalog` : '…')}
+              : tab === 'catalog'
+              ? (catalogPagination ? `${catalogPagination.total.toLocaleString()} medicines in catalog` : '…')
+              : 'Find alternatives by composition'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -339,7 +344,16 @@ export default function InventoryPage() {
         >
           Medicine Catalog
         </button>
+        <button
+          onClick={() => setTab('finder')}
+          className={`px-5 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${tab === 'finder' ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          🔍 Finder
+        </button>
       </div>
+
+      {/* ── FINDER TAB ───────────────────────────────────────────── */}
+      {tab === 'finder' && <MedicineFinder />}
 
       {/* ── CATALOG TAB ─────────────────────────────────────────── */}
       {tab === 'catalog' && (
@@ -663,6 +677,157 @@ export default function InventoryPage() {
         </div>
       )}
       </>)}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Medicine Finder — composition / generic search utility
+// ─────────────────────────────────────────────────────────────────────────────
+function MedicineFinder() {
+  const [input, setInput] = useState('');
+  const [query, setQuery] = useState('');
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shopId = typeof window !== 'undefined'
+    ? (() => { try { return JSON.parse(localStorage.getItem('rxdesk_shop') || '{}').id as string | undefined; } catch { return undefined; } })()
+    : undefined;
+
+  const { data, isLoading, isFetching } = useQuery<any>({
+    queryKey: ['medicine-finder', query],
+    queryFn: () => medicinesApi.compositionSearch(query, shopId).then(r => r.data.data),
+    enabled: query.trim().length >= 2,
+    staleTime: 30_000,
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInput(val);
+    if (debounce.current) clearTimeout(debounce.current);
+    debounce.current = setTimeout(() => setQuery(val.trim()), 500);
+  };
+
+  const formMap: Record<string, string> = {
+    tablet: '💊', capsule: '💊', syrup: '🍶', injection: '💉',
+    ointment: '🧴', drops: '💧', inhaler: '🫧', powder: '🧂',
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Hero search bar */}
+      <div className="bg-gradient-to-br from-violet-600 to-indigo-700 rounded-3xl p-8 shadow-xl shadow-violet-200">
+        <h2 className="text-white font-black text-xl tracking-tight mb-1">Medicine Composition Finder</h2>
+        <p className="text-violet-200 text-sm font-medium mb-5">
+          Type a brand name to find all medicines with the same generic composition
+        </p>
+        <div className="relative">
+          <input
+            type="text"
+            value={input}
+            onChange={handleChange}
+            placeholder="e.g. Crocin, Augmentin, Dolo 650…"
+            className="w-full bg-white/10 text-white placeholder-violet-300 border border-white/20 rounded-2xl px-5 py-3.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-white/50 backdrop-blur-sm"
+            autoFocus
+          />
+          {(isLoading || isFetching) && (
+            <div className="absolute right-4 top-3.5 w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          )}
+        </div>
+      </div>
+
+      {/* Results */}
+      {data && (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+          {/* Generic composition badge */}
+          {data.generic_name ? (
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-violet-50 border border-violet-100 rounded-2xl px-5 py-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-violet-600 flex items-center justify-center text-white text-sm font-black">Rx</div>
+                <div>
+                  <p className="text-[10px] font-black text-violet-400 uppercase tracking-widest">Active Composition Found</p>
+                  <p className="text-base font-black text-violet-900">{data.generic_name}</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-500 font-medium">{data.alternatives.length} alternative{data.alternatives.length !== 1 ? 's' : ''} found in catalog</p>
+            </div>
+          ) : data.alternatives.length > 0 ? (
+            <div className="mb-4 flex items-center gap-2 text-sm text-amber-600 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3">
+              <span>⚠️</span>
+              <span className="font-medium">No generic composition data found — showing name matches only. Consider enriching your medicine catalog with generic names.</span>
+            </div>
+          ) : (
+            <div className="text-center py-16 text-gray-400">
+              <p className="text-4xl mb-3">🔍</p>
+              <p className="font-bold text-gray-600 mb-1">No medicines found</p>
+              <p className="text-sm">Try a different name or check your medicine catalog</p>
+            </div>
+          )}
+
+          {/* Alternatives grid */}
+          {data.alternatives.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {data.alternatives.map((m: any) => (
+                <div
+                  key={m.id}
+                  className={`bg-white rounded-2xl border p-4 shadow-sm hover:shadow-md transition-all group ${
+                    m.is_in_stock === true
+                      ? 'border-emerald-100 hover:border-emerald-200'
+                      : m.is_in_stock === false
+                      ? 'border-gray-100 hover:border-violet-100'
+                      : 'border-gray-100 hover:border-violet-100'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-gray-900 text-sm truncate">{m.name}</p>
+                      {m.brand_name && m.brand_name !== m.name && (
+                        <p className="text-[10px] text-gray-400 font-medium truncate">{m.brand_name}</p>
+                      )}
+                    </div>
+                    {m.is_in_stock === true && (
+                      <span className="shrink-0 bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">
+                        ✓ In Stock
+                      </span>
+                    )}
+                    {m.is_in_stock === false && (
+                      <span className="shrink-0 bg-gray-100 text-gray-400 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">
+                        Not Stocked
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap mt-2">
+                    {m.form && (
+                      <span className="bg-violet-50 text-violet-600 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg">
+                        {formMap[m.form] || '💊'} {m.form}
+                      </span>
+                    )}
+                    {m.strength && (
+                      <span className="bg-blue-50 text-blue-600 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg">
+                        {m.strength}
+                      </span>
+                    )}
+                    {m.is_schedule_h && (
+                      <span className="bg-red-50 text-red-500 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg">
+                        Sch-H
+                      </span>
+                    )}
+                  </div>
+                  {m.manufacturer && (
+                    <p className="text-[10px] text-gray-400 mt-2 truncate">{m.manufacturer}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {!data && !isLoading && query.length < 2 && (
+        <div className="text-center py-20 text-gray-300">
+          <p className="text-5xl mb-4">💊</p>
+          <p className="font-bold text-gray-500 text-lg">Start typing a medicine name</p>
+          <p className="text-sm text-gray-400 mt-1">We'll find all alternatives with the same composition</p>
+        </div>
+      )}
     </div>
   );
 }

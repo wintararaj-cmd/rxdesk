@@ -42,6 +42,86 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /medicines/composition-search?q=Crocin&shop_id=xxx
+// Finds all medicines sharing the same generic composition
+router.get('/composition-search', searchRateLimiter, async (req, res, next) => {
+  try {
+    const q = (req.query.q as string || '').trim();
+    const shopId = req.query.shop_id as string | undefined;
+    if (!q || q.length < 2) {
+      res.json({ success: true, data: { query: q, generic_name: null, alternatives: [] } });
+      return;
+    }
+
+    // Step 1: find any matching medicine to extract its generic_name
+    const matched = await prisma.medicine.findFirst({
+      where: {
+        is_active: true,
+        OR: [
+          { name: { contains: q, mode: 'insensitive' } },
+          { brand_name: { contains: q, mode: 'insensitive' } },
+          { generic_name: { contains: q, mode: 'insensitive' } },
+        ],
+      },
+      select: { generic_name: true, name: true },
+    });
+
+    if (!matched || !matched.generic_name) {
+      // If no generic_name found, return a simple name-based search result
+      const results = await prisma.medicine.findMany({
+        where: {
+          is_active: true,
+          OR: [
+            { name: { contains: q, mode: 'insensitive' } },
+            { brand_name: { contains: q, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true, name: true, generic_name: true, brand_name: true, form: true, strength: true, manufacturer: true, gst_rate: true, is_schedule_h: true },
+        take: 20,
+      });
+      res.json({ success: true, data: { query: q, generic_name: null, alternatives: results.map(m => ({ ...m, is_in_stock: false })) } });
+      return;
+    }
+
+    // Step 2: find all medicines with the same generic_name
+    const alternatives = await prisma.medicine.findMany({
+      where: {
+        is_active: true,
+        generic_name: { contains: matched.generic_name, mode: 'insensitive' },
+      },
+      select: { id: true, name: true, generic_name: true, brand_name: true, form: true, strength: true, manufacturer: true, gst_rate: true, is_schedule_h: true },
+      orderBy: { name: 'asc' },
+      take: 50,
+    });
+
+    // Step 3: if shop_id provided, check which are in the shop's inventory
+    let inventoryNames = new Set<string>();
+    if (shopId) {
+      const inv = await prisma.shopInventory.findMany({
+        where: { shop_id: shopId, stock_qty: { gt: 0 } },
+        select: { medicine_name: true },
+      });
+      inventoryNames = new Set(inv.map(i => i.medicine_name.toLowerCase()));
+    }
+
+    const result = alternatives.map(m => ({
+      ...m,
+      is_in_stock: shopId
+        ? inventoryNames.has(m.name.toLowerCase()) || inventoryNames.has((m.brand_name || '').toLowerCase())
+        : null,
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        query: q,
+        generic_name: matched.generic_name,
+        alternatives: result,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
 // GET /medicines/search?q=paracetamol
 router.get('/search', searchRateLimiter, async (req, res, next) => {
   try {
