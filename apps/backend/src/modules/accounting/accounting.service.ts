@@ -151,7 +151,7 @@ export async function importSuppliers(userId: string, suppliers: any[]) {
   const shop = await getShopOrThrow(userId);
 
   return prisma.$transaction(async (tx) => {
-    const results = [];
+    const results: any[] = [];
     for (const s of suppliers) {
       if (!s.name) continue;
 
@@ -706,7 +706,7 @@ export async function importCreditCustomers(userId: string, customers: any[]) {
   const shop = await getShopOrThrow(userId);
 
   return prisma.$transaction(async (tx) => {
-    const results = [];
+    const results: any[] = [];
     for (const c of customers) {
       if (!c.name) continue;
 
@@ -1693,7 +1693,7 @@ export async function getShopBackupFolder(userId: string) {
   if (!shop) throw new AppError(404, 'NOT_FOUND', 'Shop not found');
   
   const sanitizedName = (shop.shop_name || 'shop').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-  const customPath = (shop.backup_path || '/rxdesk').trim();
+  const customPath = '/rxdesk'; // Default since backup_path is not in schema
   const resolvedRoot = path.isAbsolute(customPath) ? customPath : path.resolve(customPath);
   return path.join(resolvedRoot, sanitizedName);
 }
