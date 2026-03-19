@@ -114,6 +114,9 @@ export default function InventoryPage() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const catDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inventoryImportRef = useRef<HTMLInputElement>(null);
+  // Expiry alert state
+  const [expiryDays, setExpiryDays] = useState(90);
+  const [showExpiryAlert, setShowExpiryAlert] = useState(true);
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -183,6 +186,26 @@ export default function InventoryPage() {
       alert('Inventory items imported successfully!');
     },
     onError: (err: any) => alert(err.response?.data?.error?.message || 'Import failed'),
+  });
+
+  // Expiry alert query
+  const { data: expiringItems = [] } = useQuery<{
+    id: string; medicine_name: string; batch_number?: string; expiry_date: string; stock_qty: number; mrp: number;
+  }[]>({
+    queryKey: ['inventory-expiring', expiryDays],
+    queryFn: () => inventoryApi.expiringItems(expiryDays).then((r) => r.data.data),
+    enabled: tab === 'stock',
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const now = new Date();
+  const criticalItems = expiringItems.filter((i) => {
+    const d = Math.ceil((new Date(i.expiry_date).getTime() - now.getTime()) / 86_400_000);
+    return d <= 30;
+  });
+  const warningItems = expiringItems.filter((i) => {
+    const d = Math.ceil((new Date(i.expiry_date).getTime() - now.getTime()) / 86_400_000);
+    return d > 30 && d <= expiryDays;
   });
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -289,7 +312,8 @@ export default function InventoryPage() {
 
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+      {/* ── Page header ─────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Inventory</h1>
           <p className="text-gray-500 text-sm mt-1">
@@ -329,6 +353,90 @@ export default function InventoryPage() {
           )}
         </div>
       </div>
+
+      {/* ── Expiry Alert Banner ───────────────────────────────────────── */}
+      {tab === 'stock' && expiringItems.length > 0 && (
+        <div className={`mb-4 rounded-2xl border overflow-hidden ${
+          criticalItems.length > 0 ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'
+        }`}>
+          <div
+            className="flex items-center justify-between px-4 py-3 cursor-pointer"
+            onClick={() => setShowExpiryAlert((v) => !v)}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{criticalItems.length > 0 ? '⚠️' : '📅'}</span>
+              <div>
+                <p className={`text-sm font-bold ${criticalItems.length > 0 ? 'text-red-700' : 'text-amber-700'}`}>
+                  {criticalItems.length > 0
+                    ? `${criticalItems.length} medicine${criticalItems.length !== 1 ? 's' : ''} expiring within 30 days!`
+                    : `${expiringItems.length} medicine${expiringItems.length !== 1 ? 's' : ''} expiring within ${expiryDays} days`}
+                </p>
+                <p className={`text-xs ${criticalItems.length > 0 ? 'text-red-500' : 'text-amber-500'}`}>
+                  {criticalItems.length > 0 && warningItems.length > 0
+                    ? `+${warningItems.length} more within ${expiryDays} days — check stock`
+                    : 'Check stock and plan clearance or returns'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex rounded-lg border border-gray-200 overflow-hidden bg-white text-xs">
+                {[30, 60, 90].map((d) => (
+                  <button
+                    key={d}
+                    onClick={(e) => { e.stopPropagation(); setExpiryDays(d); }}
+                    className={`px-2.5 py-1 font-semibold transition-colors ${
+                      expiryDays === d ? 'bg-violet-600 text-white' : 'text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    {d}d
+                  </button>
+                ))}
+              </div>
+              <svg className={`w-4 h-4 transition-transform ${showExpiryAlert ? 'rotate-180' : ''} ${criticalItems.length > 0 ? 'text-red-400' : 'text-amber-400'}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </div>
+          </div>
+          {showExpiryAlert && (
+            <div className="border-t border-gray-200/60">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className={criticalItems.length > 0 ? 'bg-red-100/50' : 'bg-amber-100/50'}>
+                    {['Medicine', 'Batch', 'Expiry', 'Days Left', 'Qty', 'MRP'].map((h) => (
+                      <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase text-[10px] tracking-wide">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100/80">
+                  {expiringItems.map((item) => {
+                    const daysLeft = Math.ceil((new Date(item.expiry_date).getTime() - now.getTime()) / 86_400_000);
+                    const isCritical = daysLeft <= 30;
+                    const isExpired  = daysLeft <= 0;
+                    return (
+                      <tr key={item.id} className={isExpired ? 'bg-red-100' : isCritical ? 'bg-red-50/50' : 'bg-white/40'}>
+                        <td className="px-3 py-2.5 font-semibold text-gray-900">{item.medicine_name}</td>
+                        <td className="px-3 py-2.5 text-gray-500 font-mono">{item.batch_number ?? '—'}</td>
+                        <td className="px-3 py-2.5 text-gray-600">{new Date(item.expiry_date).toLocaleDateString('en-IN')}</td>
+                        <td className="px-3 py-2.5">
+                          <span className={`px-2 py-0.5 rounded-full font-bold text-[11px] ${
+                            isExpired  ? 'bg-red-600 text-white'
+                            : isCritical ? 'bg-red-100 text-red-700'
+                            : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            {isExpired ? 'EXPIRED' : `${daysLeft}d`}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 font-semibold text-gray-700">{item.stock_qty}</td>
+                        <td className="px-3 py-2.5 text-gray-600">₹{Number(item.mrp).toFixed(2)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tab switcher */}
       <div className="flex gap-1 mb-5 bg-gray-100 rounded-xl p-1 w-fit">

@@ -106,4 +106,64 @@ router.patch('/:id/fee', requireRole('shop_owner'), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /chambers/:id/stats  (shop owner views doctor performance)
+router.get('/:id/stats', requireRole('shop_owner'), async (req, res, next) => {
+  try {
+    const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: req.user!.id } });
+    if (!shop) { res.status(404).json({ success: false, error: { message: 'Shop not found' } }); return; }
+    const chamber = await prisma.doctorChamber.findFirst({ where: { id: req.params.id, shop_id: shop.id } });
+    if (!chamber) { res.status(404).json({ success: false, error: { message: 'Chamber not found' } }); return; }
+
+    const now = new Date();
+    const todayStart = new Date(now.toISOString().slice(0, 10));
+    const todayEnd   = new Date(todayStart.getTime() + 86_400_000);
+
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    const [todayCount, monthCount, allTime] = await Promise.all([
+      prisma.appointment.count({
+        where: { chamber_id: req.params.id, appointment_date: { gte: todayStart, lt: todayEnd }, status: { notIn: ['cancelled', 'no_show'] } },
+      }),
+      prisma.appointment.count({
+        where: { chamber_id: req.params.id, appointment_date: { gte: monthStart, lt: monthEnd }, status: { notIn: ['cancelled', 'no_show'] } },
+      }),
+      prisma.appointment.count({
+        where: { chamber_id: req.params.id, status: { notIn: ['cancelled', 'no_show'] } },
+      }),
+    ]);
+
+    // Revenue = completed appointments × consultation_fee  (this month)
+    const completedThisMonth = await prisma.appointment.count({
+      where: { chamber_id: req.params.id, appointment_date: { gte: monthStart, lt: monthEnd }, status: 'completed' },
+    });
+    const fee = Number(chamber.consultation_fee);
+    const monthRevenue = completedThisMonth * fee;
+
+    res.json({
+      success: true,
+      data: {
+        today_count: todayCount,
+        month_count: monthCount,
+        all_time_count: allTime,
+        month_revenue: monthRevenue,
+        consultation_fee: fee,
+        completed_this_month: completedThisMonth,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+// DELETE /chambers/:id  (shop deactivates / removes doctor link)
+router.delete('/:id', requireRole('shop_owner'), async (req, res, next) => {
+  try {
+    const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: req.user!.id } });
+    if (!shop) { res.status(404).json({ success: false, error: { message: 'Shop not found' } }); return; }
+    const chamber = await prisma.doctorChamber.findFirst({ where: { id: req.params.id, shop_id: shop.id } });
+    if (!chamber) { res.status(404).json({ success: false, error: { message: 'Chamber not found' } }); return; }
+    await prisma.doctorChamber.update({ where: { id: req.params.id }, data: { status: 'inactive' } });
+    res.json({ success: true, data: null, message: 'Doctor removed from shop' });
+  } catch (err) { next(err); }
+});
+
 export default router;

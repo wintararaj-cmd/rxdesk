@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -147,12 +147,23 @@ export default function AppointmentsPage() {
   const [wiError, setWiError] = useState('');
   const [wiSuccess, setWiSuccess] = useState<{ token: number; patientName: string; doctor: string } | null>(null);
 
-  // â”€â”€ Status filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Status filter
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  // Show cancelled/no_show toggle
+  const [showCancelled, setShowCancelled] = useState(false);
+  // Patient search
+  const [patientSearch, setPatientSearch] = useState('');
 
-  // ── View date (defaults to today) ────────────────────────────────────────
+  // View date (defaults to today)
   const todayIso = new Date().toISOString().slice(0, 10);
   const [viewDate, setViewDate] = useState<string>(todayIso);
+
+  // Weekly strip: 7 days centred on viewDate
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(viewDate + 'T00:00:00');
+    d.setDate(d.getDate() - 3 + i);
+    return d;
+  });
 
   const { data: activeChambers = [] } = useQuery<Chamber[]>({
     queryKey: ['web-active-chambers'],
@@ -176,8 +187,7 @@ export default function AppointmentsPage() {
   const walkInMutation = useMutation({
     mutationFn: (data: object) => appointmentApi.bookWalkIn(data),
     onSuccess: (res: any) => {
-      const bookedDate = wiDate; // capture before state reset
-      // Invalidate the specific date's cache then switch the main page to that date
+      const bookedDate = wiDate;
       qc.invalidateQueries({ queryKey: ['today-appointments', bookedDate] });
       if (bookedDate) setViewDate(bookedDate);
       const token = res.data?.data?.token_number ?? res.data?.token_number;
@@ -203,22 +213,40 @@ export default function AppointmentsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['today-appointments', viewDate] }),
   });
 
-  // Derived stats
+  // Derived stats (include everything)
   const stats = {
-    total:    appointments.length,
-    waiting:  appointments.filter((a) => ['booked', 'confirmed', 'arrived'].includes(a.status)).length,
-    active:   appointments.filter((a) => a.status === 'in_consultation').length,
-    done:     appointments.filter((a) => a.status === 'completed').length,
+    total:     appointments.filter((a) => !['cancelled','no_show'].includes(a.status)).length,
+    waiting:   appointments.filter((a) => ['booked','confirmed','arrived'].includes(a.status)).length,
+    active:    appointments.filter((a) => a.status === 'in_consultation').length,
+    done:      appointments.filter((a) => a.status === 'completed').length,
+    cancelled: appointments.filter((a) => ['cancelled','no_show'].includes(a.status)).length,
   };
 
-  const filtered = statusFilter === 'all' ? appointments : appointments.filter((a) => a.status === statusFilter);
+  // Visible pool (exclude cancelled unless toggled)
+  const visiblePool = showCancelled
+    ? appointments
+    : appointments.filter((a) => !['cancelled','no_show'].includes(a.status));
+
+  // Apply patient search
+  const searchFiltered = patientSearch.trim()
+    ? visiblePool.filter((a) => {
+        const q = patientSearch.toLowerCase();
+        return (
+          (a.patient?.full_name ?? '').toLowerCase().includes(q) ||
+          (a.patient?.user?.phone ?? '').includes(q)
+        );
+      })
+    : visiblePool;
+
+  // Apply status filter
+  const filtered = statusFilter === 'all' ? searchFiltered : searchFiltered.filter((a) => a.status === statusFilter);
 
   const closeModal = () => { setShowWalkIn(false); setWiSuccess(null); setWiError(''); };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-5">
 
-      {/* â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Header ────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
@@ -237,12 +265,12 @@ export default function AppointmentsPage() {
             <input
               type="date"
               value={viewDate}
-              onChange={(e) => { setViewDate(e.target.value); setStatusFilter('all'); }}
+              onChange={(e) => { setViewDate(e.target.value); setStatusFilter('all'); setPatientSearch(''); }}
               className="text-sm text-gray-700 font-medium outline-none bg-transparent cursor-pointer"
             />
             {viewDate !== todayIso && (
               <button
-                onClick={() => { setViewDate(todayIso); setStatusFilter('all'); }}
+                onClick={() => { setViewDate(todayIso); setStatusFilter('all'); setPatientSearch(''); }}
                 className="ml-1 text-xs text-violet-600 font-semibold hover:underline whitespace-nowrap"
               >
                 Back to Today
@@ -261,13 +289,67 @@ export default function AppointmentsPage() {
         </div>
       </div>
 
-      {/* â”€â”€ Stat cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <div className="grid grid-cols-4 gap-4">
+      {/* ── Weekly mini-calendar strip ─────────────────────────────────── */}
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Week View</p>
+          <div className="flex gap-1">
+            <button
+              onClick={() => {
+                const d = new Date(viewDate + 'T00:00:00'); d.setDate(d.getDate() - 7);
+                setViewDate(d.toISOString().slice(0, 10)); setStatusFilter('all');
+              }}
+              className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-400 text-sm"
+            >‹</button>
+            <button
+              onClick={() => { setViewDate(todayIso); setStatusFilter('all'); }}
+              className="px-2 h-7 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-500 text-xs font-semibold"
+            >Today</button>
+            <button
+              onClick={() => {
+                const d = new Date(viewDate + 'T00:00:00'); d.setDate(d.getDate() + 7);
+                setViewDate(d.toISOString().slice(0, 10)); setStatusFilter('all');
+              }}
+              className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-400 text-sm"
+            >›</button>
+          </div>
+        </div>
+        <div className="grid grid-cols-7 gap-1.5">
+          {weekDays.map((d) => {
+            const iso = d.toISOString().slice(0, 10);
+            const isToday = iso === todayIso;
+            const isSelected = iso === viewDate;
+            return (
+              <button
+                key={iso}
+                onClick={() => { setViewDate(iso); setStatusFilter('all'); setPatientSearch(''); }}
+                className={`flex flex-col items-center justify-center py-2.5 px-1 rounded-xl border transition-all ${
+                  isSelected
+                    ? 'border-violet-500 bg-violet-600 text-white shadow-md shadow-violet-200'
+                    : isToday
+                    ? 'border-violet-200 bg-violet-50 text-violet-700'
+                    : 'border-gray-100 hover:border-violet-200 hover:bg-violet-50 text-gray-600'
+                }`}
+              >
+                <span className={`text-[10px] font-semibold uppercase ${isSelected ? 'text-violet-200' : 'text-gray-400'}`}>
+                  {DAYS[d.getDay()]}
+                </span>
+                <span className="text-base font-black leading-tight mt-0.5">{d.getDate()}</span>
+                {isToday && <span className={`w-1.5 h-1.5 rounded-full mt-0.5 ${isSelected ? 'bg-violet-300' : 'bg-violet-500'}`} />}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Stat cards ────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-5 gap-3">
         {[
-          { label: 'Total Today', value: stats.total, color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-100' },
-          { label: 'Waiting',     value: stats.waiting, color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-100' },
-          { label: 'In Progress', value: stats.active,  color: 'text-blue-700',  bg: 'bg-blue-50',  border: 'border-blue-100' },
-          { label: 'Completed',   value: stats.done,    color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+          { label: 'Total',       value: stats.total,     color: 'text-violet-700',  bg: 'bg-violet-50',  border: 'border-violet-100' },
+          { label: 'Waiting',     value: stats.waiting,   color: 'text-amber-700',   bg: 'bg-amber-50',   border: 'border-amber-100' },
+          { label: 'In Progress', value: stats.active,    color: 'text-blue-700',    bg: 'bg-blue-50',    border: 'border-blue-100' },
+          { label: 'Completed',   value: stats.done,      color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+          { label: 'Cancelled',   value: stats.cancelled, color: 'text-red-500',     bg: 'bg-red-50',     border: 'border-red-100' },
         ].map((s) => (
           <div key={s.label} className={`${s.bg} border ${s.border} rounded-2xl p-4`}>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{s.label}</p>
@@ -276,42 +358,88 @@ export default function AppointmentsPage() {
         ))}
       </div>
 
-      {/* â”€â”€ Status filter tabs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {['all', 'booked', 'arrived', 'in_consultation', 'completed', 'cancelled'].map((s) => {
-          const meta = STATUS_META[s];
-          const count = s === 'all' ? appointments.length : appointments.filter((a) => a.status === s).length;
-          return (
+      {/* ── Search & filter bar ───────────────────────────────────────── */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Patient search */}
+        <div className="relative flex-1 min-w-[180px]">
+          <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803a7.5 7.5 0 0010.607 10.607z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search patient name or phone…"
+            value={patientSearch}
+            onChange={(e) => setPatientSearch(e.target.value)}
+            className="w-full border border-gray-200 rounded-xl pl-9 pr-8 py-2 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+          />
+          {patientSearch && (
             <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                statusFilter === s
-                  ? 'bg-violet-600 text-white border-violet-600'
-                  : 'bg-white text-gray-500 border-gray-200 hover:border-violet-300 hover:text-violet-600'
-              }`}
-            >
-              {meta && <span className={`w-1.5 h-1.5 rounded-full ${statusFilter === s ? 'bg-white' : meta.dot}`} />}
-              {meta?.label ?? 'All'} <span className={`${statusFilter === s ? 'text-violet-200' : 'text-gray-400'}`}>({count})</span>
-            </button>
-          );
-        })}
+              onClick={() => setPatientSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 text-lg leading-none"
+            >×</button>
+          )}
+        </div>
+
+        {/* Status filter pills */}
+        <div className="flex gap-1.5 flex-wrap">
+          {['all', 'booked', 'arrived', 'in_consultation', 'completed'].map((s) => {
+            const meta = STATUS_META[s];
+            const count = s === 'all'
+              ? visiblePool.length
+              : visiblePool.filter((a) => a.status === s).length;
+            return (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                  statusFilter === s
+                    ? 'bg-violet-600 text-white border-violet-600'
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-violet-300 hover:text-violet-600'
+                }`}
+              >
+                {meta && <span className={`w-1.5 h-1.5 rounded-full ${statusFilter === s ? 'bg-white' : meta.dot}`} />}
+                {meta?.label ?? 'All'} <span className={`${statusFilter === s ? 'text-violet-200' : 'text-gray-400'}`}>({count})</span>
+              </button>
+            );
+          })}
+          {/* Show cancelled toggle */}
+          <button
+            onClick={() => { setShowCancelled((v) => !v); }}
+            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+              showCancelled
+                ? 'bg-red-50 text-red-600 border-red-200'
+                : 'bg-white text-gray-400 border-gray-200 hover:border-red-200 hover:text-red-400'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+            {showCancelled ? 'Hide Cancelled' : 'Show Cancelled'}
+            {stats.cancelled > 0 && (
+              <span className={showCancelled ? 'text-red-400' : 'text-gray-300'}>({stats.cancelled})</span>
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* â”€â”€ Appointments table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Appointments table ─────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center py-20 gap-3 text-gray-400">
             <div className="w-5 h-5 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
-            Loading appointmentsâ€¦
+            Loading appointments…
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-400">
             <svg className="w-12 h-12 mb-3 opacity-30" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
             </svg>
-            <p className="font-medium">No appointments {statusFilter !== 'all' ? `with status "${STATUS_META[statusFilter]?.label}"` : 'today'}</p>
-            <p className="text-sm mt-1">Click &quot;+ Book Walk-in&quot; to add one</p>
+            <p className="font-medium">
+              {patientSearch
+                ? `No appointments matching "${patientSearch}"`
+                : statusFilter !== 'all'
+                ? `No appointments with status "${STATUS_META[statusFilter]?.label}"`
+                : 'No appointments for this day'}
+            </p>
+            {!patientSearch && <p className="text-sm mt-1">Click &quot;Book Walk-in&quot; to add one</p>}
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -326,21 +454,24 @@ export default function AppointmentsPage() {
               {filtered.map((appt) => {
                 const meta = STATUS_META[appt.status] ?? STATUS_META['booked'];
                 const isActive = appt.status === 'in_consultation';
+                const isDimmed = ['cancelled','no_show'].includes(appt.status);
                 return (
-                  <tr key={appt.id} className={`transition-colors hover:bg-gray-50/60 ${isActive ? 'bg-blue-50/30' : ''}`}>
+                  <tr key={appt.id} className={`transition-colors hover:bg-gray-50/60 ${isActive ? 'bg-blue-50/30' : ''} ${isDimmed ? 'opacity-60' : ''}`}>
                     {/* Token */}
                     <td className="px-4 py-3.5">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm ${isActive ? 'bg-blue-600 text-white shadow-md shadow-blue-200' : 'bg-violet-100 text-violet-700'}`}>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm ${isActive ? 'bg-blue-600 text-white shadow-md shadow-blue-200' : isDimmed ? 'bg-gray-100 text-gray-400' : 'bg-violet-100 text-violet-700'}`}>
                         {appt.token_number}
                       </div>
                     </td>
                     {/* Patient */}
                     <td className="px-4 py-3.5">
-                      <p className="font-semibold text-gray-900">{appt.patient?.full_name ?? 'â€”'}</p>                      {appt.patient?.user?.phone && (
+                      <p className="font-semibold text-gray-900">{appt.patient?.full_name ?? '—'}</p>
+                      {appt.patient?.user?.phone && (
                         <p className="text-xs text-gray-400 mt-0.5 font-mono">{appt.patient.user.phone}</p>
-                      )}                      {(appt.patient?.age || appt.patient?.gender) && (
+                      )}
+                      {(appt.patient?.age || appt.patient?.gender) && (
                         <p className="text-xs text-gray-400 mt-0.5 capitalize">
-                          {[appt.patient.age ? `${appt.patient.age}y` : null, appt.patient.gender].filter(Boolean).join(' Â· ')}
+                          {[appt.patient.age ? `${appt.patient.age}y` : null, appt.patient.gender].filter(Boolean).join(' · ')}
                         </p>
                       )}
                     </td>
@@ -351,17 +482,17 @@ export default function AppointmentsPage() {
                           <p className="font-medium text-gray-800">Dr. {appt.chamber.doctor.full_name}</p>
                           <p className="text-xs text-gray-400 mt-0.5">{appt.chamber.doctor.specialization}</p>
                         </>
-                      ) : <span className="text-gray-300">â€”</span>}
+                      ) : <span className="text-gray-300">—</span>}
                     </td>
                     {/* Time */}
                     <td className="px-4 py-3.5">
                       {appt.slot_start_time ? (
                         <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">{appt.slot_start_time}</span>
-                      ) : <span className="text-gray-300 text-xs">â€”</span>}
+                      ) : <span className="text-gray-300 text-xs">—</span>}
                     </td>
                     {/* Reason */}
                     <td className="px-4 py-3.5 max-w-[160px]">
-                      <p className="text-gray-500 text-xs truncate">{appt.chief_complaint ?? <span className="text-gray-300">â€”</span>}</p>
+                      <p className="text-gray-500 text-xs truncate">{appt.chief_complaint ?? <span className="text-gray-300">—</span>}</p>
                     </td>
                     {/* Status */}
                     <td className="px-4 py-3.5">
@@ -397,16 +528,18 @@ export default function AppointmentsPage() {
                             No Show
                           </button>
                         )}
-                        <button
-                          onClick={() => printOpdSlip(appt, shopData as any)}
-                          title="Print OPD Prescription Slip"
-                          className="text-xs text-violet-600 border border-violet-200 bg-violet-50 px-2.5 py-1.5 rounded-lg hover:bg-violet-100 hover:border-violet-400 transition-colors font-medium flex items-center gap-1"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
-                          </svg>
-                          Print Slip
-                        </button>
+                        {!isDimmed && (
+                          <button
+                            onClick={() => printOpdSlip(appt, shopData as any)}
+                            title="Print OPD Prescription Slip"
+                            className="text-xs text-violet-600 border border-violet-200 bg-violet-50 px-2.5 py-1.5 rounded-lg hover:bg-violet-100 hover:border-violet-400 transition-colors font-medium flex items-center gap-1"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
+                            </svg>
+                            Print
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -417,7 +550,7 @@ export default function AppointmentsPage() {
         )}
       </div>
 
-      {/* â”€â”€ Walk-in Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Walk-in Modal ─────────────────────────────────────────────── */}
       {showWalkIn && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={(e) => e.target === e.currentTarget && closeModal()}>
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col">
@@ -438,7 +571,7 @@ export default function AppointmentsPage() {
             {/* Modal body */}
             <div className="flex-1 overflow-y-auto px-6 py-5">
 
-              {/* â”€â”€ Success state â”€â”€ */}
+              {/* Success state */}
               {wiSuccess ? (
                 <div className="text-center py-4">
                   <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -503,7 +636,7 @@ export default function AppointmentsPage() {
                             <span className="font-semibold text-gray-900">
                               {c.doctor ? `Dr. ${c.doctor.full_name}` : 'Unknown Doctor'}
                             </span>
-                            <span className="text-violet-600 text-xs font-semibold bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full">â‚¹{c.consultation_fee}</span>
+                            <span className="text-violet-600 text-xs font-semibold bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full">₹{c.consultation_fee}</span>
                           </div>
                           {c.doctor?.specialization && <p className="text-gray-400 text-xs mt-0.5">{c.doctor.specialization}</p>}
                         </button>
@@ -536,7 +669,7 @@ export default function AppointmentsPage() {
                                   ? 'border-violet-500 bg-violet-600 text-white font-bold shadow-md shadow-violet-200'
                                   : 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:border-violet-400'
                               }`}
-                              title={scheduleForDay ? `${scheduleForDay.start_time} â€“ ${scheduleForDay.end_time}` : 'Off day'}
+                              title={scheduleForDay ? `${scheduleForDay.start_time} – ${scheduleForDay.end_time}` : 'Off day'}
                             >
                               <span className="font-medium">{DAYS[d.getDay()]}</span>
                               <span className="text-base font-black leading-tight">{d.getDate()}</span>
@@ -551,7 +684,7 @@ export default function AppointmentsPage() {
                       {scheduledDays.size === 0 && (
                         <p className="text-xs text-amber-500 mt-1.5 flex items-center gap-1">
                           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /></svg>
-                          No schedule set â€” current time will be used as slot
+                          No schedule set — current time will be used as slot
                         </p>
                       )}
                     </div>
@@ -567,7 +700,7 @@ export default function AppointmentsPage() {
                       {slotsLoading ? (
                         <div className="flex items-center gap-2 text-sm text-gray-400 py-2">
                           <div className="w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
-                          Loading slotsâ€¦
+                          Loading slots…
                         </div>
                       ) : (
                         <>
@@ -599,7 +732,7 @@ export default function AppointmentsPage() {
                     <textarea
                       value={wiComplaint}
                       onChange={(e) => setWiComplaint(e.target.value)}
-                      placeholder="e.g. Fever since 2 days, headacheâ€¦"
+                      placeholder="e.g. Fever since 2 days, headache…"
                       rows={2}
                       className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 resize-none"
                     />
@@ -637,7 +770,7 @@ export default function AppointmentsPage() {
                   {walkInMutation.isPending ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Bookingâ€¦
+                      Booking…
                     </>
                   ) : (
                     'Book Appointment'

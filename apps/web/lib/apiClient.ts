@@ -118,6 +118,7 @@ export const inventoryApi = {
   remove: (id: string) => apiClient.delete(`/inventory/${id}`),
   lowStock: () => apiClient.get('/inventory', { params: { low_stock: true } }),
   importBulk: (items: object[]) => apiClient.post('/inventory/import', { items }, { timeout: 120_000 }),
+  expiringItems: (days = 90) => apiClient.get('/inventory/expiring', { params: { days } }),
 };
 
 export const billApi = {
@@ -275,6 +276,10 @@ export const chamberApi = {
     apiClient.put(`/chambers/${chamberId}/schedule`, schedules),
   updateFee: (chamberId: string, fee: number) =>
     apiClient.patch(`/chambers/${chamberId}/fee`, { consultation_fee: fee }),
+  getDoctorStats: (chamberId: string) =>
+    apiClient.get(`/chambers/${chamberId}/stats`),
+  removeDoctor: (chamberId: string) =>
+    apiClient.delete(`/chambers/${chamberId}`),
 };
 
 /** Public doctor search — no authentication required */

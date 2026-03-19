@@ -64,7 +64,6 @@ router.get('/', requireRole('shop_owner'), async (req, res, next) => {
 router.get('/low-stock', requireRole('shop_owner'), async (req, res, next) => {
   try {
     const shop = await getShopByUser(req.user!.id);
-    // Find items where stock_qty <= reorder_level using raw query
     const items = await prisma.$queryRaw<{ id: string; medicine_name: string; stock_qty: number; reorder_level: number }[]>`
       SELECT id, medicine_name, stock_qty, reorder_level
       FROM shop_inventory
@@ -72,6 +71,59 @@ router.get('/low-stock', requireRole('shop_owner'), async (req, res, next) => {
         AND stock_qty <= reorder_level
       ORDER BY stock_qty ASC
     `;
+    res.json({ success: true, data: items });
+  } catch (err) { next(err); }
+});
+
+// GET /inventory/expiring  — items expiring within ?days (default 90)
+router.get('/expiring', requireRole('shop_owner'), async (req, res, next) => {
+  try {
+    const shop = await getShopByUser(req.user!.id);
+    const days = Math.max(1, Math.min(365, req.query.days ? Number(req.query.days) : 90));
+    const now   = new Date();
+    const cutoff = new Date(now.getTime() + days * 86_400_000);
+
+    const items = await prisma.shopInventory.findMany({
+      where: {
+        shop_id: shop.id,
+        expiry_date: { not: null, lte: cutoff },
+        stock_qty: { gt: 0 },
+      },
+      orderBy: { expiry_date: 'asc' },
+      select: {
+        id: true,
+        medicine_name: true,
+        batch_number: true,
+        expiry_date: true,
+        stock_qty: true,
+        mrp: true,
+      },
+    });
+
+    // Fire-and-forget: create in-app notifications for items expiring in <=30 days
+    const criticalItems = items.filter((i) => {
+      if (!i.expiry_date) return false;
+      const daysLeft = Math.ceil((i.expiry_date.getTime() - now.getTime()) / 86_400_000);
+      return daysLeft <= 30 && daysLeft >= 0;
+    });
+    if (criticalItems.length > 0) {
+      prisma.notification.createMany({
+        data: criticalItems.map((i) => {
+          const daysLeft = Math.ceil((i.expiry_date!.getTime() - now.getTime()) / 86_400_000);
+          return {
+            user_id: req.user!.id,
+            title: 'Expiry Alert',
+            body: `${i.medicine_name} (Batch: ${i.batch_number ?? 'N/A'}) expires in ${daysLeft} day(s). Qty: ${i.stock_qty}.`,
+            type: 'push' as const,
+            category: 'stock_alert' as const,
+            reference_id: i.id,
+            reference_type: 'inventory',
+          };
+        }),
+        skipDuplicates: false,
+      }).catch((e: Error) => logger.warn(`Expiry notification failed: ${e?.message}`));
+    }
+
     res.json({ success: true, data: items });
   } catch (err) { next(err); }
 });
