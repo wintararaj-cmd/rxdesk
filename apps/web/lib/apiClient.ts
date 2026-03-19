@@ -301,4 +301,5 @@ export const patientApi = {
     slot_start_time: string;
     chief_complaint?: string;
   }) => apiClient.post('/appointments', data),
+  cancelAppointment: (id: string) => apiClient.patch(`/appointments/${id}/cancel`),
 };
