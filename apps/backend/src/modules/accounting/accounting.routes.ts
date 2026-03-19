@@ -23,6 +23,17 @@ router.post('/suppliers', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.post('/suppliers/import', shopAuth, async (req, res, next) => {
+  try {
+    const items = req.body.items;
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ success: false, error: 'items array is required' });
+    }
+    const data = await service.importSuppliers(req.user!.id, items);
+    res.json({ success: true, data, message: `Imported ${data.length} suppliers` });
+  } catch (err) { next(err); }
+});
+
 router.get('/suppliers/:id/ledger', shopAuth, async (req, res, next) => {
   try {
     const data = await service.getSupplierWithLedger(req.user!.id, req.params.id);
@@ -163,6 +174,17 @@ router.post('/credit-customers', shopAuth, async (req, res, next) => {
   try {
     const data = await service.createCreditCustomer(req.user!.id, req.body);
     res.status(201).json({ success: true, data, message: 'Credit customer created' });
+  } catch (err) { next(err); }
+});
+
+router.post('/credit-customers/import', shopAuth, async (req, res, next) => {
+  try {
+    const items = req.body.items;
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ success: false, error: 'items array is required' });
+    }
+    const data = await service.importCreditCustomers(req.user!.id, items);
+    res.json({ success: true, data, message: `Imported ${data.length} credit customers` });
   } catch (err) { next(err); }
 });
 

@@ -60,13 +60,49 @@ The system also maintains a list of **Recent Server Records** within the Setting
 
 ---
 
-## 4. Billing & Inventory
+### 4. Billing & Inventory
 *   **Prescription Billing**: If a doctor uses RxDesk, their prescription will automatically appear in your Billing screen. Simply scan or select it to generate a final bill.
 *   **Stock Alerts**: The dashboard will highlight "Low Stock" items based on the reorder levels you set in your inventory settings.
 
 ---
 
-## 5. Support & Troubleshooting
+## 5. Data Migration (Bulk Import)
+If you are migrating from another software, you can bulk import your existing data (Suppliers, Stocks, and Outstandings) using the following methods.
+
+### 5.1 Importing Stocks (Inventory)
+1.  Navigate to the **Inventory** link in the sidebar.
+2.  Click the **Bulk Import** button (top right).
+3.  Upload a JSON or CSV file with the following columns:
+    *   `medicine_name` (Required)
+    *   `mrp` (Required)
+    *   `stock_qty`
+    *   `purchase_price`
+    *   `batch_number`
+    *   `expiry_date` (YYYY-MM-DD)
+    *   `gst_rate`
+    *   `unit` (strip/bottle/etc.)
+
+### 5.2 Importing Suppliers & Opening Balances
+You can bulk import your distributors and their current outstanding balances.
+1.  Go to **Accounting** > **Suppliers**.
+2.  Click **Import Suppliers**.
+3.  Provide a JSON array with:
+    *   `name` (Required)
+    *   `phone`, `email`, `address`, `gst_number`
+    *   `opening_balance`: The amount you currently owe this supplier.
+
+### 5.3 Importing Credit Customers (Outstandings)
+Import patients or customers who have a pending balance with you.
+1.  Go to **Accounting** > **Outstandings**.
+2.  Click **Import Customers**.
+3.  Provide a JSON array with:
+    *   `name` (Required)
+    *   `phone`, `address`
+    *   `opening_balance`: The amount this customer currently owes you.
+
+---
+
+## 6. Support & Troubleshooting
 If you encounter any issues or need custom feature requests:
 *   **Email**: support@rxdesk.in
 *   **Phone**: +91-XXXXXXXXXX

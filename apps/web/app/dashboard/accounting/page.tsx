@@ -446,6 +446,7 @@ function SuppliersTab() {
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('');
   const [gstin, setGstin] = useState('');
+  const [openingBalance, setOpeningBalance] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery<Supplier[]>({
@@ -469,6 +470,7 @@ function SuppliersTab() {
       setPhone('');
       setCity('');
       setGstin('');
+      setOpeningBalance('');
     },
   });
 
@@ -510,6 +512,17 @@ function SuppliersTab() {
                 />
               </div>
             ))}
+            <div>
+              <label className="text-gray-500 text-xs block mb-1">Opening Balance (₹)</label>
+              <input
+                type="number"
+                value={openingBalance}
+                onChange={(e) => setOpeningBalance(e.target.value)}
+                placeholder="0.00"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 font-semibold text-red-600"
+              />
+              <p className="text-[10px] text-gray-400 mt-1 italic">Amount you currently owe this supplier</p>
+            </div>
           </div>
           <div className="flex gap-3 mt-4">
             <button
@@ -521,6 +534,7 @@ function SuppliersTab() {
                   phone: phone.trim() || undefined,
                   city: city.trim() || undefined,
                   gstin: gstin.trim() || undefined,
+                  opening_balance: parseFloat(openingBalance) || 0,
                 });
               }}
               disabled={createMutation.isPending}
@@ -1388,6 +1402,14 @@ function OutstandingsTab() {
   const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState('cash');
 
+  const [showCustomerForm, setShowCustomerForm] = useState(false);
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [customerNotes, setCustomerNotes] = useState('');
+  const [customerLimit, setCustomerLimit] = useState('');
+  const [customerOpening, setCustomerOpening] = useState('');
+
   const { data: out, isLoading, error, isError } = useQuery({
     queryKey: ['web-outstandings'],
     queryFn: () => accountingApi.getOutstandings().then((r) => r.data.data),
@@ -1416,6 +1438,20 @@ function OutstandingsTab() {
       if (expandedType === 'customer') qc.invalidateQueries({ queryKey: ['web-credit-ledger', expandedId] });
       else qc.invalidateQueries({ queryKey: ['web-supplier-ledger', expandedId] });
       setPayAmount('');
+    },
+  });
+
+  const createCustomerMutation = useMutation({
+    mutationFn: (d: any) => accountingApi.createCreditCustomer(d),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['web-outstandings'] });
+      setShowCustomerForm(false);
+      setCustomerName('');
+      setCustomerPhone('');
+      setCustomerAddress('');
+      setCustomerNotes('');
+      setCustomerLimit('');
+      setCustomerOpening('');
     },
   });
 
@@ -1479,17 +1515,79 @@ function OutstandingsTab() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
         </div>
-        <div className="flex gap-4 w-full md:w-auto">
-          <div className="bg-emerald-50 px-5 py-2.5 rounded-2xl border border-emerald-100 flex-1 md:flex-none">
-            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Receivables</p>
-            <p className="text-lg font-black text-emerald-700">{fmt(totalRec)}</p>
-          </div>
-          <div className="bg-rose-50 px-5 py-2.5 rounded-2xl border border-rose-100 flex-1 md:flex-none">
-            <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Payables</p>
-            <p className="text-lg font-black text-rose-700">{fmt(totalPay)}</p>
+        <div className="flex gap-2">
+          {!showCustomerForm && (
+            <button
+              onClick={() => setShowCustomerForm(true)}
+              className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
+            >
+              + Add Customer
+            </button>
+          )}
+          <div className="hidden md:flex gap-4">
+            <div className="bg-emerald-50 px-5 py-2.5 rounded-2xl border border-emerald-100">
+              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Receivables</p>
+              <p className="text-lg font-black text-emerald-700">{fmt(totalRec)}</p>
+            </div>
+            <div className="bg-rose-50 px-5 py-2.5 rounded-2xl border border-rose-100">
+              <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Payables</p>
+              <p className="text-lg font-black text-rose-700">{fmt(totalPay)}</p>
+            </div>
           </div>
         </div>
       </div>
+
+      {showCustomerForm && (
+        <div className="bg-white rounded-[2rem] p-8 border border-emerald-100 shadow-xl shadow-emerald-50 animate-in zoom-in-95 duration-200">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-black text-gray-900 tracking-tight">Register New Credit Customer</h3>
+            <button onClick={() => setShowCustomerForm(false)} className="text-gray-400 hover:text-gray-900 transition-colors">✕</button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 ml-1">Full Name *</label>
+              <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="e.g. Ramesh Chandra" className="w-full border border-gray-200 rounded-xl px-4 h-11 text-sm focus:ring-2 focus:ring-emerald-400 outline-none transition-all" />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 ml-1">Phone Number</label>
+              <input type="text" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="10-digit mobile" className="w-full border border-gray-200 rounded-xl px-4 h-11 text-sm focus:ring-2 focus:ring-emerald-400 outline-none transition-all" />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 ml-1">Opening Balance (₹)</label>
+              <input type="number" value={customerOpening} onChange={(e) => setCustomerOpening(e.target.value)} placeholder="0.00" className="w-full border border-emerald-100 bg-emerald-50/30 rounded-xl px-4 h-11 text-sm font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-400 outline-none transition-all" />
+              <p className="text-[9px] text-emerald-600 mt-1 italic font-medium">Initial amount this customer owes you</p>
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 ml-1">Address</label>
+              <input type="text" value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} placeholder="Street, City, Area" className="w-full border border-gray-200 rounded-xl px-4 h-11 text-sm focus:ring-2 focus:ring-emerald-400 outline-none transition-all" />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 ml-1">Credit Limit</label>
+              <input type="number" value={customerLimit} onChange={(e) => setCustomerLimit(e.target.value)} placeholder="5000" className="w-full border border-gray-200 rounded-xl px-4 h-11 text-sm focus:ring-2 focus:ring-emerald-400 outline-none transition-all" />
+            </div>
+          </div>
+          <div className="flex gap-4 mt-8">
+            <button
+              onClick={() => {
+                if (!customerName.trim()) return;
+                createCustomerMutation.mutate({
+                  name: customerName,
+                  phone: customerPhone || undefined,
+                  address: customerAddress || undefined,
+                  notes: customerNotes || undefined,
+                  credit_limit: parseFloat(customerLimit) || 0,
+                  opening_balance: parseFloat(customerOpening) || 0,
+                });
+              }}
+              disabled={createCustomerMutation.isPending || !customerName.trim()}
+              className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-emerald-100 hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all"
+            >
+              {createCustomerMutation.isPending ? 'Saving...' : 'Register Customer'}
+            </button>
+            <button onClick={() => setShowCustomerForm(false)} className="text-gray-400 text-xs font-black uppercase tracking-widest px-6 py-3 hover:text-gray-900 transition-colors">Discard</button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Receivables Column */}

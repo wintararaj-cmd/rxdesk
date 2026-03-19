@@ -44,25 +44,50 @@ export async function createSupplier(userId: string, data: {
   credit_limit?: number;
   payment_terms?: string;
   notes?: string;
+  opening_balance?: number;
 }) {
   const shop = await getShopOrThrow(userId);
-  return prisma.supplier.create({
-    data: {
-      shop_id: shop.id,
-      name: data.name,
-      contact_person: data.contact_person,
-      phone: data.phone,
-      email: data.email,
-      address: data.address,
-      gst_number: data.gst_number,
-      drug_license_no: data.drug_license_no,
-      bank_name: data.bank_name,
-      bank_account: data.bank_account,
-      bank_ifsc: data.bank_ifsc,
-      credit_limit: data.credit_limit ?? 0,
-      payment_terms: data.payment_terms,
-      notes: data.notes,
-    },
+  return prisma.$transaction(async (tx) => {
+    const supplier = await tx.supplier.create({
+      data: {
+        shop_id: shop.id,
+        name: data.name,
+        contact_person: data.contact_person,
+        phone: data.phone,
+        email: data.email,
+        address: data.address,
+        gst_number: data.gst_number,
+        drug_license_no: data.drug_license_no,
+        bank_name: data.bank_name,
+        bank_account: data.bank_account,
+        bank_ifsc: data.bank_ifsc,
+        credit_limit: data.credit_limit ?? 0,
+        payment_terms: data.payment_terms,
+        notes: data.notes,
+      },
+    });
+
+    const balance = Number(data.opening_balance || 0);
+    if (balance > 0) {
+      await tx.purchaseEntry.create({
+        data: {
+          shop_id: shop.id,
+          supplier_id: supplier.id,
+          invoice_number: 'OPEN_BAL',
+          invoice_date: new Date(),
+          received_date: new Date(),
+          subtotal: balance,
+          gst_amount: 0,
+          total_amount: balance,
+          amount_paid: 0,
+          payment_status: 'unpaid',
+          notes: 'Opening balance',
+          created_by: userId,
+        },
+      });
+    }
+
+    return supplier;
   });
 }
 
@@ -120,6 +145,80 @@ export async function deactivateSupplier(userId: string, supplierId: string) {
   const exists = await prisma.supplier.findFirst({ where: { id: supplierId, shop_id: shop.id } });
   if (!exists) throw new AppError(404, 'NOT_FOUND', 'Supplier not found');
   return prisma.supplier.update({ where: { id: supplierId }, data: { is_active: false } });
+}
+
+export async function importSuppliers(userId: string, suppliers: any[]) {
+  const shop = await getShopOrThrow(userId);
+
+  return prisma.$transaction(async (tx) => {
+    const results = [];
+    for (const s of suppliers) {
+      if (!s.name) continue;
+
+      // Check if supplier already exists by name for this shop
+      const existing = await tx.supplier.findFirst({
+        where: { shop_id: shop.id, name: s.name },
+      });
+
+      let supplier;
+      if (existing) {
+        supplier = await tx.supplier.update({
+          where: { id: existing.id },
+          data: {
+            contact_person: s.contact_person,
+            phone: s.phone,
+            email: s.email,
+            address: s.address,
+            gst_number: s.gst_number,
+            notes: s.notes,
+          },
+        });
+      } else {
+        supplier = await tx.supplier.create({
+          data: {
+            shop_id: shop.id,
+            name: s.name,
+            contact_person: s.contact_person,
+            phone: s.phone,
+            email: s.email,
+            address: s.address,
+            gst_number: s.gst_number,
+            notes: s.notes,
+          },
+        });
+      }
+
+      // Handle opening balance
+      const balance = Number(s.opening_balance || 0);
+      if (balance > 0) {
+        // Check if an opening balance already exists to prevent duplicates on re-import
+        const existingVal = await tx.purchaseEntry.findFirst({
+          where: { supplier_id: supplier.id, invoice_number: 'OPEN_BAL' },
+        });
+
+        if (!existingVal) {
+          await tx.purchaseEntry.create({
+            data: {
+              shop_id: shop.id,
+              supplier_id: supplier.id,
+              invoice_number: 'OPEN_BAL',
+              invoice_date: new Date(),
+              received_date: new Date(),
+              subtotal: balance,
+              gst_amount: 0,
+              total_amount: balance,
+              amount_paid: 0,
+              payment_status: 'unpaid',
+              notes: 'Opening balance from migration',
+              created_by: userId,
+            },
+          });
+        }
+      }
+      results.push(supplier);
+    }
+    return results;
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -568,18 +667,116 @@ export async function listCreditCustomers(userId: string) {
   return { customers: customersWithOverdue, total_customers: customers.length, total_outstanding: totalOutstanding };
 }
 
-export async function createCreditCustomer(userId: string, data: { name: string; phone?: string; address?: string; credit_limit?: number; patient_id?: string; notes?: string }) {
+export async function createCreditCustomer(userId: string, data: { name: string; phone?: string; address?: string; credit_limit?: number; patient_id?: string; notes?: string; opening_balance?: number }) {
   const shop = await getShopOrThrow(userId);
-  return prisma.creditCustomer.create({
-    data: {
-      shop_id: shop.id,
-      name: data.name,
-      phone: data.phone,
-      address: data.address,
-      credit_limit: data.credit_limit ?? 0,
-      patient_id: data.patient_id ?? null,
-      notes: data.notes,
-    },
+  return prisma.$transaction(async (tx) => {
+    const balance = Number(data.opening_balance || 0);
+    const customer = await tx.creditCustomer.create({
+      data: {
+        shop_id: shop.id,
+        name: data.name,
+        phone: data.phone,
+        address: data.address,
+        credit_limit: data.credit_limit ?? 0,
+        patient_id: data.patient_id ?? null,
+        notes: data.notes,
+        total_outstanding: balance,
+      },
+    });
+
+    if (balance > 0) {
+      await tx.creditTransaction.create({
+        data: {
+          customer_id: customer.id,
+          shop_id: shop.id,
+          type: 'credit_given',
+          amount: balance,
+          transaction_date: new Date(),
+          notes: 'Opening balance',
+          created_by: userId,
+        },
+      });
+    }
+
+    return customer;
+  });
+}
+
+export async function importCreditCustomers(userId: string, customers: any[]) {
+  const shop = await getShopOrThrow(userId);
+
+  return prisma.$transaction(async (tx) => {
+    const results = [];
+    for (const c of customers) {
+      if (!c.name) continue;
+
+      // Check for existing customer by name + phone
+      const existing = await tx.creditCustomer.findFirst({
+        where: {
+          shop_id: shop.id,
+          name: c.name,
+          ...(c.phone ? { phone: c.phone } : {}),
+        },
+      });
+
+      const balance = Number(c.opening_balance || 0);
+      let customer;
+
+      if (existing) {
+        // Just update details, don't overwrite outstanding directly if it was already set
+        customer = await tx.creditCustomer.update({
+          where: { id: existing.id },
+          data: {
+            address: c.address,
+            credit_limit: c.credit_limit ? Number(c.credit_limit) : undefined,
+            notes: c.notes,
+          },
+        });
+      } else {
+        customer = await tx.creditCustomer.create({
+          data: {
+            shop_id: shop.id,
+            name: c.name,
+            phone: c.phone,
+            address: c.address,
+            credit_limit: Number(c.credit_limit || 0),
+            notes: c.notes,
+            total_outstanding: balance,
+          },
+        });
+      }
+
+      if (balance > 0) {
+        // Only create opening transaction if none exists
+        const txExists = await tx.creditTransaction.findFirst({
+          where: { customer_id: customer.id, notes: 'Opening balance from migration' },
+        });
+
+        if (!txExists) {
+          // If customer was updated (existing), we need to increment their outstanding
+          if (existing) {
+            await tx.creditCustomer.update({
+              where: { id: customer.id },
+              data: { total_outstanding: { increment: balance } },
+            });
+          }
+
+          await tx.creditTransaction.create({
+            data: {
+              customer_id: customer.id,
+              shop_id: shop.id,
+              type: 'credit_given',
+              amount: balance,
+              transaction_date: new Date(),
+              notes: 'Opening balance from migration',
+              created_by: userId,
+            },
+          });
+        }
+      }
+      results.push(customer);
+    }
+    return results;
   });
 }
 
