@@ -1,0 +1,5 @@
+medicine_name,mrp,gst_rate,hsn_code,unit,discount_type,discount_value,reorder_level
+"Paracetamol 500 MG",15.50,12,"30049099","strip","percent",10,50
+"Ciprofloxacin 250 MG",120.00,12,"30049099","strip","amount",5,20
+"Syrup Cough Care",85.00,12,"30041111","bottle","percent",0,10
+"Vitamin D3 Softgels",210.00,12,"30042222","box","amount",15,5
