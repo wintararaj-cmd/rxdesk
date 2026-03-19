@@ -1702,7 +1702,7 @@ function OutstandingsTab() {
                         <svg className={`w-4 h-4 transition-transform ${expandedId === c.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"/></svg>
                       </td>
                     </tr>
-                    {expandedId === c.id && expandedType === 'customer' && (
+                    {expandedId === c.id && expandedType === 'customer' && customerLedger && (
                       <tr>
                         <td colSpan={3} className="bg-gray-50/80 p-6">
                            <LedgerPanel 
@@ -1763,7 +1763,7 @@ function OutstandingsTab() {
                         <svg className={`w-4 h-4 transition-transform ${expandedId === p.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"/></svg>
                       </td>
                     </tr>
-                    {expandedId === p.id && expandedType === 'supplier' && (
+                    {expandedId === p.id && expandedType === 'supplier' && supplierLedger && (
                       <tr>
                         <td colSpan={3} className="bg-gray-50/80 p-6">
                           <LedgerPanel 
@@ -1799,7 +1799,7 @@ function OutstandingsTab() {
 }
 
 function LedgerPanel({ data, type, ledger, payAmount, setPayAmount, payMethod, setPayMethod, onPay, isPending }: any) {
-  const transactions = type === 'customer' ? ledger?.transactions : [
+  const transactions = (type === 'customer' ? ledger?.transactions : [
     ...(ledger?.purchases?.map((px: any) => ({ 
       id: px.id, 
       transaction_date: px.invoice_date, 
@@ -1814,7 +1814,7 @@ function LedgerPanel({ data, type, ledger, payAmount, setPayAmount, payMethod, s
       type: 'payment_received', 
       amount: py.amount 
     })) ?? [])
-  ].sort((a, b) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime());
+  ] ?? []).sort((a: any, b: any) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime());
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
