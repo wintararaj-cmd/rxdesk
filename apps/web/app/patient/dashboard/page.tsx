@@ -44,6 +44,7 @@ export default function PatientDashboardPage() {
   const [selSlot, setSelSlot] = useState('');
   const [complaint, setComplaint] = useState('');
   const [bookErr, setBookErr] = useState('');
+  const [dateError, setDateError] = useState('');
   const [bookSuccess, setBookSuccess] = useState(false);
 
   // Active tab
@@ -115,15 +116,40 @@ export default function PatientDashboardPage() {
     setBookingDoctor(doc);
     setSelChamber(doc.chambers[0]?.id ?? '');
     setSelDate(''); setSelSlot(''); setComplaint('');
-    setBookErr(''); setBookSuccess(false);
+    setBookErr(''); setDateError(''); setBookSuccess(false);
   };
 
-  const closeBooking = () => { setBookingDoctor(null); setBookSuccess(false); };
+  const closeBooking = () => { setBookingDoctor(null); setBookSuccess(false); setDateError(''); };
 
   const selectedChamber = bookingDoctor?.chambers.find((c) => c.id === selChamber);
 
   // Build min date (today)
   const today = new Date().toISOString().split('T')[0];
+
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const dStr = e.target.value;
+    setDateError('');
+
+    if (!dStr) {
+      setSelDate('');
+      setSelSlot('');
+      return;
+    }
+
+    if (selectedChamber?.schedules && selectedChamber.schedules.length > 0) {
+      const selectedDay = new Date(dStr).getDay();
+      const activeDays = selectedChamber.schedules.filter(s => s.is_active).map(s => s.day_of_week);
+      if (activeDays.length > 0 && !activeDays.includes(selectedDay)) {
+        setDateError(`Doctor is only available here on: ${activeDays.map(d => DAYS[d]).join(', ')}`);
+        setSelDate('');
+        setSelSlot('');
+        return;
+      }
+    }
+
+    setSelDate(dStr);
+    setSelSlot('');
+  };
 
   return (
     <>
@@ -323,7 +349,7 @@ export default function PatientDashboardPage() {
                     <div className="space-y-2">
                       {bookingDoctor.chambers.map((ch) => (
                         <label key={ch.id} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${selChamber === ch.id ? 'border-blue-500/40 bg-blue-500/10' : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.15]'}`}>
-                          <input type="radio" name="chamber" value={ch.id} checked={selChamber === ch.id} onChange={() => { setSelChamber(ch.id); setSelDate(''); setSelSlot(''); }} className="mt-0.5 accent-blue-500" />
+                          <input type="radio" name="chamber" value={ch.id} checked={selChamber === ch.id} onChange={() => { setSelChamber(ch.id); setSelDate(''); setSelSlot(''); setDateError(''); }} className="mt-0.5 accent-blue-500" />
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-white">{ch.shop.shop_name}</p>
                             <p className="text-xs text-gray-500">{ch.shop.address_line}, {ch.shop.city}</p>
@@ -357,9 +383,12 @@ export default function PatientDashboardPage() {
                   <input
                     type="date" min={today}
                     value={selDate}
-                    onChange={(e) => { setSelDate(e.target.value); setSelSlot(''); }}
+                    onChange={handleDateChange}
                     className="w-full h-11 bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 text-sm text-white outline-none focus:border-blue-500/50 transition-all [color-scheme:dark]"
                   />
+                  {dateError && (
+                    <p className="text-xs text-orange-400 mt-2">{dateError}</p>
+                  )}
                 </div>
 
                 {/* Time slots */}
