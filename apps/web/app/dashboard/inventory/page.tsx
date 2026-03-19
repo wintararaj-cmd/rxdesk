@@ -5,6 +5,21 @@ import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { inventoryApi, medicinesApi } from '../../../lib/apiClient';
 
+function parseCsv(csvText: string) {
+  const lines = csvText.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/ /g, '_'));
+  return lines.slice(1).map(line => {
+    const values = line.split(',').map(v => v.trim());
+    const obj: any = {};
+    headers.forEach((h, i) => {
+      let val = (values[i] || '').trim().replace(/^"|"$/g, '');
+      obj[h] = val;
+    });
+    return obj;
+  });
+}
+
 interface CatalogMedicine {
   id: string;
   name: string;
@@ -86,6 +101,7 @@ export default function InventoryPage() {
   const [catSearchInput, setCatSearchInput] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const catDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inventoryImportRef = useRef<HTMLInputElement>(null);
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -147,6 +163,28 @@ export default function InventoryPage() {
     mutationFn: (id: string) => inventoryApi.remove(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['inventory'] }),
   });
+
+  const importMutation = useMutation({
+    mutationFn: (items: any[]) => inventoryApi.importBulk(items),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['inventory'] });
+      alert('Inventory items imported successfully!');
+    },
+    onError: (err: any) => alert(err.response?.data?.error?.message || 'Import failed'),
+  });
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      let items = [];
+      if (file.name.endsWith('.json')) items = JSON.parse(text);
+      else items = parseCsv(text);
+      if (items.length > 0) importMutation.mutate(items);
+    } catch (err) { alert('Failed to parse file'); }
+    if (e.target) e.target.value = '';
+  };
 
   const handleAdd = () => {
     addMutation.mutate({
@@ -250,12 +288,22 @@ export default function InventoryPage() {
         </div>
         <div className="flex items-center gap-2">
           {tab === 'stock' && (
-            <button
-              onClick={() => setShowAdd(true)}
-              className="bg-violet-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-violet-700 transition-colors"
-            >
-              + Add Item
-            </button>
+            <div className="flex gap-2">
+              <input type="file" ref={inventoryImportRef} onChange={handleImportFile} accept=".csv,.json" className="hidden" />
+              <button
+                onClick={() => inventoryImportRef.current?.click()}
+                disabled={importMutation.isPending}
+                className="bg-white text-violet-600 border border-violet-200 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-violet-50 transition-colors shadow-sm"
+              >
+                {importMutation.isPending ? 'Importing...' : 'Bulk Import'}
+              </button>
+              <button
+                onClick={() => setShowAdd(true)}
+                className="bg-violet-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-violet-700 transition-colors"
+              >
+                + Add Item
+              </button>
+            </div>
           )}
         </div>
       </div>

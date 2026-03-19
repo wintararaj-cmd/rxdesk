@@ -13,6 +13,23 @@ function pct(part: number, total: number) {
   return `${((part / total) * 100).toFixed(1)}%`;
 }
 
+function parseCsv(csvText: string) {
+  const lines = csvText.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return [];
+  
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/ /g, '_'));
+  return lines.slice(1).map(line => {
+    // regex can be tricky, simple split for now or better regex
+    const values = line.split(',').map(v => v.trim());
+    const obj: any = {};
+    headers.forEach((h, i) => {
+      let val = (values[i] || '').trim().replace(/^"|"$/g, '');
+      obj[h] = val;
+    });
+    return obj;
+  });
+}
+
 const TODAY = new Date();
 const FIRST_OF_MONTH = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1)
   .toISOString()
@@ -448,6 +465,7 @@ function SuppliersTab() {
   const [gstin, setGstin] = useState('');
   const [openingBalance, setOpeningBalance] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const supplierImportRef = useRef<HTMLInputElement>(null);
 
   const { data, isLoading } = useQuery<Supplier[]>({
     queryKey: ['web-suppliers'],
@@ -479,9 +497,39 @@ function SuppliersTab() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['web-suppliers'] }),
   });
 
+  const importMutation = useMutation({
+    mutationFn: (items: any[]) => accountingApi.importSuppliers(items),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['web-suppliers'] });
+      alert('Suppliers imported successfully!');
+    },
+    onError: (err: any) => alert(err.response?.data?.error?.message || 'Import failed'),
+  });
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      let items = [];
+      if (file.name.endsWith('.json')) items = JSON.parse(text);
+      else items = parseCsv(text);
+      if (items.length > 0) importMutation.mutate(items);
+    } catch (err) { alert('Failed to parse file'); }
+    if (e.target) e.target.value = '';
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-3">
+        <input type="file" ref={supplierImportRef} onChange={handleImportFile} accept=".csv,.json" className="hidden" />
+        <button
+          onClick={() => supplierImportRef.current?.click()}
+          disabled={importMutation.isPending}
+          className="bg-white text-indigo-600 border border-indigo-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-50 transition-colors flex items-center gap-2"
+        >
+          {importMutation.isPending ? 'Importing...' : 'Bulk Import'}
+        </button>
         <button
           onClick={() => setShowForm((v) => !v)}
           className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
@@ -1409,6 +1457,7 @@ function OutstandingsTab() {
   const [customerNotes, setCustomerNotes] = useState('');
   const [customerLimit, setCustomerLimit] = useState('');
   const [customerOpening, setCustomerOpening] = useState('');
+  const customerImportRef = useRef<HTMLInputElement>(null);
 
   const { data: out, isLoading, error, isError } = useQuery({
     queryKey: ['web-outstandings'],
@@ -1499,6 +1548,28 @@ function OutstandingsTab() {
     );
   }
 
+  const importCustomersMutation = useMutation({
+    mutationFn: (items: any[]) => accountingApi.importCreditCustomers(items),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['web-outstandings'] });
+      alert('Customers imported successfully!');
+    },
+    onError: (err: any) => alert(err.response?.data?.error?.message || 'Import failed'),
+  });
+
+  const handleImportCustomers = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      let items = [];
+      if (file.name.endsWith('.json')) items = JSON.parse(text);
+      else items = parseCsv(text);
+      if (items.length > 0) importCustomersMutation.mutate(items);
+    } catch (err) { alert('Failed to parse file'); }
+    if (e.target) e.target.value = '';
+  };
+
   return (
     <div className="space-y-6">
       {/* Search and Summary */}
@@ -1517,12 +1588,22 @@ function OutstandingsTab() {
         </div>
         <div className="flex gap-2">
           {!showCustomerForm && (
-            <button
-              onClick={() => setShowCustomerForm(true)}
-              className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
-            >
-              + Add Customer
-            </button>
+            <div className="flex gap-2">
+              <input type="file" ref={customerImportRef} onChange={handleImportCustomers} accept=".csv,.json" className="hidden" />
+              <button
+                onClick={() => customerImportRef.current?.click()}
+                disabled={importCustomersMutation.isPending}
+                className="bg-white text-emerald-600 border border-emerald-200 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-50 transition-all shadow-sm"
+              >
+                {importCustomersMutation.isPending ? 'Importing...' : 'Bulk Import'}
+              </button>
+              <button
+                onClick={() => setShowCustomerForm(true)}
+                className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
+              >
+                + Add Customer
+              </button>
+            </div>
           )}
           <div className="hidden md:flex gap-4">
             <div className="bg-emerald-50 px-5 py-2.5 rounded-2xl border border-emerald-100">

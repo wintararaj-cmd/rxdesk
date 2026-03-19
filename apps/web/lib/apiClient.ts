@@ -149,6 +149,7 @@ export const accountingApi = {
   createSupplier: (data: object) => apiClient.post('/accounting/suppliers', data),
   updateSupplier: (id: string, data: object) => apiClient.put(`/accounting/suppliers/${id}`, data),
   deactivateSupplier: (id: string) => apiClient.delete(`/accounting/suppliers/${id}`),
+  importSuppliers: (items: any[]) => apiClient.post('/accounting/suppliers/import', { items }),
   getSupplierLedger: (id: string) => apiClient.get(`/accounting/suppliers/${id}/ledger`),
 
   // Purchases
@@ -172,6 +173,7 @@ export const accountingApi = {
   // Credit customers
   listCreditCustomers: () => apiClient.get('/accounting/credit-customers'),
   createCreditCustomer: (data: object) => apiClient.post('/accounting/credit-customers', data),
+  importCreditCustomers: (items: any[]) => apiClient.post('/accounting/credit-customers/import', { items }),
   getCreditLedger: (id: string) => apiClient.get(`/accounting/credit-customers/${id}/ledger`),
   recordCreditPayment: (id: string, data: object) =>
     apiClient.post(`/accounting/credit-customers/${id}/payment`, data),
