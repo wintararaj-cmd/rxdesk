@@ -13,6 +13,15 @@ function pct(part: number, total: number) {
   return `${((part / total) * 100).toFixed(1)}%`;
 }
 
+function downloadCsv(name: string, content: string) {
+  const blob = new Blob([content], { type: 'text/csv' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+}
+
 function parseCsv(csvText: string) {
   const lines = csvText.split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) return [];
@@ -521,7 +530,13 @@ function SuppliersTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end gap-3">
+      <div className="flex justify-end gap-3 items-center">
+        <button
+          onClick={() => downloadCsv('suppliers_template.csv', 'name,contact_person,phone,city,gstin,opening_balance\n"Supplier A","John Doe","9876543210","Mumbai","27AAACR0345E1ZZ",0')}
+          className="text-[10px] text-indigo-400 font-bold uppercase hover:underline"
+        >
+          Download Template
+        </button>
         <input type="file" ref={supplierImportRef} onChange={handleImportFile} accept=".csv,.json" className="hidden" />
         <button
           onClick={() => supplierImportRef.current?.click()}
@@ -1586,23 +1601,31 @@ function OutstandingsTab() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-4 items-center">
           {!showCustomerForm && (
-            <div className="flex gap-2">
-              <input type="file" ref={customerImportRef} onChange={handleImportCustomers} accept=".csv,.json" className="hidden" />
+            <div className="flex gap-4 items-center">
               <button
-                onClick={() => customerImportRef.current?.click()}
-                disabled={importCustomersMutation.isPending}
-                className="bg-white text-emerald-600 border border-emerald-200 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-50 transition-all shadow-sm"
+                onClick={() => downloadCsv('customers_template.csv', 'name,phone,address,notes,credit_limit,opening_balance\n"Ramesh Chandra","9876543210","Sector 12, Janakpuri","",5000,0')}
+                className="text-[10px] text-emerald-400 font-bold uppercase hover:underline"
               >
-                {importCustomersMutation.isPending ? 'Importing...' : 'Bulk Import'}
+                Template
               </button>
-              <button
-                onClick={() => setShowCustomerForm(true)}
-                className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
-              >
-                + Add Customer
-              </button>
+              <div className="flex gap-2">
+                <input type="file" ref={customerImportRef} onChange={handleImportCustomers} accept=".csv,.json" className="hidden" />
+                <button
+                  onClick={() => customerImportRef.current?.click()}
+                  disabled={importCustomersMutation.isPending}
+                  className="bg-white text-emerald-600 border border-emerald-200 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-50 transition-all shadow-sm"
+                >
+                  {importCustomersMutation.isPending ? 'Importing...' : 'Bulk Import'}
+                </button>
+                <button
+                  onClick={() => setShowCustomerForm(true)}
+                  className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
+                >
+                  + Add Customer
+                </button>
+              </div>
             </div>
           )}
           <div className="hidden md:flex gap-4">

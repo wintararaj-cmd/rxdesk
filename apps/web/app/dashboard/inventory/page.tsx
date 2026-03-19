@@ -20,6 +20,15 @@ function parseCsv(csvText: string) {
   });
 }
 
+function downloadCsv(name: string, content: string) {
+  const blob = new Blob([content], { type: 'text/csv' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+}
+
 interface CatalogMedicine {
   id: string;
   name: string;
@@ -288,21 +297,29 @@ export default function InventoryPage() {
         </div>
         <div className="flex items-center gap-2">
           {tab === 'stock' && (
-            <div className="flex gap-2">
-              <input type="file" ref={inventoryImportRef} onChange={handleImportFile} accept=".csv,.json" className="hidden" />
+            <div className="flex gap-3 items-center">
               <button
-                onClick={() => inventoryImportRef.current?.click()}
-                disabled={importMutation.isPending}
-                className="bg-white text-violet-600 border border-violet-200 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-violet-50 transition-colors shadow-sm"
+                onClick={() => downloadCsv('inventory_template.csv', 'medicine_name,mrp,gst_rate,hsn_code,unit,discount_type,discount_value,reorder_level\n"Paracetamol 500 MG",15.50,12,"30049099","strip","percent",10,50')}
+                className="text-[10px] text-violet-400 font-bold uppercase hover:underline"
               >
-                {importMutation.isPending ? 'Importing...' : 'Bulk Import'}
+                Template
               </button>
-              <button
-                onClick={() => setShowAdd(true)}
-                className="bg-violet-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-violet-700 transition-colors"
-              >
-                + Add Item
-              </button>
+              <div className="flex gap-2">
+                <input type="file" ref={inventoryImportRef} onChange={handleImportFile} accept=".csv,.json" className="hidden" />
+                <button
+                  onClick={() => inventoryImportRef.current?.click()}
+                  disabled={importMutation.isPending}
+                  className="bg-white text-violet-600 border border-violet-200 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-violet-50 transition-colors shadow-sm"
+                >
+                  {importMutation.isPending ? 'Importing...' : 'Bulk Import'}
+                </button>
+                <button
+                  onClick={() => setShowAdd(true)}
+                  className="bg-violet-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-violet-700 transition-colors"
+                >
+                  + Add Item
+                </button>
+              </div>
             </div>
           )}
         </div>
