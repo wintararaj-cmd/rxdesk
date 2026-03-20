@@ -327,7 +327,7 @@ export async function getTodayAppointmentsForShop(userId: string, chamberId?: st
       status: { notIn: ['cancelled', 'no_show'] },
     },
     include: {
-      patient: { select: { full_name: true, age: true, gender: true, blood_group: true, user: { select: { phone: true } } } },
+      patient: { select: { full_name: true, age: true, gender: true, blood_group: true, medical_history: true, allergies: true, user: { select: { phone: true } } } },
       chamber: {
         include: {
           doctor: { select: { full_name: true, specialization: true } },
@@ -358,7 +358,7 @@ export async function getTodayAppointmentsForDoctor(userId: string, chamberId?: 
       status: { notIn: ['cancelled', 'no_show'] },
     },
     include: {
-      patient: { select: { full_name: true, age: true, gender: true, blood_group: true } },
+      patient: { select: { full_name: true, age: true, gender: true, blood_group: true, medical_history: true, allergies: true } },
       chamber: { include: { shop: { select: { shop_name: true } } } },
       prescription: { select: { id: true } },
     },
@@ -393,7 +393,7 @@ export async function getDoctorAppointmentHistory(
     prisma.appointment.findMany({
       where,
       include: {
-        patient: { select: { full_name: true, age: true, gender: true } },
+        patient: { select: { full_name: true, age: true, gender: true, medical_history: true, allergies: true } },
         chamber: { include: { shop: { select: { shop_name: true, city: true } } } },
         prescription: { select: { id: true } },
       },

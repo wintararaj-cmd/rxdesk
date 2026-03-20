@@ -25,6 +25,8 @@ export async function createOrUpdateProfile(
     pin_code?: string;
     state?: string;
     emergency_contact?: string;
+    medical_history?: string;
+    allergies?: string;
   }
 ) {
   const patient = await prisma.patient.upsert({

@@ -67,6 +67,8 @@ export const createPatientSchema = z.object({
   pin_code: pinCodeSchema.optional(),
   state: z.string().max(100).optional(),
   emergency_contact: phoneSchema.optional(),
+  medical_history: z.string().max(2000).optional(),
+  allergies: z.string().max(1000).optional(),
 });
 
 export const updatePatientSchema = createPatientSchema.partial();

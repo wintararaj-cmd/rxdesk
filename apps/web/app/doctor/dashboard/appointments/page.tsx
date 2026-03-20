@@ -18,7 +18,11 @@ interface Appointment {
   appointment_date: string;
   status: string;
   chief_complaint?: string;
-  patient?: { full_name?: string; age?: number; gender?: string; blood_group?: string; phone?: string };
+  patient?: {
+    full_name?: string; age?: number; gender?: string;
+    blood_group?: string; phone?: string;
+    medical_history?: string; allergies?: string;
+  };
   chamber?: { shop?: { shop_name: string } };
 }
 
@@ -133,10 +137,22 @@ export default function DoctorAppointmentsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="font-medium text-gray-900">{appt.patient?.full_name ?? '—'}</p>
-                    <p className="text-gray-400 text-xs">
-                      {[appt.patient?.age ? `${appt.patient.age}y` : null, appt.patient?.gender, appt.patient?.blood_group].filter(Boolean).join(' · ')}
-                    </p>
+                    <p className="font-bold text-gray-900 leading-tight">{appt.patient?.full_name ?? '—'}</p>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                      <p className="text-gray-400 text-[10px] font-medium tracking-tight">
+                        {[appt.patient?.age ? `${appt.patient.age}y` : null, appt.patient?.gender, appt.patient?.blood_group].filter(Boolean).join(' · ')}
+                      </p>
+                      {(appt.patient?.medical_history || appt.patient?.allergies) && (
+                        <div className="flex gap-1 items-center">
+                          <span className="w-1 h-1 rounded-full bg-gray-300" />
+                          <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase transition-all ${
+                            appt.patient?.allergies ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-blue-50 text-blue-500 border border-blue-100'
+                          }`}>
+                            {appt.patient?.allergies ? 'Allergies' : 'Clinical History'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{appt.chamber?.shop?.shop_name ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{appt.slot_start_time}</td>

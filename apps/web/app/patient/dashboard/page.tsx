@@ -34,6 +34,7 @@ interface Appointment {
 interface PatientProfile {
   full_name: string; age?: number; gender?: string;
   blood_group?: string; city?: string;
+  medical_history?: string; allergies?: string;
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -433,6 +434,26 @@ function PatientDashboardPageContent() {
     patientApi.getProfile().then(res => setPatientProfile(res.data?.data ?? null)).catch(() => {});
   }, []);
 
+  const [isEditingHistory, setIsEditingHistory] = useState(false);
+  const [historyForm, setHistoryForm] = useState({ medical_history: '', allergies: '' });
+
+  const updateHistory = useMutation({
+    mutationFn: (data: { medical_history?: string; allergies?: string }) => patientApi.updateProfile(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['patient-profile'] });
+      setIsEditingHistory(false);
+      patientApi.getProfile().then(res => setPatientProfile(res.data?.data ?? null));
+    },
+  });
+
+  const startEditHistory = () => {
+    setHistoryForm({
+      medical_history: patientProfile?.medical_history ?? '',
+      allergies: patientProfile?.allergies ?? '',
+    });
+    setIsEditingHistory(true);
+  };
+
   // Open booking from URL param
   useEffect(() => {
     const bookId = searchParams.get('book');
@@ -753,7 +774,7 @@ function PatientDashboardPageContent() {
             </div>
 
             {/* Info grid */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 mb-6">
               {[
                 { label: 'Age', value: patientProfile?.age ? `${patientProfile.age} years` : '—', icon: User },
                 { label: 'Gender', value: patientProfile?.gender ? patientProfile.gender.charAt(0).toUpperCase() + patientProfile.gender.slice(1) : '—', icon: User },
@@ -765,6 +786,74 @@ function PatientDashboardPageContent() {
                   <p className="text-sm font-semibold text-white">{value}</p>
                 </div>
               ))}
+            </div>
+
+            {/* Medical History & Allergies */}
+            <div className="space-y-4 pt-6 border-t border-white/[0.06]">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                  <Activity className="w-3.5 h-3.5 text-blue-400" /> Clinical Information
+                </h4>
+                <button
+                  onClick={startEditHistory}
+                  className="text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase"
+                >
+                  {isEditingHistory ? '' : 'Edit'}
+                </button>
+              </div>
+
+              {isEditingHistory ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] text-gray-500 mb-1.5 uppercase font-bold">Medical History</label>
+                    <textarea
+                      value={historyForm.medical_history}
+                      onChange={(e) => setHistoryForm({ ...historyForm, medical_history: e.target.value })}
+                      placeholder="Chronic conditions, past surgeries, etc."
+                      className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-600 outline-none focus:border-blue-500/40 transition-all resize-none h-24"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-gray-500 mb-1.5 uppercase font-bold">Allergies</label>
+                    <textarea
+                      value={historyForm.allergies}
+                      onChange={(e) => setHistoryForm({ ...historyForm, allergies: e.target.value })}
+                      placeholder="Food, medicine, or environmental allergies"
+                      className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-600 outline-none focus:border-blue-500/40 transition-all resize-none h-20"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setIsEditingHistory(false)}
+                      className="flex-1 py-2 text-xs font-bold text-gray-400 bg-white/[0.03] hover:bg-white/[0.06] rounded-xl transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => updateHistory.mutate(historyForm)}
+                      disabled={updateHistory.isPending}
+                      className="flex-1 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl transition-all shadow-lg shadow-blue-500/20"
+                    >
+                      {updateHistory.isPending ? 'Saving...' : 'Save Changes'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-4">
+                    <p className="text-[10px] text-gray-600 mb-1 uppercase font-bold">Medical History</p>
+                    <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
+                      {patientProfile?.medical_history || 'No medical history recorded.'}
+                    </p>
+                  </div>
+                  <div className="bg-red-500/[0.03] border border-red-500/10 rounded-2xl p-4">
+                    <p className="text-[10px] text-red-400/60 mb-1 uppercase font-bold">Allergies</p>
+                    <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
+                      {patientProfile?.allergies || 'No known allergies recorded.'}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="mt-4 pt-4 border-t border-white/[0.06] flex items-center gap-2 text-xs text-gray-600">

@@ -18,7 +18,10 @@ interface Prescription {
   diagnosis: string;
   created_at: string;
   items: PrescriptionItem[];
-  patient?: { full_name?: string; age?: number; gender?: string };
+  patient?: {
+    full_name?: string; age?: number; gender?: string;
+    medical_history?: string; allergies?: string;
+  };
   shop?: { shop_name: string; city: string };
   appointment?: { appointment_date: string; slot_start_time: string };
 }
@@ -27,7 +30,11 @@ interface AppointmentOption {
   id: string;
   appointment_date: string;
   slot_start_time: string;
-  patient?: { full_name?: string };
+  patient?: {
+    full_name?: string;
+    medical_history?: string;
+    allergies?: string;
+  };
   chamber?: { shop?: { shop_name?: string; city?: string } };
 }
 
@@ -199,7 +206,9 @@ export default function DoctorPrescriptionsPage() {
                   <option value="">— Select completed appointment —</option>
                   {appointments.map((a) => (
                     <option key={a.id} value={a.id}>
-                      {a.patient?.full_name ?? 'Patient'} · {a.appointment_date} {a.slot_start_time}
+                      {a.patient?.full_name ?? 'Patient'} 
+                      {a.patient?.allergies ? ' (⚠️ ALLERGIES)' : (a.patient?.medical_history ? ' (📝 History)' : '')}
+                      · {a.appointment_date} {a.slot_start_time}
                       {a.chamber?.shop?.shop_name ? ` · ${a.chamber.shop.shop_name}` : ''}
                     </option>
                   ))}

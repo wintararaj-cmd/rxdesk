@@ -222,6 +222,8 @@ model Patient {
   pin_code          String?
   state             String?
   emergency_contact String?
+  medical_history   String? @db.Text
+  allergies         String? @db.Text
   profile_photo     String?
   created_at        DateTime @default(now())
   updated_at        DateTime @updatedAt
