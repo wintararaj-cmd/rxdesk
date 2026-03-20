@@ -142,6 +142,21 @@ class ApiService {
     return (_decode(r)['data'] as List?) ?? [];
   }
 
+  static Future<List<dynamic>> getDoctorIssuedPrescriptions() async {
+    final r = await http.get(Uri.parse('$_base/prescriptions/my-issued'), headers: await _headers());
+    return (_decode(r)['data'] as List?) ?? [];
+  }
+
+  static Future<Map<String, dynamic>> searchDoctors({String? q, String? spec, String? city}) async {
+    final params = <String, String>{};
+    if (q != null && q.isNotEmpty) params['q'] = q;
+    if (spec != null && spec.isNotEmpty) params['specialization'] = spec;
+    if (city != null && city.isNotEmpty) params['city'] = city;
+    final uri = Uri.parse('$_base/doctors/search').replace(queryParameters: params);
+    final r = await http.get(uri, headers: await _headers(auth: false));
+    return _decode(r);
+  }
+
   // ── PATIENT ──────────────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> getPatientProfile() async {
     final r = await http.get(Uri.parse('$_base/patients/me'), headers: await _headers());
@@ -151,6 +166,20 @@ class ApiService {
   static Future<List<dynamic>> getPatientAppointments() async {
     final r = await http.get(Uri.parse('$_base/patients/me/appointments'), headers: await _headers());
     return (_decode(r)['data'] as List?) ?? [];
+  }
+
+  static Future<List<dynamic>> getPatientPrescriptions() async {
+    final r = await http.get(Uri.parse('$_base/prescriptions/my'), headers: await _headers());
+    return (_decode(r)['data'] as List?) ?? [];
+  }
+
+  static Future<Map<String, dynamic>> searchShops({String? q, String? city}) async {
+    final params = <String, String>{};
+    if (q != null && q.isNotEmpty) params['q'] = q;
+    if (city != null && city.isNotEmpty) params['city'] = city;
+    final uri = Uri.parse('$_base/shops/search').replace(queryParameters: params);
+    final r = await http.get(uri, headers: await _headers(auth: false));
+    return _decode(r);
   }
 }
 
