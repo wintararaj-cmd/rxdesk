@@ -40,7 +40,11 @@ const NAV = [
   {
     href: '/dashboard/reports', label: 'Reports', icon: (
       <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
-    )
+    ),
+    children: [
+      { href: '/dashboard/reports', label: 'Overview' },
+      { href: '/dashboard/reports/sales', label: 'Sales Report' },
+    ]
   },
   {
     href: '/dashboard/accounting', label: 'Accounting', icon: (
@@ -141,7 +145,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <p className="text-violet-300/60 text-[11px] font-medium">Shop Panel</p>
               </div>
             </div>
-            
+
             {/* Financial Year Selector */}
             <div className="relative">
               <select
@@ -195,13 +199,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <span className="ml-auto text-[10px] bg-white/10 px-1.5 py-0.5 rounded text-gray-400 font-bold group-hover:text-white transition-colors">
                     Alt + {
                       label === 'Dashboard' ? 'D' :
-                      label === 'Appointments' ? 'A' :
-                      label === 'Doctors' ? 'O' :
-                      label === 'Inventory' ? 'I' :
-                      label === 'Billing' ? 'B' :
-                      label === 'Reports' ? 'R' :
-                      label === 'Accounting' ? 'C' :
-                      label === 'Settings' ? 'S' : ''
+                        label === 'Appointments' ? 'A' :
+                          label === 'Doctors' ? 'O' :
+                            label === 'Inventory' ? 'I' :
+                              label === 'Billing' ? 'B' :
+                                label === 'Reports' ? 'R' :
+                                  label === 'Accounting' ? 'C' :
+                                    label === 'Settings' ? 'S' : ''
                     }
                   </span>
                 )}

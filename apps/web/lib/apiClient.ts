@@ -188,6 +188,8 @@ export const accountingApi = {
     apiClient.get('/accounting/reports/pl', { params: { from, to } }),
   getSalesSummary: (month: number, year: number) =>
     apiClient.get('/accounting/reports/sales-summary', { params: { month, year } }),
+  getDetailedSalesReport: (from: string, to: string) =>
+    apiClient.get('/accounting/reports/sales-detailed', { params: { from, to } }),
   getGstSummary: (month: number, year: number) =>
     apiClient.get('/accounting/reports/gst-summary', { params: { month, year } }),
   getStockValuation: () => apiClient.get('/accounting/reports/stock-valuation'),

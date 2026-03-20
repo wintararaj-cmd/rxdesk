@@ -359,11 +359,11 @@ export async function listPurchaseEntries(userId: string, opts: { page?: number;
     ...(opts.supplier_id ? { supplier_id: opts.supplier_id } : {}),
     ...(opts.from || opts.to
       ? {
-          invoice_date: {
-            ...(opts.from ? { gte: new Date(opts.from) } : {}),
-            ...(opts.to ? { lte: new Date(opts.to) } : {}),
-          },
-        }
+        invoice_date: {
+          ...(opts.from ? { gte: new Date(opts.from) } : {}),
+          ...(opts.to ? { lte: new Date(opts.to) } : {}),
+        },
+      }
       : {}),
   };
   const [total, items, aggregations, topSupplierData] = await Promise.all([
@@ -397,11 +397,11 @@ export async function listPurchaseEntries(userId: string, opts: { page?: number;
   const totalAmountSum = Number(aggregations._sum.total_amount ?? 0);
   const totalPaidSum = Number(aggregations._sum.amount_paid ?? 0);
 
-  return { 
-    items, 
-    total, 
-    page, 
-    limit, 
+  return {
+    items,
+    total,
+    page,
+    limit,
     totalPages: Math.ceil(total / limit),
     total_amount_sum: totalAmountSum,
     total_due_sum: totalAmountSum - totalPaidSum,
@@ -487,11 +487,11 @@ export async function listSupplierPayments(userId: string, opts: { supplier_id?:
     ...(opts.supplier_id ? { supplier_id: opts.supplier_id } : {}),
     ...(opts.from || opts.to
       ? {
-          payment_date: {
-            ...(opts.from ? { gte: new Date(opts.from) } : {}),
-            ...(opts.to ? { lte: new Date(opts.to) } : {}),
-          },
-        }
+        payment_date: {
+          ...(opts.from ? { gte: new Date(opts.from) } : {}),
+          ...(opts.to ? { lte: new Date(opts.to) } : {}),
+        },
+      }
       : {}),
   };
   return prisma.supplierPayment.findMany({
@@ -541,11 +541,11 @@ export async function listExpenses(userId: string, opts: { category?: string; fr
     ...(opts.category ? { category: opts.category as any } : {}),
     ...(opts.from || opts.to
       ? {
-          entry_date: {
-            ...(opts.from ? { gte: new Date(opts.from) } : {}),
-            ...(opts.to ? { lte: new Date(opts.to) } : {}),
-          },
-        }
+        entry_date: {
+          ...(opts.from ? { gte: new Date(opts.from) } : {}),
+          ...(opts.to ? { lte: new Date(opts.to) } : {}),
+        },
+      }
       : {}),
   };
   const [total, items] = await Promise.all([
@@ -600,11 +600,11 @@ export async function listIncome(userId: string, opts: { from?: string; to?: str
     shop_id: shop.id,
     ...(opts.from || opts.to
       ? {
-          entry_date: {
-            ...(opts.from ? { gte: new Date(opts.from) } : {}),
-            ...(opts.to ? { lte: new Date(opts.to) } : {}),
-          },
-        }
+        entry_date: {
+          ...(opts.from ? { gte: new Date(opts.from) } : {}),
+          ...(opts.to ? { lte: new Date(opts.to) } : {}),
+        },
+      }
       : {}),
   };
   const [total, items] = await Promise.all([
@@ -991,6 +991,117 @@ export async function getSalesSummary(userId: string, month: number, year: numbe
     top_medicines: topMedicines.map((m) => ({
       name: m.medicine_name,
       qty_sold: Number(m._sum.quantity ?? 0),
+      revenue: Number(m._sum.line_total ?? 0),
+    })),
+  };
+}
+
+export async function getDetailedSalesReport(userId: string, from: string, to: string) {
+  const shop = await getShopOrThrow(userId);
+  const startDate = new Date(from);
+  const endDate = new Date(to);
+  endDate.setHours(23, 59, 59, 999);
+
+  // Get all bills in the date range
+  const bills = await prisma.bill.findMany({
+    where: {
+      shop_id: shop.id,
+      created_at: { gte: startDate, lte: endDate },
+    },
+    select: {
+      id: true,
+      bill_number: true,
+      subtotal: true,
+      gst_amount: true,
+      discount_amount: true,
+      total_amount: true,
+      payment_status: true,
+      payment_method: true,
+      created_at: true,
+      customer_name: true,
+      customer_phone: true,
+    },
+    orderBy: { created_at: 'desc' },
+  });
+
+  // Aggregate calculations
+  const totalBills = bills.length;
+  const paidBills = bills.filter((b) => b.payment_status === 'paid').length;
+  const pendingBills = bills.filter((b) => b.payment_status === 'pending').length;
+  const partialBills = bills.filter((b) => b.payment_status === 'partial').length;
+
+  const totalSales = bills.reduce((sum, b) => sum + Number(b.total_amount), 0);
+  const totalGst = bills.reduce((sum, b) => sum + Number(b.gst_amount), 0);
+  const totalDiscount = bills.reduce((sum, b) => sum + Number(b.discount_amount), 0);
+  const totalSubtotal = bills.reduce((sum, b) => sum + Number(b.subtotal), 0);
+
+  // Payment method breakdown
+  const paymentBreakdown: Record<string, { count: number; amount: number }> = {};
+  bills.forEach((bill) => {
+    const method = bill.payment_method || 'unknown';
+    if (!paymentBreakdown[method]) {
+      paymentBreakdown[method] = { count: 0, amount: 0 };
+    }
+    paymentBreakdown[method].count++;
+    paymentBreakdown[method].amount += Number(bill.total_amount);
+  });
+
+  // Daily breakdown
+  const dailyBreakdown: Record<string, { bills: number; sales: number; gst: number; discount: number }> = {};
+  bills.forEach((bill) => {
+    const dateKey = bill.created_at.toISOString().split('T')[0];
+    if (!dailyBreakdown[dateKey]) {
+      dailyBreakdown[dateKey] = { bills: 0, sales: 0, gst: 0, discount: 0 };
+    }
+    dailyBreakdown[dateKey].bills++;
+    dailyBreakdown[dateKey].sales += Number(bill.total_amount);
+    dailyBreakdown[dateKey].gst += Number(bill.gst_amount);
+    dailyBreakdown[dateKey].discount += Number(bill.discount_amount);
+  });
+
+  // Top medicines sold
+  const topMedicines = await prisma.billItem.groupBy({
+    by: ['medicine_name'],
+    where: { bill: { shop_id: shop.id, created_at: { gte: startDate, lte: endDate } } },
+    _sum: { quantity: true, line_total: true, mrp: true },
+    orderBy: { _sum: { line_total: 'desc' } },
+    take: 20,
+  });
+
+  // Bill status breakdown
+  const statusBreakdown = {
+    paid: paidBills,
+    pending: pendingBills,
+    partial: partialBills,
+  };
+
+  return {
+    date_range: { from, to },
+    summary: {
+      total_bills: totalBills,
+      total_sales: totalSales,
+      total_gst_collected: totalGst,
+      total_discount_given: totalDiscount,
+      average_bill_value: totalBills > 0 ? totalSales / totalBills : 0,
+    },
+    status_breakdown: statusBreakdown,
+    payment_breakdown: Object.entries(paymentBreakdown).map(([method, data]) => ({
+      method,
+      count: data.count,
+      amount: data.amount,
+    })),
+    daily_sales: Object.entries(dailyBreakdown)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, data]) => ({
+        date,
+        bills: data.bills,
+        sales: data.sales,
+        gst: data.gst,
+        discount: data.discount,
+      })),
+    top_medicines: topMedicines.map((m) => ({
+      name: m.medicine_name,
+      quantity_sold: Number(m._sum.quantity ?? 0),
       revenue: Number(m._sum.line_total ?? 0),
     })),
   };
@@ -1575,7 +1686,7 @@ export async function restoreAccountingData(userId: string, backup: any) {
     await tx.supplier.deleteMany({ where: { shop_id: shop.id } });
 
     // 2. Restore data
-    
+
     // Suppliers
     if (data.suppliers?.length) {
       await tx.supplier.createMany({
@@ -1691,7 +1802,7 @@ export async function restoreAccountingData(userId: string, backup: any) {
 export async function getShopBackupFolder(userId: string) {
   const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });
   if (!shop) throw new AppError(404, 'NOT_FOUND', 'Shop not found');
-  
+
   const sanitizedName = (shop.shop_name || 'shop').replace(/[^a-z0-9]/gi, '_').toLowerCase();
   const customPath = '/rxdesk'; // Default since backup_path is not in schema
   const resolvedRoot = path.isAbsolute(customPath) ? customPath : path.resolve(customPath);
@@ -1705,7 +1816,7 @@ export async function listLocalBackups(userId: string) {
     const backups = files
       .filter(f => f.startsWith('rxdesk_backup_') && f.endsWith('.json'))
       .sort((a, b) => b.localeCompare(a));
-    
+
     const details = await Promise.all(backups.map(async f => {
       try {
         const stats = await fs.stat(path.join(shopFolder, f));
@@ -1736,7 +1847,7 @@ export async function getBackupFilePath(userId: string, filename: string) {
 export async function triggerManualLocalBackup(userId: string) {
   const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });
   if (!shop) throw new AppError(404, 'NOT_FOUND', 'Shop not found');
-  
+
   const data = await exportAccountingData(userId);
   const shopFolder = await getShopBackupFolder(userId);
   await fs.mkdir(shopFolder, { recursive: true });
@@ -1744,7 +1855,7 @@ export async function triggerManualLocalBackup(userId: string) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const fileName = `rxdesk_backup_${timestamp}_manual.json`;
   const filePath = path.join(shopFolder, fileName);
-  
+
   await fs.writeFile(filePath, JSON.stringify(data, null, 2));
   return { filename: fileName, path: filePath };
 }

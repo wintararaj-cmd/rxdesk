@@ -233,6 +233,18 @@ router.get('/reports/sales-summary', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /accounting/reports/sales-detailed?from=YYYY-MM-DD&to=YYYY-MM-DD
+router.get('/reports/sales-detailed', shopAuth, async (req, res, next) => {
+  try {
+    const { from, to } = req.query as { from: string; to: string };
+    if (!from || !to) {
+      return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: '`from` and `to` dates are required' } });
+    }
+    const data = await service.getDetailedSalesReport(req.user!.id, from, to);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 // GET /accounting/reports/stock-valuation
 router.get('/reports/stock-valuation', shopAuth, async (req, res, next) => {
   try {

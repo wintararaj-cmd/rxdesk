@@ -87,6 +87,11 @@ export default function ReportsPage() {
   const { user } = useAuthStore();
   const isShopOwner = user?.role === 'shop_owner';
 
+  // Quick links to other report sections
+  const quickLinks = [
+    { href: '/dashboard/reports/sales', label: 'Sales Report', icon: '💰', desc: 'Detailed sales analysis' },
+  ];
+
   const { data: analytics, isLoading, isError } = useQuery<Analytics>({
     queryKey: ['shop-analytics', period],
     queryFn: () => reportsApi.getAnalytics(period).then((r) => r.data.data),
@@ -125,14 +130,33 @@ export default function ReportsPage() {
               key={p.value}
               onClick={() => setPeriod(p.value)}
               className={`px-4 py-2 font-medium transition-colors ${period === p.value
-                  ? 'bg-violet-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
+                ? 'bg-violet-600 text-white'
+                : 'bg-white text-gray-600 hover:bg-gray-50'
                 }`}
             >
               {p.label}
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Quick Links */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {quickLinks.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:border-violet-300 hover:shadow-md transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="text-2xl">{link.icon}</div>
+              <div>
+                <div className="font-semibold text-gray-900 group-hover:text-violet-600">{link.label}</div>
+                <div className="text-xs text-gray-500">{link.desc}</div>
+              </div>
+            </div>
+          </Link>
+        ))}
       </div>
 
       {isLoading && (
