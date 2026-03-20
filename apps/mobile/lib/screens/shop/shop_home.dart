@@ -58,11 +58,17 @@ class _ShopHomeState extends State<ShopHome> {
       appBar: _tab == 1
           ? null // Sale screen has its own AppBar
           : AppBar(
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              title: Row(
                 children: [
-                  const Text('RxDesk', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFF7C3AED))),
-                  Text(_shopName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Color(0xFF1F2937))),
+                  Image.asset('assets/images/logo.png', height: 32),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('RxDesk', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFF7C3AED))),
+                      Text(_shopName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Color(0xFF1F2937))),
+                    ],
+                  ),
                 ],
               ),
               actions: [

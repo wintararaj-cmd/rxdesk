@@ -113,8 +113,9 @@ ${bill.customer_phone ? `<div><b>Phone:</b> ${bill.customer_phone}</div>` : ''}
   <tfoot>
     <tr><td colspan="3" style="padding-top:3px">Subtotal</td><td style="text-align:right;padding-top:3px">${cur(bill.subtotal)}</td></tr>
     ${bill.discount_amount > 0 ? `<tr><td colspan="3">Discount</td><td style="text-align:right">-${cur(bill.discount_amount)}</td></tr>` : ''}
-    ${isTax ? `<tr><td colspan="3">GST</td><td style="text-align:right">${cur(bill.gst_amount)}</td></tr>` : ''}
-    <tr class="tot"><td colspan="3">TOTAL</td><td style="text-align:right">${cur(bill.total_amount)}</td></tr>
+    ${isTax ? `<tr><td colspan="3">CGST</td><td style="text-align:right">${cur(bill.gst_amount / 2)}</td></tr>
+    <tr><td colspan="3">SGST</td><td style="text-align:right">${cur(bill.gst_amount / 2)}</td></tr>` : ''}
+    <tr class="tot"><td colspan="3">TOTAL</td><td style="text-align:right">${cur(Math.round(bill.total_amount))}</td></tr>
   </tfoot>
 </table>
 <div class="div"></div>
@@ -148,8 +149,11 @@ function sendWhatsApp(bill: BillData, shopName = 'Medical Shop') {
   msg += `\n*Items:*\n${itemLines}\n\n`;
   msg += `Subtotal: ${cur(bill.subtotal)}\n`;
   if (bill.discount_amount > 0) msg += `Discount: -${cur(bill.discount_amount)}\n`;
-  if (bill.gst_amount > 0) msg += `GST: ${cur(bill.gst_amount)}\n`;
-  msg += `💰 *Total: ${cur(bill.total_amount)}*\n`;
+  if (bill.gst_amount > 0) {
+    msg += `CGST: ${cur(bill.gst_amount / 2)}\n`;
+    msg += `SGST: ${cur(bill.gst_amount / 2)}\n`;
+  }
+  msg += `💰 *Total: ${cur(Math.round(bill.total_amount))}*\n`;
   msg += `\nPayment: ${(bill.payment_method ?? '').toUpperCase()} | ${(bill.payment_status ?? '').toUpperCase()}\n`;
   msg += `\nThank you! 🙏`;
   const encoded = encodeURIComponent(msg);
@@ -343,9 +347,14 @@ function NewBillTab() {
             {bill.discount_amount > 0 && (
               <div className="flex justify-between text-emerald-600"><span>Discount</span><span>-{fmtCurrency(bill.discount_amount)}</span></div>
             )}
-            {bill.gst_amount > 0 && <div className="flex justify-between text-gray-500"><span>GST</span><span>{fmtCurrency(bill.gst_amount)}</span></div>}
+            {bill.gst_amount > 0 && (
+              <>
+                <div className="flex justify-between text-gray-500"><span>CGST</span><span>{fmtCurrency(bill.gst_amount / 2)}</span></div>
+                <div className="flex justify-between text-gray-500"><span>SGST</span><span>{fmtCurrency(bill.gst_amount / 2)}</span></div>
+              </>
+            )}
             <div className="flex justify-between font-bold text-gray-900 text-lg mt-2 pt-3 border-t border-gray-200">
-              <span>Total</span><span>{fmtCurrency(bill.total_amount)}</span>
+              <span>Total</span><span>{fmtCurrency(Math.round(bill.total_amount))}</span>
             </div>
           </div>
 
@@ -472,9 +481,14 @@ function BillDetailModal({ bill, onClose, onPay }: {
             {bill.discount_amount > 0 && (
               <div className="flex justify-between text-sm text-emerald-600"><span>Discount</span><span className="font-medium">−{fmtCurrency(bill.discount_amount)}</span></div>
             )}
-            {bill.gst_amount > 0 && <div className="flex justify-between text-sm text-gray-500"><span>GST</span><span className="font-medium">{fmtCurrency(bill.gst_amount)}</span></div>}
+            {bill.gst_amount > 0 && (
+              <>
+                <div className="flex justify-between text-sm text-gray-500"><span>CGST</span><span className="font-medium">{fmtCurrency(bill.gst_amount / 2)}</span></div>
+                <div className="flex justify-between text-sm text-gray-500"><span>SGST</span><span className="font-medium">{fmtCurrency(bill.gst_amount / 2)}</span></div>
+              </>
+            )}
             <div className="flex justify-between font-black text-violet-800 text-2xl pt-3 border-t border-violet-200/50 mt-1">
-              <span>Total</span><span>{fmtCurrency(bill.total_amount)}</span>
+              <span>Total</span><span>{fmtCurrency(Math.round(bill.total_amount))}</span>
             </div>
           </div>
 
@@ -707,7 +721,7 @@ function BillHistoryTab() {
                 <td className="px-5 py-4">
                   <span className="text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md text-[11px] font-medium">{bill.items.length}</span>
                 </td>
-                <td className="px-5 py-4 font-bold text-gray-900">{fmtCurrency(bill.total_amount)}</td>
+                <td className="px-5 py-4 font-bold text-gray-900">{fmtCurrency(Math.round(bill.total_amount))}</td>
                 <td className="px-5 py-4">
                   <StatusBadge status={bill.payment_status} />
                 </td>
@@ -1038,8 +1052,13 @@ function WalkInSaleTab() {
           <div className="space-y-1.5 text-sm mb-5">
             <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{fmtCurrency(createdBill.subtotal)}</span></div>
             {createdBill.discount_amount > 0 && <div className="flex justify-between text-emerald-600"><span>Discount</span><span>−{fmtCurrency(createdBill.discount_amount)}</span></div>}
-            {createdBill.gst_amount > 0 && <div className="flex justify-between text-gray-500"><span>GST</span><span>{fmtCurrency(createdBill.gst_amount)}</span></div>}
-            <div className="flex justify-between font-bold text-gray-900 text-xl pt-3 border-t border-gray-200"><span>Total</span><span className="text-violet-700">{fmtCurrency(createdBill.total_amount)}</span></div>
+            {createdBill.gst_amount > 0 && (
+              <>
+                <div className="flex justify-between text-gray-500"><span>CGST</span><span>{fmtCurrency(createdBill.gst_amount / 2)}</span></div>
+                <div className="flex justify-between text-gray-500"><span>SGST</span><span>{fmtCurrency(createdBill.gst_amount / 2)}</span></div>
+              </>
+            )}
+            <div className="flex justify-between font-bold text-gray-900 text-xl pt-3 border-t border-gray-200"><span>Total</span><span className="text-violet-700">{fmtCurrency(Math.round(createdBill.total_amount))}</span></div>
           </div>
 
           {/* Pay now if pending */}
@@ -1444,7 +1463,7 @@ function WalkInSaleTab() {
           <div className="flex items-center justify-between border-t border-dashed border-gray-200 mt-5 pt-5 pb-1 px-1">
             <div className="flex items-baseline gap-2">
               <span className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Total Payable</span>
-              <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-700 to-indigo-700">{fmtCurrency(calcTotal)}</span>
+              <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-700 to-indigo-700">{fmtCurrency(Math.round(calcTotal))}</span>
             </div>
             <div className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 ${paymentMethod === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700'}`}>
               <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />

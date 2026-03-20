@@ -89,8 +89,7 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
 
     setState(() {
       _subtotal = sub;
-      _total = sub - discount;
-      if (_total < 0) _total = 0;
+      _total = (sub - discount).clamp(0, double.infinity).roundToDouble();
     });
   }
 

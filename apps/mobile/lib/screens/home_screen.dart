@@ -15,7 +15,11 @@ class HomeScreen extends StatelessWidget {
       return Scaffold(
         body: const ShopDashboardScreen(),
         appBar: AppBar(
-          title: const Text('Shop'),
+          title: Row(children: [
+            Image.asset('assets/images/logo.png', height: 32),
+            const SizedBox(width: 10),
+            const Text('Shop'),
+          ]),
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
           elevation: 0,
@@ -39,7 +43,11 @@ class HomeScreen extends StatelessWidget {
       return Scaffold(
         body: const PatientDashboardScreen(),
         appBar: AppBar(
-          title: const Text('Patient'),
+          title: Row(children: [
+            Image.asset('assets/images/logo.png', height: 32),
+            const SizedBox(width: 10),
+            const Text('Patient'),
+          ]),
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
           elevation: 0,
@@ -63,7 +71,11 @@ class HomeScreen extends StatelessWidget {
       return Scaffold(
         body: const DoctorDashboardScreen(),
         appBar: AppBar(
-          title: const Text('Doctor'),
+          title: Row(children: [
+            Image.asset('assets/images/logo.png', height: 32),
+            const SizedBox(width: 10),
+            const Text('Doctor'),
+          ]),
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
           elevation: 0,

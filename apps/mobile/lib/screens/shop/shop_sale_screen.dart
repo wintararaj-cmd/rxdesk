@@ -4,6 +4,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:printing/printing.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import '../../services/api_service.dart';
 
 class ShopSaleScreen extends StatefulWidget {
@@ -30,7 +34,7 @@ class _ShopSaleScreenState extends State<ShopSaleScreen> {
   // Items list
   final List<_SaleItem> _items = [];
 
-  double _subtotal = 0, _total = 0;
+  double _subtotal = 0, _total = 0, _gstTotal = 0;
 
   // Customer search
   List<Map<String, dynamic>> _customerSuggestions = [];
@@ -91,7 +95,8 @@ class _ShopSaleScreenState extends State<ShopSaleScreen> {
 
     setState(() { 
       _subtotal = sub; 
-      _total = (sub - totalDisc + gstTotal).clamp(0, double.infinity); 
+      _gstTotal = gstTotal;
+      _total = (sub - totalDisc + gstTotal).clamp(0, double.infinity).roundToDouble(); 
     });
   }
 
@@ -141,9 +146,16 @@ class _ShopSaleScreenState extends State<ShopSaleScreen> {
         'discount_amount': double.tryParse(_discountCtrl.text) ?? 0.0,
         'payment_method': _paymentMethod,
       };
-      await ApiService.createManualBill(payload);
+      final createdData = await ApiService.createManualBill(payload);
+      final createdBill = createdData['data'] as Map<String, dynamic>?;
       _snack('✅ Bill saved successfully!');
-      _reset();
+      
+      if (createdBill != null) {
+        if (!mounted) return;
+        _showPostBillDialog(createdBill);
+      } else {
+        _reset();
+      }
     } on ApiException catch (e) {
       _snack(e.message, error: true);
     } catch (e) {
@@ -169,6 +181,125 @@ class _ShopSaleScreenState extends State<ShopSaleScreen> {
       content: Text(msg),
       backgroundColor: error ? const Color(0xFFDC2626) : const Color(0xFF059669),
     ));
+  }
+
+  void _showPostBillDialog(Map<String, dynamic> bill) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Bill Generated! 🎉'),
+        content: const Text('Would you like to print or send the bill via WhatsApp?'),
+        actions: [
+          TextButton(
+            onPressed: () { Navigator.pop(ctx); _reset(); },
+            child: const Text('Done'),
+          ),
+          TextButton.icon(
+            icon: const Icon(Icons.print, size: 18),
+            label: const Text('Print'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _printBill(bill);
+              _reset();
+            },
+          ),
+          TextButton.icon(
+            icon: const Icon(Icons.chat, size: 18),
+            label: const Text('WhatsApp'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _sendWhatsApp(bill);
+              _reset();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _printBill(Map<String, dynamic> bill) async {
+    final doc = pw.Document();
+    final billNo = bill['bill_number'] ?? 'N/A';
+    final items = bill['items'] as List<dynamic>? ?? [];
+    final total = bill['total_amount'] ?? 0;
+    
+    doc.addPage(pw.Page(
+      pageFormat: PdfPageFormat.roll80,
+      build: (pw.Context context) {
+        return pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+          children: [
+            pw.Text('Medical Shop', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center),
+            pw.SizedBox(height: 10),
+            pw.Text('Bill: $billNo', style: const pw.TextStyle(fontSize: 10)),
+            pw.Divider(),
+            pw.Row(
+              children: [
+                pw.Expanded(child: pw.Text('Item', style: const pw.TextStyle(fontSize: 10))),
+                pw.SizedBox(width: 25, child: pw.Text('Qty', style: const pw.TextStyle(fontSize: 10), textAlign: pw.TextAlign.center)),
+                pw.SizedBox(width: 35, child: pw.Text('Amt', style: const pw.TextStyle(fontSize: 10), textAlign: pw.TextAlign.right)),
+              ]
+            ),
+            pw.Divider(),
+            ...items.map((item) {
+              return pw.Row(
+                children: [
+                  pw.Expanded(child: pw.Text(item['medicine_name'] ?? '', style: const pw.TextStyle(fontSize: 10))),
+                  pw.SizedBox(width: 25, child: pw.Text(item['quantity'].toString(), style: const pw.TextStyle(fontSize: 10), textAlign: pw.TextAlign.center)),
+                  pw.SizedBox(width: 35, child: pw.Text(item['line_total'].toString(), style: const pw.TextStyle(fontSize: 10), textAlign: pw.TextAlign.right)),
+                ]
+              );
+            }),
+            pw.Divider(),
+            ...((bill['gst_amount'] ?? 0) > 0 ? [
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('CGST:', style: const pw.TextStyle(fontSize: 10)),
+                  pw.Text('Rs.${((bill['gst_amount'] ?? 0) / 2).toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 10)),
+                ]
+              ),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('SGST:', style: const pw.TextStyle(fontSize: 10)),
+                  pw.Text('Rs.${((bill['gst_amount'] ?? 0) / 2).toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 10)),
+                ]
+              ),
+            ] : []),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Total:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
+                pw.Text('Rs.${(total as num).round()}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
+              ]
+            ),
+          ],
+        );
+      },
+    ));
+    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => doc.save(), name: 'Bill_$billNo');
+  }
+
+  void _sendWhatsApp(Map<String, dynamic> bill) async {
+    final customerPhone = bill['customer_phone']?.toString() ?? '';
+    final billNo = bill['bill_number'] ?? 'N/A';
+    final total = bill['total_amount'] ?? 0;
+    final gst = bill['gst_amount'] ?? 0;
+    
+    String gstText = gst > 0 ? '\nCGST: Rs.${(gst/2).toStringAsFixed(2)}\nSGST: Rs.${(gst/2).toStringAsFixed(2)}' : '';
+    String msg = '🧾 *Medical Shop*\n📋 Bill: *$billNo*$gstText\n💰 *Total: Rs.${(total as num).round()}*\n\nThank you!';
+    final encoded = Uri.encodeComponent(msg);
+    final raw = customerPhone.replaceAll(RegExp(r'\D'), '');
+    final phone = raw.length == 10 ? '91$raw' : raw;
+    
+    final url = Uri.parse(phone.isNotEmpty ? 'https://wa.me/$phone?text=$encoded' : 'https://wa.me/?text=$encoded');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      _snack('Could not launch WhatsApp', error: true);
+    }
   }
 
   @override
@@ -338,6 +469,12 @@ class _ShopSaleScreenState extends State<ShopSaleScreen> {
                 const SizedBox(height: 6),
                 _BillRow('Discount', '−₹${_discountCtrl.text}', color: const Color(0xFF059669)),
               ],
+              if (_gstTotal > 0) ...[
+                const SizedBox(height: 6),
+                _BillRow('CGST', '₹${(_gstTotal / 2).toStringAsFixed(2)}'),
+                const SizedBox(height: 6),
+                _BillRow('SGST', '₹${(_gstTotal / 2).toStringAsFixed(2)}'),
+              ],
               const Divider(height: 24, color: Color(0xFFDDD6FE)),
               Row(children: [
                 const Text('Total', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF7C3AED))),
@@ -453,6 +590,7 @@ class _SaleItem {
     _debounce = Timer(const Duration(milliseconds: 350), () async {
       try {
         final list = await ApiService.searchInventory(q);
+        if (nameCtrl.text != q) return; // Ignore stale result if user changed text or selected an item
         onResult(list.cast<Map<String, dynamic>>());
       } catch (_) { onResult([]); }
     });
@@ -478,99 +616,126 @@ class _MedicineRowState extends State<_MedicineRow> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        // Medicine name
-        Expanded(
-          flex: 3,
-          child: Column(children: [
-            TextField(
-              controller: widget.item.nameCtrl,
-              decoration: const InputDecoration(hintText: 'Medicine name', isDense: true),
-              onChanged: (q) {
-                widget.item.searchMedicine(q, (list) {
-                  if (mounted) setState(() => _suggs = list);
-                });
-              },
-            ),
-            if (_suggs.isNotEmpty)
-              Container(
-                margin: const EdgeInsets.only(top: 2),
-                constraints: const BoxConstraints(maxHeight: 180),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.07), blurRadius: 8)],
-                ),
-                child: ListView(
-                  shrinkWrap: true,
-                  padding: EdgeInsets.zero,
-                  children: _suggs.take(5).map((m) => ListTile(
-                    dense: true,
-                    title: Text(m['medicine_name'] ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('₹${m['mrp'] ?? 0}  |  Stock: ${m['stock_qty'] ?? 0}',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
-                        if (m['batch_number'] != null || m['expiry_date'] != null)
-                          Text('Batch: ${m['batch_number'] ?? 'N/A'}  |  Exp: ${m['expiry_date'] != null ? (m['expiry_date'] as String).split('T')[0] : 'N/A'}',
-                              style: const TextStyle(fontSize: 10, color: Color(0xFF9CA3AF))),
-                      ],
-                    ),
-                    onTap: () {
-                      widget.item.nameCtrl.text = m['medicine_name'] ?? '';
-                      widget.item.mrpCtrl.text  = (m['mrp'] ?? '').toString();
-                      
-                      widget.item.inventoryId = m['id'];
-                      widget.item.unit = m['unit'] ?? widget.item.unit;
-                      widget.item.batchNumber = m['batch_number'] ?? '';
-                      widget.item.expiryDate = m['expiry_date'] ?? '';
-                      widget.item.gstRate = (m['gst_rate'] ?? 12).toDouble();
-                      widget.item.discountType = m['discount_type'] ?? widget.item.discountType;
-                      widget.item.discCtrl.text = (m['discount_value'] ?? 0).toString();
-
-                      widget.item.onChanged();
-                      setState(() => _suggs = []);
-                    },
-                  )).toList(),
-                ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2))
+        ]
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Top row: Medicine name and search
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          TextField(
+            controller: widget.item.nameCtrl,
+            decoration: const InputDecoration(hintText: 'Medicine name', isDense: true, prefixIcon: Icon(Icons.medication_outlined, size: 18)),
+            onChanged: (q) {
+              widget.item.searchMedicine(q, (list) {
+                if (mounted) setState(() => _suggs = list);
+              });
+            },
+          ),
+          if (_suggs.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 4, bottom: 8),
+              constraints: const BoxConstraints(maxHeight: 180),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.07), blurRadius: 8, offset: const Offset(0, 4))],
               ),
-          ]),
-        ),
-        const SizedBox(width: 8),
-        // Qty
-        SizedBox(
-          width: 56,
-          child: TextField(
-            controller: widget.item.qtyCtrl,
-            keyboardType: TextInputType.number,
-            textAlign: TextAlign.center,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(hintText: 'Qty', isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 10)),
+              child: ListView(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                children: _suggs.take(5).map((m) => ListTile(
+                  dense: true,
+                  title: Text(m['medicine_name'] ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('₹${m['mrp'] ?? 0}  |  Stock: ${m['stock_qty'] ?? 0}',
+                          style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+                      if (m['batch_number'] != null || m['expiry_date'] != null)
+                        Text('Batch: ${m['batch_number'] ?? 'N/A'}  |  Exp: ${m['expiry_date'] != null ? (m['expiry_date'] as String).split('T')[0] : 'N/A'}',
+                            style: const TextStyle(fontSize: 10, color: Color(0xFF9CA3AF))),
+                    ],
+                  ),
+                  onTap: () {
+                    widget.item.nameCtrl.text = m['medicine_name'] ?? '';
+                    widget.item.mrpCtrl.text  = (m['mrp'] ?? '').toString();
+                    
+                    widget.item.inventoryId = m['id'];
+                    widget.item.unit = m['unit'] ?? widget.item.unit;
+                    widget.item.batchNumber = m['batch_number'] ?? '';
+                    widget.item.expiryDate = m['expiry_date'] ?? '';
+                    widget.item.gstRate = (m['gst_rate'] ?? 12).toDouble();
+                    widget.item.discountType = m['discount_type'] ?? widget.item.discountType;
+                    widget.item.discCtrl.text = (m['discount_value'] ?? 0).toString();
+
+                    widget.item.onChanged();
+                    setState(() => _suggs = []);
+                    FocusScope.of(context).unfocus(); // Unfocus to hide keyboard and clear state if needed
+                  },
+                )).toList(),
+              ),
+            ),
+        ]),
+        const SizedBox(height: 10),
+        
+        // Bottom row: Qty, MRP, Discount, Remove
+        Row(children: [
+          // Qty
+          Expanded(
+            flex: 2,
+            child: TextField(
+              controller: widget.item.qtyCtrl,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(labelText: 'Qty', isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 10)),
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        // MRP
-        SizedBox(
-          width: 72,
-          child: TextField(
-            controller: widget.item.mrpCtrl,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(hintText: 'MRP', isDense: true, prefixText: '₹',
-              contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 10)),
+          const SizedBox(width: 8),
+          // MRP
+          Expanded(
+            flex: 3,
+            child: TextField(
+              controller: widget.item.mrpCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'MRP', isDense: true, prefixText: '₹', contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 10)),
+            ),
           ),
-        ),
-        // Remove
-        IconButton(
-          onPressed: widget.onRemove,
-          icon: Icon(Icons.close, size: 18, color: widget.onRemove != null ? const Color(0xFF9CA3AF) : Colors.transparent),
-          padding: EdgeInsets.zero,
-          visualDensity: VisualDensity.compact,
-        ),
+          const SizedBox(width: 8),
+          // Discount
+          Expanded(
+            flex: 3,
+            child: TextField(
+              controller: widget.item.discCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: 'Disc', 
+                isDense: true, 
+                prefixText: widget.item.discountType == 'percentage' ? '%' : '₹',
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10)
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          // Remove
+          IconButton(
+            onPressed: widget.onRemove,
+            icon: Icon(Icons.delete_outline, size: 20, color: widget.onRemove != null ? const Color(0xFFEF4444) : Colors.transparent),
+            padding: const EdgeInsets.all(4),
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints(),
+          ),
+        ]),
       ]),
-      const SizedBox(height: 10),
-    ]);
+    );
   }
 }

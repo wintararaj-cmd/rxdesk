@@ -3,10 +3,17 @@
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import 'auth_service.dart';
 
 class ApiService {
-  static const String _base = 'https://backend.rxdesk.in/api/v1';
+  static String get _base {
+    if (kReleaseMode) {
+      return 'https://backend.rxdesk.in/api/v1';
+    }
+    // Automatically use the development machine IP to support physical devices
+    return 'http://192.168.0.116:3000/api/v1';
+  }
 
   // ── helpers ──────────────────────────────────────────────────────────────
   static Future<Map<String, String>> _headers({bool auth = true}) async {
