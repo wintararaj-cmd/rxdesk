@@ -19,11 +19,25 @@ class ShopHome extends StatefulWidget {
 class _ShopHomeState extends State<ShopHome> {
   int _tab = 0;
   String _shopName = 'My Shop';
+  late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
     _loadShopName();
+    _pages = [
+      ShopDashboardTab(
+        onNewSaleTap: () => setState(() => _tab = 1),
+        onAppointmentsTap: () => setState(() => _tab = 2),
+        onReportTap: () => {
+          // TODO: Implement report navigation or show a message
+          // For now, we can show a toast or dialog
+        },
+      ),
+      ShopSaleScreen(),
+      ShopAppointmentsTab(),
+      ShopInventoryTab(),
+    ];
   }
 
   Future<void> _loadShopName() async {
@@ -44,20 +58,6 @@ class _ShopHomeState extends State<ShopHome> {
       );
     }
   }
-
-   final _pages = [
-     ShopDashboardTab(
-       onNewSaleTap: () => setState(() => _tab = 1),
-       onAppointmentsTap: () => setState(() => _tab = 2),
-       onReportTap: () => {
-         // TODO: Implement report navigation or show a message
-         // For now, we can show a toast or dialog
-       },
-     ),
-     ShopSaleScreen(),
-     ShopAppointmentsTab(),
-     ShopInventoryTab(),
-   ];
 
   @override
   Widget build(BuildContext context) {

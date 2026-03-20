@@ -135,6 +135,7 @@ export async function getTodayDashboard(userId: string) {
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
+  // 1. Appointments
   const appointments = await prisma.appointment.findMany({
     where: {
       chamber: { shop_id: shop.id },
@@ -158,7 +159,38 @@ export async function getTodayDashboard(userId: string) {
     completed: appointments.filter((a) => a.status === 'completed').length,
   };
 
-  return { shop_id: shop.id, stats, appointments };
+  // 2. Revenue (Bills created today with payment_status: 'paid')
+  const billsToday = await prisma.bill.findMany({
+    where: {
+      shop_id: shop.id,
+      created_at: { gte: today, lt: tomorrow },
+    },
+    select: { total_amount: true, payment_status: true },
+  });
+
+  const todayRevenue = billsToday
+    .filter((b) => b.payment_status === 'paid')
+    .reduce((sum, b) => sum + Number(b.total_amount), 0);
+
+  const pendingBillsCount = billsToday.filter((b) => b.payment_status === 'pending').length;
+
+  // 3. Low stock count
+  const allStock = await prisma.shopInventory.findMany({
+    where: { shop_id: shop.id },
+    select: { stock_qty: true, reorder_level: true },
+  });
+  const lowStockCount = allStock.filter((it) => it.stock_qty <= (it.reorder_level ?? 10)).length;
+
+  // Combine for both mobile and web frontends
+  return {
+    shop_id: shop.id,
+    stats, // Used by mobile
+    appointments, // Used by both
+    today_revenue: todayRevenue, // Used by web
+    today_appointments: appointments.length, // Used by web
+    pending_bills: pendingBillsCount, // Used by web
+    low_stock_count: lowStockCount, // Used by web
+  };
 }
 
 export async function updateShop(
