@@ -66,19 +66,39 @@ class _ShopSaleScreenState extends State<ShopSaleScreen> {
 
   void _recalc() {
     double sub = 0;
+    double itemDiscTotal = 0;
+    double gstTotal = 0;
+
     for (final item in _items) {
       final qty = int.tryParse(item.qtyCtrl.text) ?? 0;
       final mrp = double.tryParse(item.mrpCtrl.text) ?? 0.0;
-      sub += qty * mrp;
+      final discVal = double.tryParse(item.discCtrl.text) ?? 0.0;
+
+      final itemSub = qty * mrp;
+      sub += itemSub;
+
+      final itemDisc = item.discountType == 'percentage'
+          ? (itemSub * discVal) / 100
+          : (qty * discVal);
+      itemDiscTotal += itemDisc;
+
+      final taxVal = ((itemSub - itemDisc) * item.gstRate) / 100;
+      gstTotal += taxVal;
     }
-    final disc = double.tryParse(_discountCtrl.text) ?? 0.0;
-    setState(() { _subtotal = sub; _total = (sub - disc).clamp(0, double.infinity); });
+    
+    final globalDisc = double.tryParse(_discountCtrl.text) ?? 0.0;
+    final totalDisc = itemDiscTotal + globalDisc;
+
+    setState(() { 
+      _subtotal = sub; 
+      _total = (sub - totalDisc + gstTotal).clamp(0, double.infinity); 
+    });
   }
 
   Future<void> _searchCustomers(String q) async {
     _customerDebounce?.cancel();
-    if (q.length < 4) { setState(() => _customerSuggestions = []); return; }
-    _customerDebounce = Timer(const Duration(milliseconds: 400), () async {
+    if (q.length < 3) { setState(() => _customerSuggestions = []); return; }
+    _customerDebounce = Timer(const Duration(milliseconds: 250), () async {
       try {
         final results = await ApiService.searchCustomers(q);
         if (mounted) setState(() => _customerSuggestions = results.cast<Map<String, dynamic>>());
@@ -93,7 +113,18 @@ class _ShopSaleScreenState extends State<ShopSaleScreen> {
       final qty  = int.tryParse(item.qtyCtrl.text) ?? 0;
       final mrp  = double.tryParse(item.mrpCtrl.text) ?? 0.0;
       if (name.isNotEmpty && qty > 0) {
-        payloadItems.add({'medicine_name': name, 'mrp': mrp, 'quantity': qty});
+        payloadItems.add({
+          'medicine_name': name,
+          'mrp': mrp,
+          'quantity': qty,
+          'inventory_id': item.inventoryId,
+          'unit': item.unit,
+          'batch_number': item.batchNumber,
+          if (item.expiryDate.isNotEmpty) 'expiry_date': item.expiryDate,
+          'gst_rate': item.gstRate,
+          'discount_type': item.discountType,
+          'discount_value': double.tryParse(item.discCtrl.text) ?? 0.0,
+        });
       }
     }
 
@@ -397,6 +428,15 @@ class _SaleItem {
   final TextEditingController nameCtrl = TextEditingController();
   final TextEditingController qtyCtrl  = TextEditingController(text: '1');
   final TextEditingController mrpCtrl  = TextEditingController();
+  final TextEditingController discCtrl = TextEditingController(text: '0');
+
+  String? inventoryId;
+  String unit = 'strip';
+  String batchNumber = '';
+  String expiryDate = '';
+  double gstRate = 12.0;
+  String discountType = 'percentage';
+
   final VoidCallback onChanged;
   List<Map<String, dynamic>> suggestions = [];
   Timer? _debounce;
@@ -404,6 +444,7 @@ class _SaleItem {
   _SaleItem({required this.onChanged}) {
     qtyCtrl.addListener(onChanged);
     mrpCtrl.addListener(onChanged);
+    discCtrl.addListener(onChanged);
   }
 
   void searchMedicine(String q, Function(List<Map<String, dynamic>>) onResult) {
@@ -418,7 +459,7 @@ class _SaleItem {
   }
 
   void dispose() {
-    nameCtrl.dispose(); qtyCtrl.dispose(); mrpCtrl.dispose();
+    nameCtrl.dispose(); qtyCtrl.dispose(); mrpCtrl.dispose(); discCtrl.dispose();
     _debounce?.cancel();
   }
 }
@@ -468,11 +509,28 @@ class _MedicineRowState extends State<_MedicineRow> {
                   children: _suggs.take(5).map((m) => ListTile(
                     dense: true,
                     title: Text(m['medicine_name'] ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                    subtitle: Text('₹${m['mrp'] ?? 0}  |  Stock: ${m['stock_qty'] ?? 0}',
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('₹${m['mrp'] ?? 0}  |  Stock: ${m['stock_qty'] ?? 0}',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+                        if (m['batch_number'] != null || m['expiry_date'] != null)
+                          Text('Batch: ${m['batch_number'] ?? 'N/A'}  |  Exp: ${m['expiry_date'] != null ? (m['expiry_date'] as String).split('T')[0] : 'N/A'}',
+                              style: const TextStyle(fontSize: 10, color: Color(0xFF9CA3AF))),
+                      ],
+                    ),
                     onTap: () {
                       widget.item.nameCtrl.text = m['medicine_name'] ?? '';
                       widget.item.mrpCtrl.text  = (m['mrp'] ?? '').toString();
+                      
+                      widget.item.inventoryId = m['id'];
+                      widget.item.unit = m['unit'] ?? widget.item.unit;
+                      widget.item.batchNumber = m['batch_number'] ?? '';
+                      widget.item.expiryDate = m['expiry_date'] ?? '';
+                      widget.item.gstRate = (m['gst_rate'] ?? 12).toDouble();
+                      widget.item.discountType = m['discount_type'] ?? widget.item.discountType;
+                      widget.item.discCtrl.text = (m['discount_value'] ?? 0).toString();
+
                       widget.item.onChanged();
                       setState(() => _suggs = []);
                     },
