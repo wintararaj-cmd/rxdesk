@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../login_screen.dart';
+import 'doctor_prescribe_screen.dart';
+import 'doctor_profile_details.dart';
 
 class DoctorHome extends StatefulWidget {
   const DoctorHome({super.key});
@@ -33,9 +35,10 @@ class _DoctorHomeState extends State<DoctorHome> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = [
+    final List<Widget> pages = [
       const DoctorAppointmentsTab(),
       const DoctorHistoryTab(),
+      DoctorPrescribeScreen(),
       const DoctorProfileTab(),
     ];
 
@@ -62,6 +65,7 @@ class _DoctorHomeState extends State<DoctorHome> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.assignment_outlined), selectedIcon: Icon(Icons.assignment), label: 'Today'),
           NavigationDestination(icon: Icon(Icons.history), selectedIcon: Icon(Icons.history), label: 'History'),
+          NavigationDestination(icon: Icon(Icons.medication_outlined), selectedIcon: Icon(Icons.medication), label: 'Prescribe'),
           NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
@@ -180,11 +184,22 @@ class DoctorProfileTab extends StatelessWidget {
       const SizedBox(height: 20),
       const Text('Practice Settings', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
       const SizedBox(height: 12),
-      ListTile(leading: const Icon(Icons.person_outline), title: const Text('Profile Details'), trailing: const Icon(Icons.chevron_right), onTap: () {}),
-      ListTile(leading: const Icon(Icons.account_balance_outlined), title: const Text('Linked Chambers'), trailing: const Icon(Icons.chevron_right), onTap: () {}),
-      ListTile(leading: const Icon(Icons.schedule_outlined), title: const Text('Work Schedule'), trailing: const Icon(Icons.chevron_right), onTap: () {}),
-      const Divider(),
-      ListTile(leading: const Icon(Icons.security), title: const Text('Security & Privacy'), trailing: const Icon(Icons.chevron_right), onTap: () {}),
+       ListTile(leading: const Icon(Icons.person_outline), title: const Text('Profile Details'), trailing: const Icon(Icons.chevron_right), onTap: () {
+         Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DoctorProfileDetails()));
+       }),
+       ListTile(leading: const Icon(Icons.account_balance_outlined), title: const Text('Linked Chambers'), trailing: const Icon(Icons.chevron_right), onTap: () {
+         // TODO: Implement linked chambers screen
+         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Linked Chambers coming soon')));
+       }),
+       ListTile(leading: const Icon(Icons.schedule_outlined), title: const Text('Work Schedule'), trailing: const Icon(Icons.chevron_right), onTap: () {
+         // TODO: Implement work schedule screen
+         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Work Schedule coming soon')));
+       }),
+       const Divider(),
+       ListTile(leading: const Icon(Icons.security), title: const Text('Security & Privacy'), trailing: const Icon(Icons.chevron_right), onTap: () {
+         // TODO: Implement security & privacy screen
+         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Security & Privacy coming soon')));
+       }),
     ]);
   }
 }

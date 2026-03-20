@@ -97,7 +97,7 @@ export default function DoctorPrescriptionsPage() {
     setTriedToSubmit(true);
     if (!apptId) { setFormError('Please select an appointment.'); return; }
     if (!diagnosis.trim()) { setFormError('Diagnosis is required.'); return; }
-    
+
     const activeItems = items.filter(it => it.medicine_name.trim() || it.dosage || it.frequency || it.duration);
     if (activeItems.length === 0) { setFormError('Add at least one medicine.'); return; }
 
@@ -154,9 +154,18 @@ export default function DoctorPrescriptionsPage() {
                     {rx.patient?.gender ? ` · ${rx.patient.gender}` : ''}
                   </p>
                 </div>
-                <p className="text-gray-400 text-xs shrink-0 ml-4">
-                  {new Date(rx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="text-gray-400 hover:text-emerald-600 text-sm font-medium px-2 py-1 rounded-lg hover:bg-gray-50"
+                    title="Print Prescription"
+                  >
+                    🖨️ Print
+                  </button>
+                  <p className="text-gray-400 text-xs shrink-0 ml-2">
+                    {new Date(rx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </p>
+                </div>
               </div>
 
               {(rx.shop || rx.appointment) && (
@@ -206,7 +215,7 @@ export default function DoctorPrescriptionsPage() {
                   <option value="">— Select completed appointment —</option>
                   {appointments.map((a) => (
                     <option key={a.id} value={a.id}>
-                      {a.patient?.full_name ?? 'Patient'} 
+                      {a.patient?.full_name ?? 'Patient'}
                       {a.patient?.allergies ? ' (⚠️ ALLERGIES)' : (a.patient?.medical_history ? ' (📝 History)' : '')}
                       · {a.appointment_date} {a.slot_start_time}
                       {a.chamber?.shop?.shop_name ? ` · ${a.chamber.shop.shop_name}` : ''}

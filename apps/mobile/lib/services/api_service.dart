@@ -173,6 +173,25 @@ class ApiService {
     return (_decode(r)['data'] as List?) ?? [];
   }
 
+  // ── PRESCRIPTIONS ───────────────────────────────────────────────────────
+  static Future<Map<String, dynamic>> createPrescription(Map<String, dynamic> payload) async {
+    final r = await http.post(Uri.parse('$_base/prescriptions'),
+        headers: await _headers(), body: jsonEncode(payload));
+    return _decode(r);
+  }
+
+  static Future<List<dynamic>> searchPatients(String q) async {
+    final uri = Uri.parse('$_base/patients/search').replace(queryParameters: {'q': q});
+    final r = await http.get(uri, headers: await _headers());
+    return (_decode(r)['data'] as List?) ?? [];
+  }
+
+  static Future<List<dynamic>> searchMedicines(String q) async {
+    final uri = Uri.parse('$_base/medicines/search').replace(queryParameters: {'q': q, 'limit': '10'});
+    final r = await http.get(uri, headers: await _headers());
+    return (_decode(r)['data'] as List?) ?? [];
+  }
+
   static Future<Map<String, dynamic>> searchShops({String? q, String? city}) async {
     final params = <String, String>{};
     if (q != null && q.isNotEmpty) params['q'] = q;
