@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   Activity, LogOut, User, Search, Calendar, Home,
@@ -11,16 +11,17 @@ import { useAuthStore } from '../../../store/authStore';
 import { authApi, patientApi } from '../../../lib/apiClient';
 
 const NAV = [
-  { href: '/patient/dashboard', label: 'Home', icon: Home },
-  { href: '/patient/dashboard#find', label: 'Find Doctors', icon: Search },
-  { href: '/patient/dashboard#appointments', label: 'Appointments', icon: Calendar },
-  { href: '/patient/dashboard#profile', label: 'My Profile', icon: User },
+  { tab: 'home', href: '/patient/dashboard', label: 'Home', icon: Home },
+  { tab: 'search', href: '/patient/dashboard?tab=search', label: 'Find Doctors', icon: Search },
+  { tab: 'appointments', href: '/patient/dashboard?tab=appointments', label: 'Appointments', icon: Calendar },
+  { tab: 'profile', href: '/patient/dashboard?tab=profile', label: 'My Profile', icon: User },
 ];
 
-export default function PatientDashboardLayout({ children }: { children: React.ReactNode }) {
+function PatientDashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, accessToken, clearAuth } = useAuthStore();
   const router = useRouter();
-  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentTab = searchParams.get('tab') || 'home';
   const [mobileOpen, setMobileOpen] = useState(false);
   const [patientName, setPatientName] = useState<string | null>(null);
   const [profilePic, setProfilePic] = useState<string | null>(null);
@@ -86,8 +87,8 @@ export default function PatientDashboardLayout({ children }: { children: React.R
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
-          {NAV.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href.split('#')[0];
+          {NAV.map(({ tab, href, label, icon: Icon }) => {
+            const active = currentTab === tab;
             return (
               <Link
                 key={label}
@@ -167,5 +168,13 @@ export default function PatientDashboardLayout({ children }: { children: React.R
         </footer>
       </div>
     </div>
+  );
+}
+
+export default function PatientDashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#07070e] text-white flex items-center justify-center">Loading...</div>}>
+      <PatientDashboardLayoutContent>{children}</PatientDashboardLayoutContent>
+    </Suspense>
   );
 }

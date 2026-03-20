@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, useCallback, useEffect, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Search, MapPin, Navigation, Stethoscope, Calendar, X, ChevronRight,
   Clock, CheckCircle, AlertCircle, RefreshCw, User, Star, Activity,
@@ -395,7 +395,7 @@ function BookingModal({
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
-export default function PatientDashboardPage() {
+function PatientDashboardPageContent() {
   const searchParams = useSearchParams();
   const { user } = useAuthStore();
   const qc = useQueryClient();
@@ -411,8 +411,19 @@ export default function PatientDashboardPage() {
   // Booking modal
   const [bookingDoctor, setBookingDoctor] = useState<Doctor | null>(null);
 
+  const router = useRouter();
+  
   // Active section
-  const [section, setSection] = useState<'home' | 'search' | 'appointments' | 'profile'>('home');
+  const tabParam = searchParams.get('tab') as 'home' | 'search' | 'appointments' | 'profile' | null;
+  const section = (tabParam && ['home', 'search', 'appointments', 'profile'].includes(tabParam)) ? tabParam : 'home';
+
+  const setSection = useCallback((s: typeof section) => {
+    if (s === 'home') {
+      router.push('/patient/dashboard');
+    } else {
+      router.push(`/patient/dashboard?tab=${s}`);
+    }
+  }, [router]);
 
   // Profile
   const [patientProfile, setPatientProfile] = useState<PatientProfile | null>(null);
@@ -769,5 +780,13 @@ export default function PatientDashboardPage() {
         <BookingModal doctor={bookingDoctor} onClose={() => setBookingDoctor(null)} />
       )}
     </>
+  );
+}
+
+export default function PatientDashboardPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center p-8 text-gray-500">Loading...</div>}>
+      <PatientDashboardPageContent />
+    </Suspense>
   );
 }
