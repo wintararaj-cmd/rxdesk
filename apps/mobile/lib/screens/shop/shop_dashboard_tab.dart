@@ -4,7 +4,15 @@ import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 
 class ShopDashboardTab extends StatefulWidget {
-  const ShopDashboardTab({super.key});
+  const ShopDashboardTab({
+    super.key,
+    this.onNewSaleTap,
+    this.onAppointmentsTap,
+    this.onReportTap,
+  });
+  final VoidCallback? onNewSaleTap;
+  final VoidCallback? onAppointmentsTap;
+  final VoidCallback? onReportTap;
   @override
   State<ShopDashboardTab> createState() => _ShopDashboardTabState();
 }
@@ -83,27 +91,26 @@ class _ShopDashboardTabState extends State<ShopDashboardTab> {
 
           const _SectionTitle('Quick Actions'),
           const SizedBox(height: 12),
-          _QuickAction(
-            icon: Icons.receipt_long_rounded,
-            label: 'New Sale / Bill',
-            color: const Color(0xFF7C3AED),
-            onTap: () {
-              // Switch to sale tab — handled via parent but we use bottom nav
-              // User can tap sale tab directly
-            },
-          ),
-          const SizedBox(height: 10),
-          _QuickAction(
-            icon: Icons.people_alt_outlined,
-            label: 'Today\'s Appointments',
-            color: const Color(0xFF2563EB),
-          ),
-          const SizedBox(height: 10),
-          _QuickAction(
-            icon: Icons.bar_chart_rounded,
-            label: 'Sales Report',
-            color: const Color(0xFF059669),
-          ),
+           _QuickAction(
+             icon: Icons.receipt_long_rounded,
+             label: 'New Sale / Bill',
+             color: const Color(0xFF7C3AED),
+             onTap: widget.onNewSaleTap,
+           ),
+           const SizedBox(height: 10),
+           _QuickAction(
+             icon: Icons.people_alt_outlined,
+             label: 'Today\'s Appointments',
+             color: const Color(0xFF2563EB),
+             onTap: widget.onAppointmentsTap,
+           ),
+           const SizedBox(height: 10),
+           _QuickAction(
+             icon: Icons.bar_chart_rounded,
+             label: 'Sales Report',
+             color: const Color(0xFF059669),
+             onTap: widget.onReportTap,
+           ),
         ],
       ),
     );

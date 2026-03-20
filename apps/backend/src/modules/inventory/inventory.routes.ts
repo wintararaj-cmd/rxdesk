@@ -204,6 +204,9 @@ router.post('/import', requireRole('shop_owner'), async (req, res, next) => {
       reorder_level: number;
       unit: string;
       expiry_date?: Date;
+      hsn_code?: string;
+      discount_type?: 'percentage' | 'amount';
+      discount_value?: number;
     };
 
     const errors: { row: number; error: string }[] = [];
@@ -211,21 +214,28 @@ router.post('/import', requireRole('shop_owner'), async (req, res, next) => {
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
-      const medicineName = String(row.medicine_name ?? '').trim();
+      const medicineName = String(row.medicine_name ?? row.name ?? row.medicine ?? '').trim();
       if (!medicineName) { errors.push({ row: i + 1, error: 'medicine_name is required' }); continue; }
       const mrp = Number(row.mrp);
       if (!mrp || isNaN(mrp) || mrp <= 0) { errors.push({ row: i + 1, error: 'mrp must be a positive number' }); continue; }
+
+      // Map "percent" to "percentage" if present
+      let dType = row.discount_type ? String(row.discount_type).toLowerCase().trim() : undefined;
+      if (dType === 'percent') dType = 'percentage';
 
       const p: ParsedPayload = {
         shop_id:        shop.id,
         medicine_name:  medicineName,
         mrp,
-        stock_qty:      row.stock_qty      != null ? Number(row.stock_qty)   : 0,
+        stock_qty:      Number(row.stock_qty ?? row.stock ?? row.quantity ?? 0),
         purchase_price: row.purchase_price != null ? Number(row.purchase_price) : undefined,
         batch_number:   row.batch_number   ? String(row.batch_number).trim() : undefined,
         gst_rate:       row.gst_rate       != null ? Number(row.gst_rate)    : 12,
         reorder_level:  row.reorder_level  != null ? Number(row.reorder_level) : 10,
         unit:           row.unit           ? String(row.unit).trim()          : 'strip',
+        hsn_code:       row.hsn_code       ? String(row.hsn_code).trim()      : undefined,
+        discount_type:  (dType === 'amount' || dType === 'percentage') ? (dType as any) : undefined,
+        discount_value: row.discount_value != null ? Number(row.discount_value) : undefined,
       };
       if (row.expiry_date) {
         const d = new Date(String(row.expiry_date));
@@ -264,6 +274,9 @@ router.post('/import', requireRole('shop_owner'), async (req, res, next) => {
         reorder_level:  r.reorder_level,
         unit:           r.unit,
         expiry_date:    r.expiry_date,
+        hsn_code:       r.hsn_code,
+        discount_type:  r.discount_type,
+        discount_value: r.discount_value,
       };
 
       if (existingId) {

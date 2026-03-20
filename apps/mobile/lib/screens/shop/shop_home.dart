@@ -45,12 +45,19 @@ class _ShopHomeState extends State<ShopHome> {
     }
   }
 
-  final _pages = const [
-    ShopDashboardTab(),
-    ShopSaleScreen(),
-    ShopAppointmentsTab(),
-    ShopInventoryTab(),
-  ];
+   final _pages = [
+     ShopDashboardTab(
+       onNewSaleTap: () => setState(() => _tab = 1),
+       onAppointmentsTap: () => setState(() => _tab = 2),
+       onReportTap: () => {
+         // TODO: Implement report navigation or show a message
+         // For now, we can show a toast or dialog
+       },
+     ),
+     ShopSaleScreen(),
+     ShopAppointmentsTab(),
+     ShopInventoryTab(),
+   ];
 
   @override
   Widget build(BuildContext context) {
