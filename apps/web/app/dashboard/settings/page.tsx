@@ -200,6 +200,7 @@ export default function SettingsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['shop-profile'] });
       qc.invalidateQueries({ queryKey: ['web-shop'] });
+      qc.invalidateQueries({ queryKey: ['shop-me'] });
       setSaved(true);
       setFormError('');
       setTimeout(() => setSaved(false), 3000);
@@ -220,6 +221,7 @@ export default function SettingsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['shop-profile'] });
       qc.invalidateQueries({ queryKey: ['web-shop'] });
+      qc.invalidateQueries({ queryKey: ['shop-me'] });
       setSaved(true);
       setFormError('');
       setTimeout(() => setSaved(false), 3000);
