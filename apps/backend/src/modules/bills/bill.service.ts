@@ -34,6 +34,7 @@ export async function generateBillFromPrescription(
   const billItems: {
     inventory_id?: string;
     medicine_name: string;
+    hsn_code?: string;
     batch_number?: string;
     expiry_date?: Date;
     mrp: number;
@@ -66,6 +67,7 @@ export async function generateBillFromPrescription(
     billItems.push({
       inventory_id: inv?.id,
       medicine_name: item.medicine_name,
+      hsn_code: inv?.hsn_code ?? undefined,
       batch_number: inv?.batch_number ?? undefined,
       expiry_date: inv?.expiry_date ?? undefined,
       mrp,
@@ -164,7 +166,7 @@ export async function createManualBill(
   data: {
     customer_name?: string;
     customer_phone?: string;
-    items: { medicine_name: string; mrp: number; quantity: number; gst_rate?: number; inventory_id?: string; discount_type?: 'percentage' | 'amount'; discount_value?: number }[];
+    items: { medicine_name: string; mrp: number; quantity: number; gst_rate?: number; inventory_id?: string; discount_type?: 'percentage' | 'amount'; discount_value?: number; hsn_code?: string }[];
     discount_amount?: number;
     payment_method?: 'cash' | 'upi' | 'card' | 'credit' | 'pending';
     notes?: string;
@@ -187,6 +189,7 @@ export async function createManualBill(
   const billItems: {
     inventory_id?: string;
     medicine_name: string;
+    hsn_code?: string;
     batch_number?: string;
     expiry_date?: Date;
     mrp: number;
@@ -217,6 +220,7 @@ export async function createManualBill(
         itemBatches.push({
           inventory_id: inv.id,
           medicine_name: item.medicine_name,
+          hsn_code: inv.hsn_code || undefined,
           batch_number: inv.batch_number || undefined,
           expiry_date: inv.expiry_date || undefined,
           mrp: item.mrp,
@@ -253,6 +257,7 @@ export async function createManualBill(
         itemBatches.push({
           inventory_id: b.id,
           medicine_name: item.medicine_name,
+          hsn_code: b.hsn_code || undefined,
           batch_number: b.batch_number || undefined,
           expiry_date: b.expiry_date || undefined,
           mrp: item.mrp,
@@ -275,6 +280,7 @@ export async function createManualBill(
 
       itemBatches.push({
         medicine_name: item.medicine_name,
+        hsn_code: item.hsn_code || undefined,
         mrp: item.mrp,
         quantity: remainingQty,
         discount_type: itemDiscountType,
@@ -578,7 +584,7 @@ export async function listBills(userId: string, params: ListBillsParams) {
       where,
       include: {
         patient: { select: { full_name: true, user_id: true } },
-        items: { select: { id: true, medicine_name: true, quantity: true, mrp: true, line_total: true } },
+        items: { select: { id: true, medicine_name: true, hsn_code: true, batch_number: true, expiry_date: true, quantity: true, mrp: true, line_total: true, discount_type: true, discount_value: true, gst_rate: true } },
       },
       orderBy: { [sortField]: sortOrder },
       skip,

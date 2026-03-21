@@ -9,6 +9,7 @@ import { billApi, prescriptionApi, inventoryApi, shopApi, medicinesApi } from '.
 interface BillItem {
   id: string;
   medicine_name: string;
+  hsn_code?: string;
   batch_number?: string;
   expiry_date?: string;
   quantity: number;
@@ -61,7 +62,145 @@ const fmtDateTime = (iso: string) =>
 
 // ── Thermal Print & WhatsApp ─────────────────────────────────────────────────
 
-function printThermalReceipt(bill: BillData, shopName = 'Medical Shop') {
+function printInvoice(bill: BillData, shopData: any) {
+  const isA4 = shopData?.printer_type === 'a4';
+  if (isA4) return printA4Invoice(bill, shopData);
+  return printThermalReceipt(bill, shopData);
+}
+
+function printA4Invoice(bill: BillData, shopData: any) {
+  const shopName = shopData?.shop_name ?? 'Medical Shop';
+  const shopAddress = [shopData?.address_line, shopData?.city, shopData?.state, shopData?.pin_code].filter(Boolean).join(', ');
+  const shopPhone = shopData?.contact_phone ?? '';
+  const shopGst = shopData?.gst_number ?? '';
+  const drugLicense = shopData?.drug_license_no ?? '';
+
+  const displayName = bill.customer_name ?? bill.patient?.full_name ?? 'Walk-in Customer';
+  const displayPhone = bill.customer_phone ?? bill.patient?.phone ?? '';
+  const date = new Date(bill.created_at).toLocaleString('en-IN', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: true,
+  });
+
+  const isTax = Number(bill.gst_amount) > 0;
+  const invoiceLabel = isTax ? 'TAX INVOICE' : 'BILL OF SUPPLY';
+  const cur = (v: number | string) => `Rs.${Number(v).toFixed(2)}`;
+
+  const showHsn = shopData?.show_hsn_code !== false;
+  const showBatch = shopData?.show_batch_no !== false;
+
+  const itemRows = bill.items.map((it, idx) =>
+    `<tr>
+      <td style="padding:8px 6px;text-align:center;">${idx + 1}</td>
+      <td style="padding:8px 6px;">
+        <div style="font-weight:bold;">${it.medicine_name}</div>
+        <div style="font-size:10px;color:#555;margin-top:2px;">
+          ${showBatch && it.batch_number ? `Batch: ${it.batch_number} &middot; ` : ''}
+          ${it.expiry_date ? `Exp: ${new Date(it.expiry_date).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}` : ''}
+        </div>
+      </td>
+      ${showHsn ? `<td style="padding:8px 6px;text-align:center;">${it.hsn_code || '-'}</td>` : ''}
+      <td style="padding:8px 6px;text-align:center;">${it.quantity}</td>
+      <td style="padding:8px 6px;text-align:right;">${cur(it.mrp)}</td>
+      <td style="padding:8px 6px;text-align:right;">${cur(it.line_total)}</td>
+    </tr>`
+  ).join('');
+
+  const hsnColHtml = showHsn ? `<th style="text-align:center;padding:10px 8px;border-bottom:2px solid #e5e7eb;">HSN Code</th>` : '';
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>${bill.bill_number}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  @page { size: A4; margin: 15mm; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 13px; line-height: 1.5; color: #111827; }
+  table { width: 100%; border-collapse: collapse; margin-top: 25px; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #4b5563; }
+  td { border-bottom: 1px solid #f3f4f6; }
+</style></head>
+<body>
+  <div style="text-align:center;border-bottom:1px solid #d1d5db;padding-bottom:15px;margin-bottom:25px">
+    <h1 style="font-size:24px;margin-bottom:4px;font-weight:900;">${shopName}</h1>
+    ${shopAddress ? `<p style="color:#4b5563;font-size:13px">${shopAddress}</p>` : ''}
+    <div style="font-size:12px;color:#4b5563;margin-top:8px;display:flex;justify-content:center;gap:20px">
+      ${shopPhone ? `<span><b>Phone:</b> ${shopPhone}</span>` : ''}
+      ${shopGst && isTax ? `<span><b>GSTIN:</b> ${shopGst}</span>` : ''}
+      ${drugLicense ? `<span><b>DL No:</b> ${drugLicense}</span>` : ''}
+    </div>
+  </div>
+
+  <div style="text-align:center;font-weight:900;font-size:16px;letter-spacing:1px;margin-bottom:25px;">
+    ${invoiceLabel}
+  </div>
+
+  <div style="display:flex;justify-content:space-between;border:1px solid #e5e7eb;padding:20px;border-radius:8px;background:#f9fafb;">
+    <div>
+      <p style="margin-bottom:4px;font-size:11px;text-transform:uppercase;color:#6b7280;font-weight:bold;">Billed To</p>
+      <p style="font-size:15px;font-weight:bold">${displayName}</p>
+      ${displayPhone ? `<p style="margin-top:2px;">Phone: ${displayPhone}</p>` : ''}
+    </div>
+    <div style="text-align:right">
+      <p style="margin-bottom:4px"><b>Invoice No:</b> ${bill.bill_number}</p>
+      <p style="margin-bottom:4px"><b>Date:</b> ${date}</p>
+      <p><b>Payment:</b> ${(bill.payment_method ?? '').toUpperCase()} <span style="color:#9ca3af;margin:0 4px;">|</span> ${(bill.payment_status ?? '').toUpperCase()}</p>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="padding:10px 8px;border-bottom:2px solid #e5e7eb;width:5%;text-align:center;">#</th>
+        <th style="text-align:left;padding:10px 8px;border-bottom:2px solid #e5e7eb;width:${showHsn ? '38%' : '50%'}">Description</th>
+        ${hsnColHtml}
+        <th style="text-align:center;padding:10px 8px;border-bottom:2px solid #e5e7eb;width:10%">Qty</th>
+        <th style="text-align:right;padding:10px 8px;border-bottom:2px solid #e5e7eb;width:15%">Rate</th>
+        <th style="text-align:right;padding:10px 8px;border-bottom:2px solid #e5e7eb;width:20%">Amount</th>
+      </tr>
+    </thead>
+    <tbody>${itemRows}</tbody>
+  </table>
+
+  <div style="display:flex;justify-content:flex-end;margin-top:30px">
+    <div style="width:320px;background:#f8fafc;padding:20px;border-radius:8px;">
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e2e8f0;color:#475569;">
+        <span>Subtotal</span><span style="font-weight:600;">${cur(bill.subtotal)}</span>
+      </div>
+      ${bill.discount_amount > 0 ? `
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e2e8f0;color:#059669;">
+        <span>Discount</span><span style="font-weight:600;">-${cur(bill.discount_amount)}</span>
+      </div>` : ''}
+      ${isTax ? `
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e2e8f0;color:#475569;">
+        <span>CGST</span><span style="font-weight:600;">${cur(bill.gst_amount / 2)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e2e8f0;color:#475569;">
+        <span>SGST</span><span style="font-weight:600;">${cur(bill.gst_amount / 2)}</span>
+      </div>` : ''}
+      <div style="display:flex;justify-content:space-between;padding-top:12px;margin-top:6px;font-size:18px;font-weight:900;">
+        <span>Total Amount</span><span>${cur(Math.round(bill.total_amount))}</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:60px;padding-top:20px;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280;text-align:center">
+    <p>Thank you for your purchase!</p>
+    <p style="margin-top:4px;">Powered by <b>RxDesk</b></p>
+  </div>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  if (!w) return;
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => { w.print(); setTimeout(() => w.close(), 600); }, 300);
+}
+
+function printThermalReceipt(bill: BillData, shopData: any) {
+  const shopName = shopData?.shop_name ?? 'Medical Shop';
+  const showHsn = shopData?.show_hsn_code !== false;
+  const showBatch = shopData?.show_batch_no !== false;
+
   const displayName = bill.customer_name ?? bill.patient?.full_name ?? 'Walk-in Customer';
   const date = new Date(bill.created_at).toLocaleString('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric',
@@ -74,7 +213,8 @@ function printThermalReceipt(bill: BillData, shopName = 'Medical Shop') {
     `<tr>
       <td style="padding:2px 0;word-break:break-word">
         ${it.medicine_name}
-        ${it.batch_number ? `<div style="font-size:8px;color:#666;margin-top:1px">Batch: ${it.batch_number}</div>` : ''}
+        ${showBatch && it.batch_number ? `<div style="font-size:8px;color:#666;margin-top:1px">Batch: ${it.batch_number}</div>` : ''}
+        ${showHsn && it.hsn_code ? `<div style="font-size:8px;color:#666;margin-top:1px">HSN: ${it.hsn_code}</div>` : ''}
       </td>
       <td style="text-align:center;padding:2px 4px;white-space:nowrap">${it.quantity}</td>
       <td style="text-align:right;padding:2px 0;white-space:nowrap">${cur(it.mrp)}</td>
@@ -376,7 +516,7 @@ function NewBillTab() {
           {/* Print & WhatsApp */}
           <div className="flex gap-2 mt-5">
             <button
-              onClick={() => printThermalReceipt(bill!, shopName)}
+              onClick={() => printInvoice(bill!, shopData)}
               className="flex-1 flex items-center justify-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-all"
             >
               🖨️ Print Receipt
@@ -510,7 +650,7 @@ function BillDetailModal({ bill, onClose, onPay }: {
           {/* Print & WhatsApp */}
           <div className="flex gap-3 pt-2">
             <button
-              onClick={() => printThermalReceipt(bill, shopName)}
+              onClick={() => printInvoice(bill, shopData)}
               className="flex-1 flex items-center justify-center gap-2 bg-gray-900 text-white rounded-xl py-3 text-sm font-bold hover:bg-black transition-all shadow-lg shadow-gray-200 active:scale-95"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.821l.821-.821L12 16.179l3.459-3.459.821.821L12 17.821l-5.28-5.28zM6 18h12V6H6v12z" /><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12h-15" /></svg>
@@ -1080,7 +1220,7 @@ function WalkInSaleTab() {
           {/* Print & WhatsApp */}
           <div className="flex gap-2 mt-4">
             <button
-              onClick={() => printThermalReceipt(createdBill, shopName)}
+              onClick={() => printInvoice(createdBill, shopData)}
               className="flex-1 flex items-center justify-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-all"
             >
               🖨️ Print Receipt

@@ -539,6 +539,7 @@ model BillItem {
   bill_id      String
   inventory_id String?
   medicine_name String
+  hsn_code      String?
   batch_number  String?
   expiry_date   DateTime? @db.Date
   mrp          Decimal   @db.Decimal(10, 2)
