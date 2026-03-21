@@ -36,16 +36,16 @@ async function main() {
       where: { name: 'Standard' },
       update: {
         price_monthly: 1299,
-        max_doctors: 5,
-        max_appointments_per_month: 250,
-        max_sessions: 5,
+        max_doctors: 10,
+        max_appointments_per_month: 2500,
+        max_sessions: 10,
       },
       create: {
         name: 'Standard',
         price_monthly: 1299,
-        max_doctors: 5,
-        max_appointments_per_month: 250,
-        max_sessions: 5,
+        max_doctors: 10,
+        max_appointments_per_month: 2500,
+        max_sessions: 10,
         features: {
           sms_reminders: true,
           pdf_bills: true,
@@ -59,16 +59,16 @@ async function main() {
       where: { name: 'Premium' },
       update: {
         price_monthly: 2299,
-        max_doctors: 15,
+        max_doctors: 25,
         max_appointments_per_month: 99999,
-        max_sessions: 10,
+        max_sessions: 25,
       },
       create: {
         name: 'Premium',
         price_monthly: 2299,
-        max_doctors: 15,
+        max_doctors: 25,
         max_appointments_per_month: 99999,
-        max_sessions: 10,
+        max_sessions: 25,
         features: {
           sms_reminders: true,
           pdf_bills: true,
