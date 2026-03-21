@@ -1,0 +1,4 @@
+# This file helps PostgreSQL-based databases to track migration state
+# Please do not edit or remove this file.
+
+lastMigration = "20260321000000_add_invoice_settings"

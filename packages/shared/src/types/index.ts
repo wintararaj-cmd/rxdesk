@@ -43,6 +43,8 @@ export type PaymentStatus = 'pending' | 'paid' | 'not_required';
 
 export type SubscriptionStatus = 'trial' | 'active' | 'expired' | 'cancelled';
 
+export type PrinterType = 'thermal' | 'a4';
+
 // ─── API Response Shapes ───────────────────────
 
 export interface ApiSuccessResponse<T> {

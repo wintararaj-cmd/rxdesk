@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { shopApi, subscriptionApi, chamberApi, accountingApi } from '../../../lib/apiClient';
 import { useAuthStore } from '../../../store/authStore';
-import { Phone, Mail, Clock, X, Database, Download, Upload, AlertCircle, Check } from 'lucide-react';
+import { Phone, Mail, Clock, X, Database, Download, Upload, AlertCircle, Check, Printer } from 'lucide-react';
 
 type GstType = 'unregistered' | 'composite' | 'regular';
 
@@ -22,6 +22,10 @@ interface ShopProfile {
   longitude: number | null;
   gst_number: string | null;
   gst_type: GstType;
+  // Invoice Settings
+  show_hsn_code: boolean;
+  show_batch_no: boolean;
+  printer_type: 'thermal' | 'a4';
   owner?: { phone: string };
 }
 
@@ -152,9 +156,29 @@ export default function SettingsPage() {
   const sub: Subscription | null = subRes?.data?.data ?? null;
 
   const [form, setForm] = useState<Partial<ShopProfile>>({});
+  const [invoiceSettings, setInvoiceSettings] = useState<{
+    show_hsn_code: boolean;
+    show_batch_no: boolean;
+    printer_type: 'thermal' | 'a4';
+  }>({
+    show_hsn_code: true,
+    show_batch_no: true,
+    printer_type: 'thermal',
+  });
 
   // Initialize form when shop data loads
   const isNewShop = !shop && !isLoading;
+
+  // Initialize invoice settings when shop data loads
+  useEffect(() => {
+    if (shop) {
+      setInvoiceSettings({
+        show_hsn_code: shop.show_hsn_code ?? true,
+        show_batch_no: shop.show_batch_no ?? true,
+        printer_type: shop.printer_type ?? 'thermal',
+      });
+    }
+  }, [shop]);
 
   const activeForm: Partial<ShopProfile> = Object.keys(form).length
     ? form
@@ -188,6 +212,26 @@ export default function SettingsPage() {
           .join('; ')
         : null;
       setFormError(fieldErrors ?? err?.response?.data?.error?.message ?? 'Failed to save changes.');
+    },
+  });
+
+  const invoiceSettingsMutation = useMutation({
+    mutationFn: (data: { show_hsn_code: boolean; show_batch_no: boolean; printer_type: 'thermal' | 'a4' }) => shopApi.updateProfile(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['shop-profile'] });
+      qc.invalidateQueries({ queryKey: ['web-shop'] });
+      setSaved(true);
+      setFormError('');
+      setTimeout(() => setSaved(false), 3000);
+    },
+    onError: (err: any) => {
+      const details = err?.response?.data?.error?.details;
+      const fieldErrors = details && typeof details === 'object'
+        ? Object.entries(details as Record<string, string[]>)
+          .map(([f, msgs]) => `${f}: ${(msgs as string[]).join(', ')}`)
+          .join('; ')
+        : null;
+      setFormError(fieldErrors ?? err?.response?.data?.error?.message ?? 'Failed to save invoice settings.');
     },
   });
 
@@ -531,6 +575,83 @@ export default function SettingsPage() {
           </form>
         </div>
 
+        {/* Invoice Settings */}
+        {!isNewShop && (
+          <div className="bg-white rounded-2xl border border-gray-200 p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Printer className="w-5 h-5 text-violet-600" />
+              <h2 className="text-base font-semibold text-gray-800">Invoice Settings</h2>
+            </div>
+            <p className="text-gray-500 text-sm mb-6">
+              Configure how your invoices are generated and printed.
+            </p>
+
+            <div className="space-y-4">
+              {/* Show HSN Code */}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={invoiceSettings.show_hsn_code}
+                  onChange={(e) => setInvoiceSettings(prev => ({ ...prev, show_hsn_code: e.target.checked }))}
+                  className="w-4 h-4 text-violet-600 border-gray-300 rounded focus:ring-violet-500"
+                />
+                <div>
+                  <p className="text-sm font-medium text-gray-800">HSN Code wise</p>
+                  <p className="text-xs text-gray-400">Show HSN code on invoices</p>
+                </div>
+              </label>
+
+              {/* Show Batch Number */}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={invoiceSettings.show_batch_no}
+                  onChange={(e) => setInvoiceSettings(prev => ({ ...prev, show_batch_no: e.target.checked }))}
+                  className="w-4 h-4 text-violet-600 border-gray-300 rounded focus:ring-violet-500"
+                />
+                <div>
+                  <p className="text-sm font-medium text-gray-800">Batch No</p>
+                  <p className="text-xs text-gray-400">Show batch number on invoices</p>
+                </div>
+              </label>
+
+              {/* Printer Type */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Printer Settings</label>
+                <select
+                  value={invoiceSettings.printer_type}
+                  onChange={(e) => setInvoiceSettings(prev => ({ ...prev, printer_type: e.target.value as 'thermal' | 'a4' }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 bg-white"
+                >
+                  <option value="thermal">Thermal Printer</option>
+                  <option value="a4">A4 Printer</option>
+                </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  {invoiceSettings.printer_type === 'thermal'
+                    ? 'Invoices will be formatted for thermal/pos printers'
+                    : 'Invoices will be formatted for A4 paper size'}
+                </p>
+              </div>
+
+              {/* Save Button */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => invoiceSettingsMutation.mutate(invoiceSettings)}
+                  disabled={invoiceSettingsMutation.isPending}
+                  className="px-6 py-2.5 bg-violet-600 text-white text-sm font-semibold rounded-xl hover:bg-violet-700 disabled:opacity-50 transition-colors"
+                >
+                  {invoiceSettingsMutation.isPending ? 'Saving…' : 'Save Invoice Settings'}
+                </button>
+              </div>
+
+              {saved && (
+                <p className="text-green-600 text-sm font-medium">✓ Invoice settings saved successfully.</p>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Backup & Restore */}
         <div className="bg-white rounded-2xl border border-gray-200 p-5">
           <div className="flex items-center gap-2 mb-4">
@@ -540,7 +661,7 @@ export default function SettingsPage() {
           <p className="text-gray-500 text-sm mb-6">
             Keep your financial records safe. Export all accounting data (Suppliers, Purchases, Expenses, Income, etc.) to a JSON file or restore from a previous backup.
           </p>
-          
+
           <div className="flex flex-col sm:flex-row gap-4">
             <button
               disabled={sub?.status === 'trial'}
@@ -601,7 +722,7 @@ export default function SettingsPage() {
                   e.target.value = '';
                 }}
               />
-              <button 
+              <button
                 disabled={sub?.status === 'trial'}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
               >
@@ -620,9 +741,9 @@ export default function SettingsPage() {
           <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-100 flex gap-3">
             <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
             <div className="text-xs text-amber-800 leading-relaxed">
-              <strong>Note:</strong> Restore operation is destructive. It will remove all existing suppliers, 
-              purchases, and payment records for the current shop before importing the backup file. 
-              Inventory and Bill records are NOT affected, but links to accounting entries may be lost if 
+              <strong>Note:</strong> Restore operation is destructive. It will remove all existing suppliers,
+              purchases, and payment records for the current shop before importing the backup file.
+              Inventory and Bill records are NOT affected, but links to accounting entries may be lost if
               they aren't part of the backup.
             </div>
           </div>

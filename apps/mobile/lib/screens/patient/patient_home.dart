@@ -235,26 +235,372 @@ class _PatientRecordsTabState extends State<PatientRecordsTab> {
       onRefresh: _load,
       child: _loading
           ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _records.length,
-              itemBuilder: (_, i) {
-                final r = _records[i];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  child: ListTile(
-                    leading: const Icon(Icons.description_outlined, color: Colors.blue),
-                    title: Text('Diagnosis: ${r['diagnosis'] ?? 'Visit Result'}'),
-                    subtitle: Text('Issued on: ${r['created_at']?.toString().substring(0, 10)}'),
-                    trailing: const Icon(Icons.download, size: 20),
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Downloading PDF...')));
-                    },
-                  ),
-                );
-              },
+          : _records.isEmpty
+              ? const Center(child: Padding(padding: EdgeInsets.all(40), child: Text('No prescriptions yet')))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _records.length,
+                  itemBuilder: (_, i) {
+                    final r = _records[i];
+                    final medicines = r['medicines'] as List<dynamic>? ?? [];
+                    final doctor = r['doctor'] as Map<String, dynamic>? ?? {};
+                    final chamber = r['chamber'] as Map<String, dynamic>? ?? {};
+                    
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 2,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () => _showPrescriptionDetail(context, r),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF7C3AED).withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(Icons.description_outlined, color: Color(0xFF7C3AED), size: 24),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          r['diagnosis'] ?? 'Visit Result',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1F2937)),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Dr. ${doctor['full_name'] ?? 'Unknown'} • ${chamber['name'] ?? 'Clinic'}',
+                                          style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        r['created_at']?.toString().substring(0, 10) ?? '',
+                                        style: const TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.green.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          '${medicines.length} medicine${medicines.length != 1 ? 's' : ''}',
+                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.green),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              const Divider(height: 1),
+                              const SizedBox(height: 12),
+                              if (medicines.isNotEmpty) ...[
+                                const Text('Medicines', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF6B7280))),
+                                const SizedBox(height: 8),
+                                ...medicines.take(3).map((m) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 6),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.medication, size: 16, color: Color(0xFF7C3AED)),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          '${m['medicine_name'] ?? 'Medicine'}',
+                                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )),
+                                if (medicines.length > 3)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Text(
+                                      '+${medicines.length - 3} more medicines',
+                                      style: const TextStyle(fontSize: 12, color: Color(0xFF7C3AED), fontWeight: FontWeight.w500),
+                                    ),
+                                  ),
+                              ],
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF7C3AED).withOpacity(0.05),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.visibility_outlined, size: 18, color: Color(0xFF7C3AED)),
+                                    SizedBox(width: 8),
+                                    Text('View Full Prescription', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF7C3AED))),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+    );
+  }
+
+  void _showPrescriptionDetail(BuildContext context, Map<String, dynamic> prescription) {
+    final medicines = prescription['medicines'] as List<dynamic>? ?? [];
+    final doctor = prescription['doctor'] as Map<String, dynamic>? ?? {};
+    final chamber = prescription['chamber'] as Map<String, dynamic>? ?? {};
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40, height: 4,
+                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF7C3AED).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.description, color: Color(0xFF7C3AED), size: 28),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Prescription', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1F2937))),
+                          const SizedBox(height: 4),
+                          Text(prescription['created_at']?.toString().substring(0, 10) ?? '', style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280))),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3F4F6),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const CircleAvatar(
+                            backgroundColor: Color(0xFF7C3AED),
+                            child: Icon(Icons.person, color: Colors.white),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Dr. ${doctor['full_name'] ?? 'Unknown'}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                const SizedBox(height: 2),
+                                Text(chamber['name'] ?? 'Clinic', style: const TextStyle(color: Color(0xFF6B7280), fontSize: 14)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text('Diagnosis', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF6B7280))),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEEF2FF),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF7C3AED).withOpacity(0.2)),
+                      ),
+                      child: Text(
+                        prescription['diagnosis'] ?? 'No diagnosis recorded',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Color(0xFF1F2937)),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    if (prescription['symptoms'] != null && prescription['symptoms'].toString().isNotEmpty) ...[
+                      const Text('Symptoms', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF6B7280))),
+                      const SizedBox(height: 8),
+                      Text(prescription['symptoms'].toString(), style: const TextStyle(fontSize: 15)),
+                      const SizedBox(height: 20),
+                    ],
+                    Row(
+                      children: [
+                        const Text('Medicines', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1F2937))),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(color: const Color(0xFF7C3AED), borderRadius: BorderRadius.circular(10)),
+                          child: Text('${medicines.length}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ...medicines.asMap().entries.map((entry) {
+                      final idx = entry.key;
+                      final m = entry.value as Map<String, dynamic>;
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 28, height: 28,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF7C3AED).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Center(child: Text('${idx + 1}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF7C3AED), fontSize: 12))),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    m['medicine_name'] ?? 'Medicine',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                _MedicineInfoChip(icon: Icons.speed, label: 'Dosage', value: m['dosage'] ?? '-'),
+                                const SizedBox(width: 8),
+                                _MedicineInfoChip(icon: Icons.repeat, label: 'Frequency', value: m['frequency'] ?? '-'),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                _MedicineInfoChip(icon: Icons.calendar_today, label: 'Duration', value: m['duration'] ?? '-'),
+                                const SizedBox(width: 8),
+                                _MedicineInfoChip(icon: Icons.info_outline, label: 'Instructions', value: m['instructions'] ?? '-', flex: 2),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 20),
+                    if (prescription['notes'] != null && prescription['notes'].toString().isNotEmpty) ...[
+                      const Text('Doctor\'s Notes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF6B7280))),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF7ED),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                        ),
+                        child: Text(
+                          prescription['notes'].toString(),
+                          style: const TextStyle(fontSize: 14, color: Color(0xFF92400E)),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MedicineInfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final int flex;
+  const _MedicineInfoChip({required this.icon, required this.label, required this.value, this.flex = 1});
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      flex: flex,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 14, color: const Color(0xFF6B7280)),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF9CA3AF))),
+                  Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1F2937)), overflow: TextOverflow.ellipsis),
+                ],
+              ),
             ),
+          ],
+        ),
+      ),
     );
   }
 }

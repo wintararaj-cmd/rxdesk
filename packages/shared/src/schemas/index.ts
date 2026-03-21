@@ -87,6 +87,12 @@ export const createDoctorSchema = z.object({
 
 // ─── Shop ─────────────────────────────────────
 
+export const invoiceSettingsSchema = z.object({
+  show_hsn_code: z.boolean().default(true),
+  show_batch_no: z.boolean().default(true),
+  printer_type: z.enum(['thermal', 'a4']).default('thermal'),
+});
+
 export const createShopSchema = z.object({
   shop_name: z.string().min(2).max(150),
   shop_type: z
@@ -117,7 +123,13 @@ export const createShopSchema = z.object({
   working_days: z
     .array(z.enum(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']))
     .default(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']),
+  // Invoice Settings
+  show_hsn_code: z.boolean().default(true),
+  show_batch_no: z.boolean().default(true),
+  printer_type: z.enum(['thermal', 'a4']).default('thermal'),
 });
+
+export const updateInvoiceSettingsSchema = invoiceSettingsSchema;
 
 // ─── Chamber ──────────────────────────────────
 

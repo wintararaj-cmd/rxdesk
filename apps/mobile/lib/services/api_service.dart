@@ -82,6 +82,12 @@ class ApiService {
     return _decode(r);
   }
 
+  static Future<Map<String, dynamic>> updateShopProfile(Map<String, dynamic> data) async {
+    final r = await http.put(Uri.parse('$_base/shops/me'),
+        headers: await _headers(), body: jsonEncode(data));
+    return _decode(r);
+  }
+
   static Future<List<dynamic>> getTodayAppointments({String? date}) async {
     final uri = Uri.parse('$_base/appointments/today')
         .replace(queryParameters: date != null ? {'date': date} : null);

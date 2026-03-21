@@ -46,6 +46,11 @@ enum ShopType {
   dispensary
 }
 
+enum PrinterType {
+  thermal
+  a4
+}
+
 enum ChamberLinkStatus {
   pending
   active
@@ -290,6 +295,10 @@ model MedicalShop {
   working_days        String[]
   is_active           Boolean            @default(true)
   verification_status VerificationStatus @default(pending)
+  // Invoice Settings
+  show_hsn_code       Boolean            @default(true)
+  show_batch_no       Boolean            @default(true)
+  printer_type        PrinterType        @default(thermal)
   created_at          DateTime           @default(now())
   updated_at          DateTime           @updatedAt
 

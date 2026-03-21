@@ -214,6 +214,10 @@ export async function updateShop(
     auto_backup_enabled?: boolean;
     backup_time?: string;
     backup_path?: string;
+    // Invoice Settings
+    show_hsn_code?: boolean;
+    show_batch_no?: boolean;
+    printer_type?: 'thermal' | 'a4';
   }
 ) {
   const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });
@@ -240,6 +244,10 @@ export async function updateShop(
       ...(data.auto_backup_enabled !== undefined && { auto_backup_enabled: data.auto_backup_enabled }),
       ...(data.backup_time !== undefined && { backup_time: data.backup_time }),
       ...(data.backup_path !== undefined && { backup_path: data.backup_path }),
+      // Invoice Settings
+      ...(data.show_hsn_code !== undefined && { show_hsn_code: data.show_hsn_code }),
+      ...(data.show_batch_no !== undefined && { show_batch_no: data.show_batch_no }),
+      ...(data.printer_type !== undefined && { printer_type: data.printer_type }),
     },
   });
 }

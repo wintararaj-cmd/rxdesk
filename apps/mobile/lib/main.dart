@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/shop/shop_home.dart';
+import 'screens/shop/shop_settings_screen.dart';
 import 'screens/doctor/doctor_home.dart';
 import 'screens/patient/patient_home.dart';
 
@@ -60,6 +61,9 @@ class RxDeskApp extends StatelessWidget {
         ),
       ),
       home: const SplashGate(),
+      routes: {
+        '/shop/settings': (context) => const ShopSettingsScreen(),
+      },
     );
   }
 }

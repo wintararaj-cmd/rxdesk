@@ -111,6 +111,15 @@ class _ShopDashboardTabState extends State<ShopDashboardTab> {
              color: const Color(0xFF059669),
              onTap: widget.onReportTap,
            ),
+           const SizedBox(height: 10),
+           _QuickAction(
+             icon: Icons.settings_rounded,
+             label: 'Settings',
+             color: const Color(0xFF6B7280),
+             onTap: () {
+               Navigator.pushNamed(context, '/shop/settings');
+             },
+           ),
         ],
       ),
     );
