@@ -263,6 +263,28 @@ router.get('/reports/gst-summary', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/reports/gstr1-csv', shopAuth, async (req, res, next) => {
+  try {
+    const month = req.query.month ? Number(req.query.month) : new Date().getMonth() + 1;
+    const year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
+    const csv = await service.generateGstr1Csv(req.user!.id, month, year);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=GSTR1_${month}_${year}.csv`);
+    res.send(csv);
+  } catch (err) { next(err); }
+});
+
+router.get('/reports/gstr2a-csv', shopAuth, async (req, res, next) => {
+  try {
+    const month = req.query.month ? Number(req.query.month) : new Date().getMonth() + 1;
+    const year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
+    const csv = await service.generateGstr2aCsv(req.user!.id, month, year);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=GSTR2A_${month}_${year}.csv`);
+    res.send(csv);
+  } catch (err) { next(err); }
+});
+
 // GET /accounting/reports/payment-split?from=YYYY-MM-DD&to=YYYY-MM-DD
 router.get('/reports/payment-split', shopAuth, async (req, res, next) => {
   try {

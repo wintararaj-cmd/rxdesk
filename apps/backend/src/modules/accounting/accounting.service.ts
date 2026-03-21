@@ -2068,3 +2068,141 @@ export async function triggerManualLocalBackup(userId: string) {
   return { filename: fileName, path: filePath };
 }
 
+export async function generateGstr1Csv(userId: string, month: number, year: number) {
+  const shop = await getShopOrThrow(userId);
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0, 23, 59, 59);
+
+  const bills = await prisma.bill.findMany({
+    where: { shop_id: shop.id, payment_status: 'paid', created_at: { gte: start, lte: end } },
+    include: { items: true },
+    orderBy: { created_at: 'asc' },
+  });
+
+  const header = ['Invoice Date', 'Invoice Number', 'Customer Name', 'Customer Phone', 'HSN Code', 'Medicine Name', 'Quantity', 'MRP', 'Taxable Value', 'GST Rate', 'CGST', 'SGST', 'IGST', 'Total GST', 'Total Amount'].join(',');
+  const rows = [header];
+
+  const hsnSummary: Record<string, { taxable: number; gst: number; total: number; qty: number }> = {};
+
+  for (const bill of bills) {
+    for (const item of bill.items) {
+      const taxableVal = Number(item.line_total);
+      const gstRate = Number(item.gst_rate);
+      const gstAmt = taxableVal * (gstRate / 100);
+      const cgst = Math.round((gstAmt / 2) * 100) / 100;
+      const sgst = cgst;
+      const lineTotalAmount = taxableVal + gstAmt;
+      const dateStr = bill.created_at.toISOString().split('T')[0];
+      const hsn = item.hsn_code || 'N/A';
+      
+      rows.push([
+        dateStr,
+        bill.bill_number ?? '-',
+        `"${bill.customer_name ?? 'Walk-in'}"`,
+        bill.customer_phone ?? '-',
+        hsn,
+        `"${item.medicine_name}"`,
+        item.quantity,
+        item.mrp,
+        taxableVal.toFixed(2),
+        gstRate,
+        cgst.toFixed(2),
+        sgst.toFixed(2),
+        '0.00',
+        gstAmt.toFixed(2),
+        lineTotalAmount.toFixed(2),
+      ].join(','));
+
+      if (!hsnSummary[hsn]) hsnSummary[hsn] = { taxable: 0, gst: 0, total: 0, qty: 0 };
+      hsnSummary[hsn].taxable += taxableVal;
+      hsnSummary[hsn].gst += gstAmt;
+      hsnSummary[hsn].total += lineTotalAmount;
+      hsnSummary[hsn].qty += item.quantity;
+    }
+  }
+
+  rows.push('');
+  rows.push('HSN SUMMARY');
+  rows.push(['HSN Code', 'Total Quantity', 'Taxable Value', 'Total GST', 'Total Value'].join(','));
+  for (const [hsn, data] of Object.entries(hsnSummary)) {
+    rows.push([
+      hsn,
+      data.qty,
+      data.taxable.toFixed(2),
+      data.gst.toFixed(2),
+      data.total.toFixed(2)
+    ].join(','));
+  }
+
+  return rows.join('\n');
+}
+
+export async function generateGstr2aCsv(userId: string, month: number, year: number) {
+  const shop = await getShopOrThrow(userId);
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0, 23, 59, 59);
+
+  const purchases = await prisma.purchaseEntry.findMany({
+    where: { shop_id: shop.id, received_date: { gte: start, lte: end } },
+    include: { items: { include: { medicine: true } }, supplier: true },
+    orderBy: { received_date: 'asc' },
+  });
+
+  const header = ['Received Date', 'Invoice Date', 'Invoice Number', 'Supplier Name', 'Supplier GSTIN', 'HSN Code', 'Medicine Name', 'Quantity', 'Purchase Price', 'Taxable Value', 'GST Rate', 'CGST', 'SGST', 'IGST', 'Total GST', 'Line Total'].join(',');
+  const rows = [header];
+
+  const hsnSummary: Record<string, { taxable: number; gst: number; total: number; qty: number }> = {};
+
+  for (const pur of purchases) {
+    for (const item of pur.items) {
+      const taxableVal = Number(item.purchase_price) * item.quantity * (1 - Number(item.discount_pct) / 100);
+      const gstRate = Number(item.gst_rate);
+      const gstAmt = taxableVal * (gstRate / 100);
+      const cgst = Math.round((gstAmt / 2) * 100) / 100;
+      const sgst = cgst;
+      const hsn = item.medicine?.hsn_code ?? '-';
+      const lineTotal = Number(item.line_total);
+      
+      rows.push([
+        pur.received_date.toISOString().split('T')[0],
+        pur.invoice_date.toISOString().split('T')[0],
+        pur.invoice_number ?? '-',
+        `"${pur.supplier?.name ?? 'Unknown Supplier'}"`,
+        pur.supplier?.gst_number ?? '-',
+        hsn,
+        `"${item.medicine_name}"`,
+        item.quantity,
+        item.purchase_price,
+        taxableVal.toFixed(2),
+        gstRate,
+        cgst.toFixed(2),
+        sgst.toFixed(2),
+        '0.00',
+        gstAmt.toFixed(2),
+        lineTotal.toFixed(2),
+      ].join(','));
+
+      if (!hsnSummary[hsn]) hsnSummary[hsn] = { taxable: 0, gst: 0, total: 0, qty: 0 };
+      hsnSummary[hsn].taxable += taxableVal;
+      hsnSummary[hsn].gst += gstAmt;
+      hsnSummary[hsn].total += lineTotal;
+      hsnSummary[hsn].qty += item.quantity;
+    }
+  }
+
+  rows.push('');
+  rows.push('HSN SUMMARY');
+  rows.push(['HSN Code', 'Total Quantity', 'Taxable Value', 'Total GST', 'Total Value'].join(','));
+  for (const [hsn, data] of Object.entries(hsnSummary)) {
+    rows.push([
+      hsn,
+      data.qty,
+      data.taxable.toFixed(2),
+      data.gst.toFixed(2),
+      data.total.toFixed(2)
+    ].join(','));
+  }
+
+  return rows.join('\n');
+}
+

@@ -192,6 +192,10 @@ export const accountingApi = {
     apiClient.get('/accounting/reports/sales-detailed', { params: { from, to } }),
   getGstSummary: (month: number, year: number) =>
     apiClient.get('/accounting/reports/gst-summary', { params: { month, year } }),
+  getGstr1Csv: (month: number, year: number) =>
+    apiClient.get('/accounting/reports/gstr1-csv', { params: { month, year }, responseType: 'blob' }),
+  getGstr2aCsv: (month: number, year: number) =>
+    apiClient.get('/accounting/reports/gstr2a-csv', { params: { month, year }, responseType: 'blob' }),
   getStockValuation: () => apiClient.get('/accounting/reports/stock-valuation'),
   getPaymentSplit: (from: string, to: string) =>
     apiClient.get('/accounting/reports/payment-split', { params: { from, to } }),

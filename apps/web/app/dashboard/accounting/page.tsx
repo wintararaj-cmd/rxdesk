@@ -1966,6 +1966,45 @@ function GSTTab() {
             className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 w-24 focus:outline-none focus:ring-2 focus:ring-violet-400"
           />
         </div>
+        <div className="flex-1" />
+        <div className="flex gap-3">
+          <button
+            onClick={async () => {
+              try {
+                const res = await accountingApi.getGstr1Csv(month, year);
+                const url = window.URL.createObjectURL(new Blob([res.data]));
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', `GSTR1_${month}_${year}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+              } catch (err) { alert('Failed to download GSTR-1'); }
+            }}
+            className="flex items-center gap-2 bg-violet-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-violet-100 hover:scale-[1.02] active:scale-95 transition-all"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            GSTR-1 (Sales)
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                const res = await accountingApi.getGstr2aCsv(month, year);
+                const url = window.URL.createObjectURL(new Blob([res.data]));
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', `GSTR2A_${month}_${year}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+              } catch (err) { alert('Failed to download GSTR-2A'); }
+            }}
+            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-emerald-100 hover:scale-[1.02] active:scale-95 transition-all"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            GSTR-2A (Purchase)
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
