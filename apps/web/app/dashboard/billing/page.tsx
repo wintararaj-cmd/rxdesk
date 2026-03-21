@@ -102,7 +102,7 @@ function printA4Invoice(bill: BillData, shopData: any) {
       ${showHsn ? `<td style="padding:8px 6px;text-align:center;">${it.hsn_code || '-'}</td>` : ''}
       <td style="padding:8px 6px;text-align:center;">${it.quantity}</td>
       <td style="padding:8px 6px;text-align:right;">${cur(it.mrp)}</td>
-      <td style="padding:8px 6px;text-align:right;">${cur(it.line_total)}</td>
+      <td style="padding:8px 6px;text-align:right;">${cur(Number(it.mrp) * it.quantity)}</td>
     </tr>`
   ).join('');
 
@@ -218,7 +218,7 @@ function printThermalReceipt(bill: BillData, shopData: any) {
       </td>
       <td style="text-align:center;padding:2px 4px;white-space:nowrap">${it.quantity}</td>
       <td style="text-align:right;padding:2px 0;white-space:nowrap">${cur(it.mrp)}</td>
-      <td style="text-align:right;padding:2px 0;white-space:nowrap">${cur(it.line_total)}</td>
+      <td style="text-align:right;padding:2px 0;white-space:nowrap">${cur(Number(it.mrp) * it.quantity)}</td>
     </tr>`
   ).join('');
   const html = `<!DOCTYPE html>
