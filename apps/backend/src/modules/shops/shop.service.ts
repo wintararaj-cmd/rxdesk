@@ -180,6 +180,7 @@ export async function getTodayDashboard(userId: string) {
     select: { stock_qty: true, reorder_level: true },
   });
   const lowStockCount = allStock.filter((it) => it.stock_qty <= (it.reorder_level ?? 10)).length;
+  const totalInventory = allStock.length;
 
   // Combine for both mobile and web frontends
   return {
@@ -187,9 +188,12 @@ export async function getTodayDashboard(userId: string) {
     stats, // Used by mobile
     appointments, // Used by both
     today_revenue: todayRevenue, // Used by web
+    today_sales: todayRevenue, // Used by mobile
+    today_bills: billsToday.length, // Used by mobile
     today_appointments: appointments.length, // Used by web
     pending_bills: pendingBillsCount, // Used by web
     low_stock_count: lowStockCount, // Used by web
+    total_inventory: totalInventory, // Used by mobile
   };
 }
 
