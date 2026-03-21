@@ -101,6 +101,18 @@ async function main() {
   });
   console.log(`✅ Admin user ready: ${adminUser.phone}`);
 
+  // ── Auto-upgrade Basic to Standard (fix for current users) ──────────────────────
+  const standardPlan = plans.find(p => p.name === 'Standard');
+  if (standardPlan) {
+    const upgraded = await prisma.shopSubscription.updateMany({
+      where: { plan: { name: 'Basic' }, status: 'active' },
+      data: { plan_id: standardPlan.id }
+    });
+    if (upgraded.count > 0) {
+      console.log(`✅ Upgraded ${upgraded.count} active basic subscriptions to Standard fallback`);
+    }
+  }
+
   console.log('\n🎉 Seeding complete!');
 }
 

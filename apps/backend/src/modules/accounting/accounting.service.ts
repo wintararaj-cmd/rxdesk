@@ -782,7 +782,45 @@ export async function importCreditCustomers(userId: string, customers: any[]) {
 
 export async function getCreditCustomerLedger(userId: string, customerId: string) {
   const shop = await getShopOrThrow(userId);
-  const customer = await prisma.creditCustomer.findFirst({
+  let customer: any = null;
+  let pendingBills: any[] = [];
+
+  if (customerId.startsWith('pending-')) {
+    const identifier = customerId.replace('pending-', '');
+    // Virtual customer for pending bills
+    pendingBills = await prisma.bill.findMany({
+      where: {
+        shop_id: shop.id,
+        payment_status: 'pending',
+        OR: [
+          { customer_phone: identifier },
+          { customer_name: identifier }
+        ]
+      },
+      orderBy: { created_at: 'desc' },
+      include: { items: { select: { medicine_name: true, quantity: true } } }
+    });
+
+    if (pendingBills.length === 0) throw new AppError(404, 'NOT_FOUND', 'Pending customer record not found');
+
+    const amount = pendingBills.reduce((s, b) => s + Number(b.total_amount || 0), 0);
+    return {
+      id: customerId,
+      name: identifier,
+      phone: /^[0-9]+$/.test(identifier) ? identifier : undefined,
+      total_outstanding: amount,
+      transactions: pendingBills.map(b => ({
+        id: b.id,
+        transaction_date: b.created_at,
+        notes: `Pending Bill: ${b.bill_number}`,
+        type: 'credit_given',
+        amount: Number(b.total_amount),
+        bill: { id: b.id, bill_number: b.bill_number, total_amount: b.total_amount }
+      }))
+    };
+  }
+
+  customer = await prisma.creditCustomer.findFirst({
     where: { id: customerId, shop_id: shop.id },
     include: {
       transactions: {
@@ -791,28 +829,171 @@ export async function getCreditCustomerLedger(userId: string, customerId: string
       },
     },
   });
+
   if (!customer) throw new AppError(404, 'NOT_FOUND', 'Credit customer not found');
-  return customer;
+
+  // Also fetch any "Pay Later" bills for this real customer that aren't yet in the credit_transactions
+  pendingBills = await prisma.bill.findMany({
+    where: {
+      shop_id: shop.id,
+      payment_status: 'pending',
+      OR: [
+        (customer.phone ? { customer_phone: customer.phone } : {}),
+        { customer_name: customer.name }
+      ].filter(o => Object.keys(o).length > 0) as any,
+      credit_transactions: { none: {} } // only those not already linked to a credit txn
+    },
+    orderBy: { created_at: 'desc' }
+  });
+
+  const virtualTxns = pendingBills.map(b => ({
+    id: `v-${b.id}`,
+    transaction_date: b.created_at,
+    notes: `Pending Bill: ${b.bill_number}`,
+    type: 'credit_given',
+    amount: Number(b.total_amount),
+    bill: { id: b.id, bill_number: b.bill_number, total_amount: b.total_amount }
+  }));
+
+  // Combine real and virtual transactions
+  const allTxns = [...(customer.transactions || []), ...virtualTxns].sort(
+    (a, b) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime()
+  );
+
+  return {
+    ...customer,
+    total_outstanding: Number(customer.total_outstanding) + pendingBills.reduce((s, b) => s + Number(b.total_amount), 0),
+    transactions: allTxns
+  };
 }
 
 export async function recordCreditPayment(userId: string, customerId: string, data: { amount: number; payment_method?: string; reference_no?: string; notes?: string }) {
   const shop = await getShopOrThrow(userId);
-  const customer = await prisma.creditCustomer.findFirst({ where: { id: customerId, shop_id: shop.id } });
-  if (!customer) throw new AppError(404, 'NOT_FOUND', 'Credit customer not found');
-  if (data.amount > Number(customer.total_outstanding)) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Payment exceeds outstanding balance');
+  let customer: any = null;
+  let pendingBills: any[] = [];
+  let totalPending = 0;
+
+  if (customerId.startsWith('pending-')) {
+    const identifier = customerId.replace('pending-', '');
+    // Find bills matching this identifier (as phone or name)
+    pendingBills = await prisma.bill.findMany({
+      where: {
+        shop_id: shop.id,
+        payment_status: 'pending',
+        OR: [
+          { customer_phone: identifier },
+          { customer_name: identifier }
+        ]
+      },
+      orderBy: { created_at: 'asc' }
+    });
+    totalPending = pendingBills.reduce((s, b) => s + Number(b.total_amount || 0), 0);
+  } else {
+    customer = await prisma.creditCustomer.findFirst({ where: { id: customerId, shop_id: shop.id } });
+    if (!customer) throw new AppError(404, 'NOT_FOUND', 'Credit customer not found');
+
+    // Also check for pending bills for this real customer
+    pendingBills = await prisma.bill.findMany({
+      where: {
+        shop_id: shop.id,
+        payment_status: 'pending',
+        OR: [
+          (customer.phone ? { customer_phone: customer.phone } : {}),
+          { customer_name: customer.name }
+        ].filter(o => Object.keys(o).length > 0) as any
+      },
+      orderBy: { created_at: 'asc' }
+    });
+    totalPending = pendingBills.reduce((s, b) => s + Number(b.total_amount || 0), 0);
+  }
+
+  const combinedOutstanding = Number(customer?.total_outstanding || 0) + totalPending;
+  
+  // Allow small floating point variations? Better to round.
+  if (data.amount > (combinedOutstanding + 0.01)) {
+    throw new AppError(400, 'VALIDATION_ERROR', `Payment exceeds outstanding balance (Current: ${combinedOutstanding.toFixed(2)})`);
   }
 
   return prisma.$transaction(async (tx) => {
+    let remaining = data.amount;
+
+    // 1. Ensure CreditCustomer exists for tracking
+    if (!customer) {
+      const identifier = customerId.replace('pending-', '');
+      // Try to find by phone/name in case they were created meanwhile
+      customer = await tx.creditCustomer.findFirst({
+        where: {
+          shop_id: shop.id,
+          OR: [
+            { phone: identifier },
+            { name: identifier }
+          ]
+        }
+      });
+
+      if (!customer) {
+        customer = await tx.creditCustomer.create({
+          data: {
+            shop_id: shop.id,
+            name: identifier,
+            phone: /^[0-9]+$/.test(identifier) ? identifier : undefined,
+            total_outstanding: 0,
+          }
+        });
+      }
+    }
+
+    // 2. Settle the Ledger first (if any positive balance)
+    let ledgerSettlement = 0;
+    if (Number(customer.total_outstanding) > 0) {
+      ledgerSettlement = Math.min(Number(customer.total_outstanding), remaining);
+      await tx.creditCustomer.update({
+        where: { id: customer.id },
+        data: { total_outstanding: { decrement: ledgerSettlement } }
+      });
+      remaining -= ledgerSettlement;
+    }
+
+    // 3. Settle Pending Bills (Greedy)
+    for (const bill of pendingBills) {
+      if (remaining <= 0) break;
+      const billAmt = Number(bill.total_amount);
+      
+      // We only mark as 'paid' if the remaining payment covers the FULL bill
+      // Partial payments stay in the ledger as a credit (negative balance)
+      if (remaining >= (billAmt - 0.01)) {
+        await tx.bill.update({
+          where: { id: bill.id },
+          data: { 
+            payment_status: 'paid', 
+            payment_method: (data.payment_method ?? 'cash') as any,
+            updated_at: new Date()
+          }
+        });
+        remaining -= billAmt;
+      } else {
+        // Can't settle this bill fully, stop settling bills and put the rest in ledger
+        break;
+      }
+    }
+
+    // 4. Any leftover amount goes to the ledger (reduces outstanding or becomes credit)
+    if (remaining > 0) {
+      await tx.creditCustomer.update({
+        where: { id: customer.id },
+        data: { total_outstanding: { decrement: remaining } }
+      });
+    }
+
     const txn = await tx.creditTransaction.create({
       data: {
-        customer_id: customerId,
+        customer_id: customer.id,
         shop_id: shop.id,
         type: 'payment_received',
         amount: data.amount,
         payment_method: (data.payment_method ?? 'cash') as any,
         reference_no: data.reference_no,
-        notes: data.notes,
+        notes: data.notes || `Settle dues for ${customer.name}`,
         transaction_date: new Date(),
         created_by: userId,
       },
@@ -830,10 +1011,6 @@ export async function recordCreditPayment(userId: string, customerId: string, da
       }
     });
 
-    await tx.creditCustomer.update({
-      where: { id: customerId },
-      data: { total_outstanding: { decrement: data.amount } },
-    });
     return txn;
   });
 }
