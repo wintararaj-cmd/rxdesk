@@ -1542,11 +1542,13 @@ function OutstandingsTab() {
   };
 
   const receivables = (out?.receivables ?? []).filter((r: any) =>
-    (r.name || '').toLowerCase().includes(search.toLowerCase()) || (r.phone && r.phone.includes(search))
+    (Number(r.total_outstanding) !== 0) &&
+    ((r.name || '').toLowerCase().includes(search.toLowerCase()) || (r.phone && r.phone.includes(search)))
   );
 
   const payables = (out?.payables ?? []).filter((p: any) =>
-    (p.name || '').toLowerCase().includes(search.toLowerCase())
+    (Number(p.total_outstanding) !== 0) &&
+    ((p.name || '').toLowerCase().includes(search.toLowerCase()))
   );
 
   const totalRec = (out?.receivables ?? []).reduce((s: number, r: any) => s + Number(r.total_outstanding || 0), 0);
