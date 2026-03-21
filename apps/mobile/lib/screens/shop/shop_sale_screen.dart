@@ -243,15 +243,44 @@ class _ShopSaleScreenState extends State<ShopSaleScreen> {
             ),
             pw.Divider(),
             ...items.map((item) {
-              return pw.Row(
+              final batch = item['batch_number']?.toString();
+              final hsn = item['hsn_code']?.toString();
+              return pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Expanded(child: pw.Text(item['medicine_name'] ?? '', style: const pw.TextStyle(fontSize: 10))),
-                  pw.SizedBox(width: 25, child: pw.Text(item['quantity'].toString(), style: const pw.TextStyle(fontSize: 10), textAlign: pw.TextAlign.center)),
-                  pw.SizedBox(width: 35, child: pw.Text(item['line_total'].toString(), style: const pw.TextStyle(fontSize: 10), textAlign: pw.TextAlign.right)),
+                  pw.Row(
+                    children: [
+                      pw.Expanded(child: pw.Text(item['medicine_name'] ?? '', style: const pw.TextStyle(fontSize: 10))),
+                      pw.SizedBox(width: 25, child: pw.Text(item['quantity'].toString(), style: const pw.TextStyle(fontSize: 10), textAlign: pw.TextAlign.center)),
+                      pw.SizedBox(width: 35, child: pw.Text(((item['mrp'] as num? ?? 0) * (item['quantity'] as num? ?? 0)).toStringAsFixed(2), style: const pw.TextStyle(fontSize: 10), textAlign: pw.TextAlign.right)),
+                    ]
+                  ),
+                  if (batch != null && batch.isNotEmpty)
+                    pw.Text('Batch: $batch', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                  if (hsn != null && hsn.isNotEmpty)
+                    pw.Text('HSN: $hsn', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
                 ]
               );
             }),
             pw.Divider(),
+            ...((bill['subtotal'] ?? 0) > 0 ? [
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Subtotal:', style: const pw.TextStyle(fontSize: 10)),
+                  pw.Text('Rs.${(bill['subtotal'] as num).toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 10)),
+                ]
+              ),
+            ] : []),
+            ...((bill['discount_amount'] ?? 0) > 0 ? [
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Discount:', style: const pw.TextStyle(fontSize: 10)),
+                  pw.Text('-Rs.${(bill['discount_amount'] as num).toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 10)),
+                ]
+              ),
+            ] : []),
             ...((bill['gst_amount'] ?? 0) > 0 ? [
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
