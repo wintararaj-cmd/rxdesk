@@ -34,7 +34,7 @@ class _ShopSaleScreenState extends State<ShopSaleScreen> {
   // Items list
   final List<_SaleItem> _items = [];
 
-  double _subtotal = 0, _total = 0, _gstTotal = 0;
+  double _subtotal = 0, _total = 0, _gstTotal = 0, _totalDiscount = 0;
 
   // Customer search
   List<Map<String, dynamic>> _customerSuggestions = [];
@@ -96,6 +96,7 @@ class _ShopSaleScreenState extends State<ShopSaleScreen> {
     setState(() { 
       _subtotal = sub; 
       _gstTotal = gstTotal;
+      _totalDiscount = totalDisc;
       _total = (sub - totalDisc + gstTotal).clamp(0, double.infinity).roundToDouble(); 
     });
   }
@@ -494,9 +495,9 @@ class _ShopSaleScreenState extends State<ShopSaleScreen> {
             ),
             child: Column(children: [
               _BillRow('Subtotal', '₹${_subtotal.toStringAsFixed(2)}'),
-              if (double.tryParse(_discountCtrl.text) != null && double.tryParse(_discountCtrl.text)! > 0) ...[
+              if (_totalDiscount > 0) ...[
                 const SizedBox(height: 6),
-                _BillRow('Discount', '−₹${_discountCtrl.text}', color: const Color(0xFF059669)),
+                _BillRow('Discount', '−₹${_totalDiscount.toStringAsFixed(2)}', color: const Color(0xFF059669)),
               ],
               if (_gstTotal > 0) ...[
                 const SizedBox(height: 6),

@@ -748,19 +748,19 @@ function BillHistoryTab() {
               icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             },
           ].map(({ label, value, sub, gradient, icon, iconBg }) => (
-            <div key={label} className="group relative bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-lg hover:shadow-gray-200/50 transition-all duration-300 overflow-hidden">
+            <div key={label} className="group relative bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-lg hover:shadow-gray-200/50 transition-all duration-300 overflow-hidden min-h-[180px] flex flex-col justify-between">
               {/* Gradient accent top */}
               <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${gradient} opacity-80`} />
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{label}</p>
                   <p className="text-2xl font-bold text-gray-900 mt-1.5 tracking-tight">{value}</p>
-                  {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
                 </div>
                 <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center text-gray-600 group-hover:scale-110 transition-transform duration-300`}>
                   {icon}
                 </div>
               </div>
+              {sub && <p className="text-xs text-gray-400 mt-auto">{sub}</p>}
             </div>
           ))}
         </div>

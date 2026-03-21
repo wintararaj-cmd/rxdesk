@@ -857,6 +857,37 @@ export async function listOutstandings(userId: string) {
       total_outstanding: Number(c.total_outstanding || 0)
     }));
 
+    // 1.1 Pending Bills (Direct Receivables)
+    const pendingBills = await prisma.bill.groupBy({
+      by: ['customer_name', 'customer_phone'],
+      where: { shop_id: shop.id, payment_status: 'pending' },
+      _sum: { total_amount: true },
+    });
+
+    for (const pb of pendingBills) {
+      const name = pb.customer_name || 'Walk-in Customer';
+      const phone = pb.customer_phone;
+      const amount = Number(pb._sum.total_amount || 0);
+
+      // Check for overlap with existing CreditCustomer (by phone if available, or exact name)
+      const match = customers.find(c =>
+        (phone && c.phone === phone) || (!phone && !c.phone && c.name === name)
+      );
+
+      if (match) {
+        match.total_outstanding += amount;
+      } else {
+        customers.push({
+          id: `pending-${phone || name}`,
+          name: name,
+          phone: phone,
+          total_outstanding: amount,
+          notes: 'Pending bills',
+          updated_at: new Date(),
+        } as any);
+      }
+    }
+
     // 2. Suppliers (Payables)
     const suppliers = await prisma.supplier.findMany({
       where: { shop_id: shop.id, is_active: true },
