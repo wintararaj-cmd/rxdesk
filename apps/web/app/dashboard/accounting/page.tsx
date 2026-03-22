@@ -25,7 +25,7 @@ function downloadCsv(name: string, content: string) {
 function parseCsv(csvText: string) {
   const lines = csvText.split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) return [];
-  
+
   const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/ /g, '_'));
   return lines.slice(1).map(line => {
     // regex can be tricky, simple split for now or better regex
@@ -657,7 +657,7 @@ function SuppliersTab({ shopGstType }: { shopGstType?: string }) {
                   address: address.trim() || undefined,
                   gst_number: gstin.trim() || undefined,
                 };
-                
+
                 if (editingId) {
                   updateMutation.mutate({ id: editingId, data: payload });
                 } else {
@@ -700,7 +700,7 @@ function SuppliersTab({ shopGstType }: { shopGstType?: string }) {
                     <td className="px-5 py-3 text-gray-500">{s.city ?? '—'}</td>
                     <td className="px-5 py-3 text-gray-500 font-mono text-xs">{s.gst_number ?? s.gstin ?? '—'}</td>
                     <td className="px-5 py-3 text-right">
-                       <button
+                      <button
                         onClick={() => startEdit(s)}
                         className="text-indigo-400 hover:text-indigo-600 text-xs mr-4 transition-colors"
                       >
@@ -806,8 +806,8 @@ function PurchasesTab() {
     queryFn: () => accountingApi.listSuppliers().then((r) => r.data.data),
   });
 
-  const { data: listData, isLoading } = useQuery<{ 
-    items: Purchase[]; 
+  const { data: listData, isLoading } = useQuery<{
+    items: Purchase[];
     total: number;
     total_amount_sum: number;
     total_due_sum: number;
@@ -902,7 +902,7 @@ function PurchasesTab() {
     setFormError(null);
 
     const validItems = piItems.filter((it) => it.medicine_name.trim() !== '' || Number(it.purchase_price) > 0 || Number(it.quantity) > 0);
-    
+
     if (!validItems.length) {
       setFormError('Please add at least one medicine item');
       return;
@@ -1031,7 +1031,7 @@ function PurchasesTab() {
 
           {/* Line items */}
           <div>
-            <div className="grid gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-2" style={{gridTemplateColumns:'2.5fr 1fr 1.5fr 0.8fr 0.8fr 1fr 1fr 0.8fr 1fr 80px 32px'}}>
+            <div className="grid gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-2" style={{ gridTemplateColumns: '2.5fr 1fr 1.5fr 0.8fr 0.8fr 1fr 1fr 0.8fr 1fr 80px 32px' }}>
               <div>Medicine</div>
               <div>Unit</div>
               <div>Batch / Expiry</div>
@@ -1047,7 +1047,7 @@ function PurchasesTab() {
             <div className="space-y-2">
               {piItems.map((item, idx) => (
                 <div key={idx} className="relative">
-                  <div className="grid gap-2 items-start" style={{gridTemplateColumns:'2.5fr 1fr 1.5fr 0.8fr 0.8fr 1fr 1fr 0.8fr 1fr 80px 32px'}}>
+                  <div className="grid gap-2 items-start" style={{ gridTemplateColumns: '2.5fr 1fr 1.5fr 0.8fr 0.8fr 1fr 1fr 0.8fr 1fr 80px 32px' }}>
                     {/* Medicine Name with autocomplete */}
                     <div className="relative">
                       <input type="text" placeholder="Search medicine..." value={item.medicine_name}
@@ -1060,9 +1060,9 @@ function PurchasesTab() {
                           else if (e.key === 'ArrowUp') { e.preventDefault(); setSuggHighlights((p) => ({ ...p, [idx]: Math.max(h - 1, 0) })); }
                           else if (e.key === 'Enter' && h >= 0 && suggs[h]) { e.preventDefault(); selectSuggestion(idx, suggs[h]); }
                           else if (e.key === 'Enter' && (h < 0 || suggs.length === 0)) { e.preventDefault(); setSuggestions((p) => ({ ...p, [idx]: [] })); piUnitRefs.current[idx]?.focus(); }
-                          else if (e.key === 'Escape') { 
-                            setSuggestions((p) => ({ ...p, [idx]: [] })); 
-                            setSuggHighlights((p) => ({ ...p, [idx]: -1 })); 
+                          else if (e.key === 'Escape') {
+                            setSuggestions((p) => ({ ...p, [idx]: [] }));
+                            setSuggHighlights((p) => ({ ...p, [idx]: -1 }));
                             if (!item.medicine_name.trim()) {
                               if (piItems.length > 1) {
                                 removePiItem(idx);
@@ -1123,16 +1123,16 @@ function PurchasesTab() {
                     </div>
                     <div>
                       <input ref={(el) => { piMrpRefs.current[idx] = el; }} type="number" min="0" step="0.01" placeholder="0.00" value={item.mrp} onChange={(e) => updatePiItem(idx, 'mrp', e.target.value)}
-                        onKeyDown={(e) => { 
-                          if (e.key === 'Enter') { 
-                            e.preventDefault(); 
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
                             if (idx === piItems.length - 1) {
                               addPiItem();
                               setTimeout(() => piMedRefs.current[idx + 1]?.focus(), 0);
                             } else {
                               piMedRefs.current[idx + 1]?.focus();
                             }
-                          } 
+                          }
                         }}
                         className="w-full border border-gray-200 rounded-xl px-2 h-10 text-sm font-black text-violet-700 outline-none focus:border-violet-500 shadow-sm" />
                     </div>
@@ -1191,7 +1191,7 @@ function PurchasesTab() {
                 <p className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-700 to-indigo-700">{fmt(calcTotal)}</p>
               </div>
             </div>
-            
+
             <div className="flex gap-4">
               <button onClick={() => { setShowForm(false); resetForm(); }}
                 className="text-gray-500 text-sm font-bold px-6 py-3 hover:text-gray-900 transition-colors">Discard Changes</button>
@@ -1256,11 +1256,10 @@ function PurchasesTab() {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm ${
-                      p.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 
-                      p.payment_status === 'partial' ? 'bg-amber-100 text-amber-700' : 
-                      'bg-red-100 text-red-700'
-                    }`}>
+                    <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm ${p.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
+                        p.payment_status === 'partial' ? 'bg-amber-100 text-amber-700' :
+                          'bg-red-100 text-red-700'
+                      }`}>
                       {p.payment_status}
                     </span>
                   </td>
@@ -1477,7 +1476,7 @@ function PurchaseDetailModal({ id, onClose }: { id: string; onClose: () => void 
                   ) : (
                     <div className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-gray-50">
                       <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center">
-                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                       </div>
                       <div>
                         <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Remaining Balance</p>
@@ -1517,8 +1516,8 @@ function PurchaseDetailModal({ id, onClose }: { id: string; onClose: () => void 
         </div>
 
         <div className="p-6 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 px-8">
-           <button onClick={onClose} className="bg-white px-8 py-3 rounded-2xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-100 transition-all">Close</button>
-           {/* Add dynamic bill print/export button here if needed */}
+          <button onClick={onClose} className="bg-white px-8 py-3 rounded-2xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-100 transition-all">Close</button>
+          {/* Add dynamic bill print/export button here if needed */}
         </div>
       </div>
     </div>
@@ -1559,7 +1558,7 @@ function SaleReturnDetailModal({ id, onClose }: { id: string; onClose: () => voi
             </div>
           </div>
           <div className="flex items-center gap-3">
-             <button onClick={() => window.print()} className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2 shadow-sm transition-all">
+            <button onClick={() => window.print()} className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2 shadow-sm transition-all">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.89l-4.72-4.72m0 0l4.72-4.72M2 9.17h18a2 2 0 012 2v10.99" /></svg>
               Print Credit Note
             </button>
@@ -1659,7 +1658,7 @@ function PurchaseReturnDetailModal({ id, onClose }: { id: string; onClose: () =>
             </div>
           </div>
           <div className="flex items-center gap-3">
-             <button onClick={() => window.print()} className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2 shadow-sm transition-all">
+            <button onClick={() => window.print()} className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2 shadow-sm transition-all">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.89l-4.72-4.72m0 0l4.72-4.72M2 9.17h18a2 2 0 012 2v10.99" /></svg>
               Print Debit Note
             </button>
@@ -1992,25 +1991,25 @@ function OutstandingsTab() {
                         {c.overdue && <span className="text-[9px] font-black text-rose-500 uppercase tracking-tighter">Overdue</span>}
                       </td>
                       <td className="pr-4 text-gray-300 group-hover:text-violet-400 transition-colors">
-                        <svg className={`w-4 h-4 transition-transform ${expandedId === c.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        <svg className={`w-4 h-4 transition-transform ${expandedId === c.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" /></svg>
                       </td>
                     </tr>
                     {expandedId === c.id && expandedType === 'customer' && customerLedger && (
                       <tr>
                         <td colSpan={3} className="bg-gray-50/80 p-6">
-                           <LedgerPanel 
-                            data={c} 
-                            type="customer" 
-                            ledger={customerLedger} 
-                            payAmount={payAmount} 
-                            setPayAmount={setPayAmount} 
-                            payMethod={payMethod} 
-                            setPayMethod={setPayMethod} 
+                          <LedgerPanel
+                            data={c}
+                            type="customer"
+                            ledger={customerLedger}
+                            payAmount={payAmount}
+                            setPayAmount={setPayAmount}
+                            payMethod={payMethod}
+                            setPayMethod={setPayMethod}
                             onPay={() => {
                               const amt = parseFloat(payAmount);
                               if (!amt || amt <= 0) return;
                               payMutation.mutate({ id: c.id, amount: amt, method: payMethod });
-                            }} 
+                            }}
                             isPending={payMutation.isPending}
                           />
                         </td>
@@ -2053,25 +2052,25 @@ function OutstandingsTab() {
                         <p className="font-black text-rose-600">{fmt(p.total_outstanding)}</p>
                       </td>
                       <td className="pr-4 text-gray-300 group-hover:text-rose-400 transition-colors">
-                        <svg className={`w-4 h-4 transition-transform ${expandedId === p.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        <svg className={`w-4 h-4 transition-transform ${expandedId === p.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" /></svg>
                       </td>
                     </tr>
                     {expandedId === p.id && expandedType === 'supplier' && supplierLedger && (
                       <tr>
                         <td colSpan={3} className="bg-gray-50/80 p-6">
-                          <LedgerPanel 
-                            data={p} 
-                            type="supplier" 
-                            ledger={supplierLedger} 
-                            payAmount={payAmount} 
-                            setPayAmount={setPayAmount} 
-                            payMethod={payMethod} 
-                            setPayMethod={setPayMethod} 
+                          <LedgerPanel
+                            data={p}
+                            type="supplier"
+                            ledger={supplierLedger}
+                            payAmount={payAmount}
+                            setPayAmount={setPayAmount}
+                            payMethod={payMethod}
+                            setPayMethod={setPayMethod}
                             onPay={() => {
                               const amt = parseFloat(payAmount);
                               if (!amt || amt <= 0) return;
                               payMutation.mutate({ id: p.id, amount: amt, method: payMethod });
-                            }} 
+                            }}
                             isPending={payMutation.isPending}
                           />
                         </td>
@@ -2092,31 +2091,31 @@ function OutstandingsTab() {
 }
 
 function LedgerPanel({ data, type, ledger, payAmount, setPayAmount, payMethod, setPayMethod, onPay, isPending }: any) {
-  const transactions = (type === 'customer' 
-    ? (ledger?.transactions ?? []) 
+  const transactions = (type === 'customer'
+    ? (ledger?.transactions ?? [])
     : [
-        ...(ledger?.purchases?.map((px: any) => ({ 
-          id: px.id, 
-          transaction_date: px.invoice_date, 
-          notes: `Purchase - ${px.invoice_number}`, 
-          type: 'credit_given', 
-          amount: px.total_amount 
-        })) ?? []),
-        ...(ledger?.payments?.map((py: any) => ({ 
-          id: py.id, 
-          transaction_date: py.payment_date, 
-          notes: 'Payment Made', 
-          type: 'payment_received', 
-          amount: py.amount 
-        })) ?? []),
-        ...(ledger?.purchase_returns?.map((pr: any) => ({ 
-          id: pr.id, 
-          transaction_date: pr.return_date, 
-          notes: `Purchase Return - ${pr.return_number}`, 
-          type: 'payment_received', 
-          amount: pr.total_amount 
-        })) ?? [])
-      ]
+      ...(ledger?.purchases?.map((px: any) => ({
+        id: px.id,
+        transaction_date: px.invoice_date,
+        notes: `Purchase - ${px.invoice_number}`,
+        type: 'credit_given',
+        amount: px.total_amount
+      })) ?? []),
+      ...(ledger?.payments?.map((py: any) => ({
+        id: py.id,
+        transaction_date: py.payment_date,
+        notes: 'Payment Made',
+        type: 'payment_received',
+        amount: py.amount
+      })) ?? []),
+      ...(ledger?.purchase_returns?.map((pr: any) => ({
+        id: pr.id,
+        transaction_date: pr.return_date,
+        notes: `Purchase Return - ${pr.return_number}`,
+        type: 'payment_received',
+        amount: pr.total_amount
+      })) ?? [])
+    ]
   ).sort((a: any, b: any) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime());
 
   return (
@@ -2157,7 +2156,7 @@ function LedgerPanel({ data, type, ledger, payAmount, setPayAmount, payMethod, s
             disabled={!data.phone}
             className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${data.phone ? 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-100' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
           >
-            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.246 2.248 3.484 5.232 3.484 8.412-.003 6.557-5.338 11.892-11.893 11.892-1.997-.001-3.951-.5-5.688-1.448l-6.309 1.656zm6.224-3.82l.339.201c1.53 1.01 3.321 1.543 5.167 1.545l.006.001c5.82 0 10.555-4.735 10.558-10.555 0-2.819-1.098-5.471-3.091-7.465-1.993-1.993-4.644-3.092-7.463-3.093h-.008c-5.819 0-10.554 4.735-10.558 10.556 0 2.053.593 4.053 1.716 5.79l.244.379-1.025 3.746 3.834-1.005zm12.333-10.579l-1.423-.711-.336-.168c-.149-.074-.3-.112-.451-.112-.11 0-.22.02-.321.061-.091.037-.183.1-.264.18l-.946.945c-.092.092-.153.21-.173.336-.02.126-.002.253.051.373.491 1.076 1.111 2.067 1.841 2.943.08.096.165.188.254.277l.797.796.347.348c.15.15.344.225.541.225.12 0 .241-.028.35-.084l.215-.107 1.118-.559c.142-.071.25-.183.308-.323s.06-.296.002-.43l-.337-.768-.901-2.051c-.086-.197-.282-.322-.497-.322zm-3.692 3.693c-.49-.49-.96-.948-1.408-1.375l-.265-.252c-.426-.406-.827-.788-1.201-1.144-.127-.121-.241-.23-.339-.324-1.503-1.432-2.122-2.316-2.174-2.394-.052-.078-.052-.078-.052-.078s0 0 0 0l-.338-1.014c-.053-.159-.172-.288-.327-.357s-.332-.071-.489-.001l-.756.336-.339.151c-.098.044-.187.112-.266.197-.18.196-.3.428-.351.68-.13.626.059 1.42 1.489 3.197l.1.124.017.02c.032.039.064.079.098.118 1.48 1.761 3.518 3.55 5.518 4.316l.164.06c.306.111.64.129.957.05.295-.074.56-.231.751-.453l.945-.945c.291-.291.291-.763 0-1.054l-.797-.796z"/></svg>
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.246 2.248 3.484 5.232 3.484 8.412-.003 6.557-5.338 11.892-11.893 11.892-1.997-.001-3.951-.5-5.688-1.448l-6.309 1.656zm6.224-3.82l.339.201c1.53 1.01 3.321 1.543 5.167 1.545l.006.001c5.82 0 10.555-4.735 10.558-10.555 0-2.819-1.098-5.471-3.091-7.465-1.993-1.993-4.644-3.092-7.463-3.093h-.008c-5.819 0-10.554 4.735-10.558 10.556 0 2.053.593 4.053 1.716 5.79l.244.379-1.025 3.746 3.834-1.005zm12.333-10.579l-1.423-.711-.336-.168c-.149-.074-.3-.112-.451-.112-.11 0-.22.02-.321.061-.091.037-.183.1-.264.18l-.946.945c-.092.092-.153.21-.173.336-.02.126-.002.253.051.373.491 1.076 1.111 2.067 1.841 2.943.08.096.165.188.254.277l.797.796.347.348c.15.15.344.225.541.225.12 0 .241-.028.35-.084l.215-.107 1.118-.559c.142-.071.25-.183.308-.323s.06-.296.002-.43l-.337-.768-.901-2.051c-.086-.197-.282-.322-.497-.322zm-3.692 3.693c-.49-.49-.96-.948-1.408-1.375l-.265-.252c-.426-.406-.827-.788-1.201-1.144-.127-.121-.241-.23-.339-.324-1.503-1.432-2.122-2.316-2.174-2.394-.052-.078-.052-.078-.052-.078s0 0 0 0l-.338-1.014c-.053-.159-.172-.288-.327-.357s-.332-.071-.489-.001l-.756.336-.339.151c-.098.044-.187.112-.266.197-.18.196-.3.428-.351.68-.13.626.059 1.42 1.489 3.197l.1.124.017.02c.032.039.064.079.098.118 1.48 1.761 3.518 3.55 5.518 4.316l.164.06c.306.111.64.129.957.05.295-.074.56-.231.751-.453l.945-.945c.291-.291.291-.763 0-1.054l-.797-.796z" /></svg>
             Send WhatsApp Report
           </button>
         </div>
@@ -2468,7 +2467,7 @@ function SaleReturnTab() {
     if (q.length < 2) { setBillSuggestions([]); return; }
     try {
       const res = await billApi.list({ search: q, limit: 10 });
-      setBillSuggestions(res.data.data.items || []);
+      setBillSuggestions(res.data.data.bills || []);
     } catch (err) { console.error(err); }
   };
 
@@ -2510,7 +2509,7 @@ function SaleReturnTab() {
               )}
             </div>
             {[{ label: 'Customer Name', val: customerName, set: setCustomerName, placeholder: 'Walk-in customer', type: 'text' },
-              { label: 'Reason', val: reason, set: setReason, placeholder: 'Damaged / Wrong item', type: 'text' }].map((f) => (
+            { label: 'Reason', val: reason, set: setReason, placeholder: 'Damaged / Wrong item', type: 'text' }].map((f) => (
               <div key={f.label}>
                 <label className="text-xs font-medium text-gray-500 block mb-1">{f.label}</label>
                 <input type={f.type} value={f.val} onChange={(e) => f.set(e.target.value)} placeholder={f.placeholder}
@@ -2534,14 +2533,14 @@ function SaleReturnTab() {
           </div>
 
           <div>
-            <div className="grid gap-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-1 mb-1" style={{gridTemplateColumns:'2.5fr 0.9fr 1.5fr 0.8fr 1.5fr 0.8fr 0.8fr 1fr'}}>
+            <div className="grid gap-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-1 mb-1" style={{ gridTemplateColumns: '2.5fr 0.9fr 1.5fr 0.8fr 1.5fr 0.8fr 0.8fr 1fr' }}>
               <div>Medicine</div><div>Unit</div><div>Batch</div>
               <div>Qty</div><div>MRP (₹)</div>
               <div>Disc%</div><div>GST%</div><div className="text-right">Total</div>
             </div>
             <div className="space-y-2">
               {srItems.map((item, idx) => (
-                <div key={idx} className="grid gap-1.5 items-center" style={{gridTemplateColumns:'2.5fr 0.9fr 1.5fr 0.8fr 1.5fr 0.8fr 0.8fr 1fr'}}>
+                <div key={idx} className="grid gap-1.5 items-center" style={{ gridTemplateColumns: '2.5fr 0.9fr 1.5fr 0.8fr 1.5fr 0.8fr 0.8fr 1fr' }}>
                   <div className="relative">
                     <input type="text" placeholder="Medicine name" value={item.medicine_name} onChange={(e) => updateSrItem(idx, 'medicine_name', e.target.value)}
                       onKeyDown={(e) => {
@@ -2564,7 +2563,7 @@ function SaleReturnTab() {
                       </div>
                     )}
                   </div>
-                  <div><select value={item.unit} onChange={(e) => updateSrItem(idx, 'unit', e.target.value)} className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs bg-white outline-none focus:border-orange-500">{['strip','bottle','packet','vial','tube','piece','box'].map((u) => <option key={u} value={u}>{u}</option>)}</select></div>
+                  <div><select value={item.unit} onChange={(e) => updateSrItem(idx, 'unit', e.target.value)} className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs bg-white outline-none focus:border-orange-500">{['strip', 'bottle', 'packet', 'vial', 'tube', 'piece', 'box'].map((u) => <option key={u} value={u}>{u}</option>)}</select></div>
                   <div><input type="text" placeholder="Batch" value={item.batch_number} onChange={(e) => updateSrItem(idx, 'batch_number', e.target.value)} className="w-full border border-gray-200 rounded-lg px-2 h-8 text-xs outline-none focus:border-orange-500" /></div>
                   <div><input type="number" min="1" value={item.quantity} onChange={(e) => updateSrItem(idx, 'quantity', e.target.value)} className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs outline-none text-center focus:border-orange-500" /></div>
                   <div><input type="number" min="0" step="0.01" placeholder="0.00" value={item.mrp} onChange={(e) => updateSrItem(idx, 'mrp', e.target.value)} className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs outline-none focus:border-orange-500" /></div>
@@ -2668,7 +2667,7 @@ function PurchaseReturnTab() {
     }
     const inv = supplierInvoices.find((i: any) => i.id === purchaseId);
     if (!inv) return;
-    
+
     setSelectedInvoiceId(purchaseId);
     setInvoiceRef(inv.invoice_number);
 
@@ -2757,8 +2756,8 @@ function PurchaseReturnTab() {
             <div>
               <label className="text-xs font-medium text-gray-500 block mb-1">Invoice Ref</label>
               <div className="flex gap-2">
-                <select 
-                  value={selectedInvoiceId} 
+                <select
+                  value={selectedInvoiceId}
                   onChange={(e) => loadInvoiceItems(e.target.value)}
                   className="flex-1 border border-gray-200 rounded-lg px-2 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
                 >
@@ -2767,12 +2766,12 @@ function PurchaseReturnTab() {
                     <option key={inv.id} value={inv.id}>{inv.invoice_number} ({new Date(inv.invoice_date).toLocaleDateString()})</option>
                   ))}
                 </select>
-                <input 
-                  type="text" 
-                  placeholder="Manual Ref" 
-                  value={invoiceRef} 
+                <input
+                  type="text"
+                  placeholder="Manual Ref"
+                  value={invoiceRef}
                   onChange={(e) => { setInvoiceRef(e.target.value); setSelectedInvoiceId(''); }}
-                  className="w-24 border border-gray-200 rounded-lg px-2 h-9 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400" 
+                  className="w-24 border border-gray-200 rounded-lg px-2 h-9 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
               </div>
             </div>
@@ -2789,20 +2788,20 @@ function PurchaseReturnTab() {
           </div>
 
           <div>
-            <div className="grid gap-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-1 mb-1" style={{gridTemplateColumns:'0.3fr 2.5fr 0.9fr 1.5fr 0.8fr 1.5fr 0.9fr 1fr'}}>
+            <div className="grid gap-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-1 mb-1" style={{ gridTemplateColumns: '0.3fr 2.5fr 0.9fr 1.5fr 0.8fr 1.5fr 0.9fr 1fr' }}>
               <div className="text-center">✔</div><div>Medicine</div><div>Unit</div><div>Batch</div>
               <div>Qty</div><div>Cost (₹)</div>
               <div>GST%</div><div className="text-right">Total</div>
             </div>
             <div className="space-y-2">
               {prItems.map((item, idx) => (
-                <div key={idx} className={`grid gap-1.5 items-center p-1 rounded-lg transition-colors ${item.selected ? 'bg-blue-50/30' : 'opacity-40 grayscale'}`} style={{gridTemplateColumns:'0.3fr 2.5fr 0.9fr 1.5fr 0.8fr 1.5fr 0.9fr 1fr'}}>
+                <div key={idx} className={`grid gap-1.5 items-center p-1 rounded-lg transition-colors ${item.selected ? 'bg-blue-50/30' : 'opacity-40 grayscale'}`} style={{ gridTemplateColumns: '0.3fr 2.5fr 0.9fr 1.5fr 0.8fr 1.5fr 0.9fr 1fr' }}>
                   <div className="flex justify-center">
-                    <input 
-                      type="checkbox" 
-                      checked={item.selected} 
+                    <input
+                      type="checkbox"
+                      checked={item.selected}
                       onChange={(e) => updatePrItem(idx, 'selected' as any, e.target.checked as any)}
-                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
                   </div>
                   <div className="relative">
@@ -2828,7 +2827,7 @@ function PurchaseReturnTab() {
                       </div>
                     )}
                   </div>
-                  <div><select value={item.unit} disabled={!item.selected} onChange={(e) => updatePrItem(idx, 'unit', e.target.value)} className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs bg-white outline-none focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400">{['strip','bottle','packet','vial','tube','piece','box'].map((u) => <option key={u} value={u}>{u}</option>)}</select></div>
+                  <div><select value={item.unit} disabled={!item.selected} onChange={(e) => updatePrItem(idx, 'unit', e.target.value)} className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs bg-white outline-none focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400">{['strip', 'bottle', 'packet', 'vial', 'tube', 'piece', 'box'].map((u) => <option key={u} value={u}>{u}</option>)}</select></div>
                   <div><input type="text" placeholder="Batch" value={item.batch_number} disabled={!item.selected} onChange={(e) => updatePrItem(idx, 'batch_number', e.target.value)} className="w-full border border-gray-200 rounded-lg px-2 h-8 text-xs outline-none focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400" /></div>
                   <div><input type="number" min="1" value={item.quantity} disabled={!item.selected} onChange={(e) => updatePrItem(idx, 'quantity', e.target.value)} className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs outline-none text-center focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400" /></div>
                   <div><input type="number" min="0" step="0.01" placeholder="0.00" value={item.purchase_price} disabled={!item.selected} onChange={(e) => updatePrItem(idx, 'purchase_price', e.target.value)} className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs outline-none focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400" /></div>
@@ -2852,20 +2851,20 @@ function PurchaseReturnTab() {
               <button onClick={() => {
                 const valid = prItems.filter((it) => it.selected && it.medicine_name && Number(it.quantity) > 0 && Number(it.purchase_price) > 0);
                 if (!valid.length) return;
-                createMutation.mutate({ 
-                  supplier_id: prSupplierId || undefined, 
-                  invoice_ref: invoiceRef || undefined, 
+                createMutation.mutate({
+                  supplier_id: prSupplierId || undefined,
+                  invoice_ref: invoiceRef || undefined,
                   purchase_entry_id: selectedInvoiceId || undefined,
-                  return_date: prReturnDate, 
-                  reason: prReason || undefined, 
-                  items: valid.map((it) => ({ 
-                    medicine_name: it.medicine_name, 
-                    unit: it.unit || 'strip', 
-                    batch_number: it.batch_number || undefined, 
-                    quantity: Number(it.quantity), 
-                    purchase_price: Number(it.purchase_price), 
-                    gst_rate: Number(it.gst_rate) || 12 
-                  })) 
+                  return_date: prReturnDate,
+                  reason: prReason || undefined,
+                  items: valid.map((it) => ({
+                    medicine_name: it.medicine_name,
+                    unit: it.unit || 'strip',
+                    batch_number: it.batch_number || undefined,
+                    quantity: Number(it.quantity),
+                    purchase_price: Number(it.purchase_price),
+                    gst_rate: Number(it.gst_rate) || 12
+                  }))
                 });
               }} disabled={createMutation.isPending || !prItems.some((it) => it.selected && it.medicine_name && Number(it.quantity) > 0 && Number(it.purchase_price) > 0)}
                 className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
@@ -2895,7 +2894,7 @@ function PurchaseReturnTab() {
                   <td className="px-5 py-4 text-right">
                     <div className="flex items-center justify-end gap-3">
                       <span className="font-bold text-rose-600">{fmt(r.total_amount)}</span>
-                      <button 
+                      <button
                         onClick={() => setSelectedReturnId(r.id)}
                         className="opacity-0 group-hover:opacity-100 p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-all"
                         title="View Debit Note"
@@ -3216,7 +3215,7 @@ function SettingsTab() {
 
   const handleManualDownload = async () => {
     try {
-      const res = await accountingApi.backup(); 
+      const res = await accountingApi.backup();
       const data = res.data.data;
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = window.URL.createObjectURL(blob);
@@ -3263,7 +3262,7 @@ function SettingsTab() {
             <h3 className="text-xl font-black text-gray-900 tracking-tight mb-2">Backup Data</h3>
             <p className="text-sm text-gray-500 font-medium leading-relaxed">Download a complete copy of your accounting records to your local computer.</p>
           </div>
-          <button 
+          <button
             onClick={handleManualDownload}
             className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-3xl text-sm font-black uppercase tracking-widest shadow-lg shadow-emerald-100 transition-all hover:scale-[1.02] active:scale-95 mt-auto"
           >
@@ -3283,7 +3282,7 @@ function SettingsTab() {
             <p className="text-sm text-gray-500 font-medium leading-relaxed">Upload an RxDesk backup file (.json) to restore your accounting data.</p>
           </div>
           <input type="file" ref={fileInputRef} onChange={handleRestore} accept=".json" className="hidden" />
-          <button 
+          <button
             onClick={() => fileInputRef.current?.click()}
             className="w-full bg-rose-500 hover:bg-rose-600 text-white py-4 rounded-3xl text-sm font-black uppercase tracking-widest shadow-lg shadow-rose-100 transition-all hover:scale-[1.02] active:scale-95 mt-auto"
           >
@@ -3301,24 +3300,24 @@ function SettingsTab() {
           </div>
           <button onClick={() => refetchBackups()} className="w-10 h-10 rounded-full bg-white text-gray-400 flex items-center justify-center hover:text-violet-600 shadow-sm transition-all italic font-black">↻</button>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {backups?.length ? backups.slice(0, 4).map((b: any) => (
             <div key={b.filename} className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex items-center justify-between group hover:border-violet-200 transition-all">
-               <div className="min-w-0 pl-1">
-                  <p className="text-[11px] font-black text-gray-900 truncate mb-0.5">{b.filename}</p>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">{new Date(b.date).toLocaleDateString()} • {(b.size / 1024).toFixed(1)} KB</p>
-               </div>
-               <button 
-                  onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL || 'https://backend.rxdesk.in'}/api/v1/accounting/backups/download/${b.filename}`, '_blank')}
-                  className="w-10 h-10 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center hover:bg-violet-600 hover:text-white transition-all shadow-sm shrink-0"
-               >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
-               </button>
+              <div className="min-w-0 pl-1">
+                <p className="text-[11px] font-black text-gray-900 truncate mb-0.5">{b.filename}</p>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">{new Date(b.date).toLocaleDateString()} • {(b.size / 1024).toFixed(1)} KB</p>
+              </div>
+              <button
+                onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL || 'https://backend.rxdesk.in'}/api/v1/accounting/backups/download/${b.filename}`, '_blank')}
+                className="w-10 h-10 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center hover:bg-violet-600 hover:text-white transition-all shadow-sm shrink-0"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+              </button>
             </div>
           )) : (
             <div className="col-span-full py-12 text-center flex flex-col items-center gap-3">
-               <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">No server-side backups found</p>
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">No server-side backups found</p>
             </div>
           )}
         </div>
@@ -3362,11 +3361,10 @@ export default function AccountingPage() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 ${
-                activeTab === tab
+              className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 ${activeTab === tab
                   ? 'bg-violet-600 text-white shadow-lg shadow-violet-200 ring-2 ring-violet-100'
                   : 'text-gray-500 hover:bg-white hover:text-gray-900'
-              }`}
+                }`}
             >
               {tab}
             </button>
