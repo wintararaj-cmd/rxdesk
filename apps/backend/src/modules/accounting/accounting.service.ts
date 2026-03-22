@@ -65,6 +65,7 @@ export async function createSupplier(userId: string, data: {
   payment_terms?: string;
   notes?: string;
   opening_balance?: number;
+  city?: string;
   state?: string;
 }) {
   const shop = await getShopOrThrow(userId);
