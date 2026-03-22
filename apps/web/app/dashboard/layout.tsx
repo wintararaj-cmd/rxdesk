@@ -128,7 +128,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex h-screen bg-[#f8f9fb]">
       {/* Sidebar */}
-      <aside className="w-[260px] bg-[#0f0f1a] flex flex-col relative overflow-hidden shrink-0">
+      <aside className="w-[260px] bg-[#0f0f1a] flex flex-col relative overflow-hidden shrink-0 print:hidden">
         {/* Decorative gradient blob */}
         <div className="absolute -top-20 -left-20 w-60 h-60 bg-violet-600/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />

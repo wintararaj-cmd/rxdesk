@@ -155,3 +155,61 @@
   background-image: radial-gradient(circle, #e5e7eb 1px, transparent 1px);
   background-size: 16px 16px;
 }
+
+/* ── Print Styles ──────────────────────────────────────────── */
+@media print {
+  /* Ensure a clean white background for the whole page */
+  body {
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Reset layout for the print only area (Sale/Purchase Return Notes) */
+  .print-only {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    z-index: 99999 !important;
+    background: white !important;
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  /* Clean up the modal interior for printing */
+  .print-only > div {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    position: static !important;
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 10mm !important; /* Standard print margin */
+    overflow: visible !important;
+  }
+
+  /* Hide UI elements within the print area */
+  .print-only .print\:hidden,
+  .print-only button,
+  .print-only .close-button,
+  .print-only .bg-gray-900\/60 {
+    display: none !important;
+  }
+
+  /* Ensure content doesn't get cut off */
+  .print-only .overflow-y-auto {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  /* Remove any backdrop filters that might mess with print */
+  .print-only {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}

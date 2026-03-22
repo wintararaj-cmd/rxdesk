@@ -1257,8 +1257,8 @@ function PurchasesTab() {
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm ${p.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
-                        p.payment_status === 'partial' ? 'bg-amber-100 text-amber-700' :
-                          'bg-red-100 text-red-700'
+                      p.payment_status === 'partial' ? 'bg-amber-100 text-amber-700' :
+                        'bg-red-100 text-red-700'
                       }`}>
                       {p.payment_status}
                     </span>
@@ -1533,7 +1533,7 @@ function SaleReturnDetailModal({ id, onClose }: { id: string; onClose: () => voi
   if (isLoading || !r) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200 print-only" onClick={onClose}>
       <div className="bg-white rounded-[2rem] w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
         {/* Modal Header */}
         <div className="p-8 border-b border-gray-100 flex items-start justify-between relative overflow-hidden bg-orange-50/50">
@@ -1557,7 +1557,7 @@ function SaleReturnDetailModal({ id, onClose }: { id: string; onClose: () => voi
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 print:hidden">
             <button onClick={() => window.print()} className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2 shadow-sm transition-all">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.89l-4.72-4.72m0 0l4.72-4.72M2 9.17h18a2 2 0 012 2v10.99" /></svg>
               Print Credit Note
@@ -1631,7 +1631,7 @@ function PurchaseReturnDetailModal({ id, onClose }: { id: string; onClose: () =>
   if (isLoading || !r) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200 print-only" onClick={onClose}>
       <div className="bg-white rounded-[2rem] w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
         {/* Modal Header */}
         <div className="p-8 border-b border-gray-100 flex items-start justify-between relative overflow-hidden bg-rose-50/50">
@@ -1657,7 +1657,7 @@ function PurchaseReturnDetailModal({ id, onClose }: { id: string; onClose: () =>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 print:hidden">
             <button onClick={() => window.print()} className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2 shadow-sm transition-all">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.89l-4.72-4.72m0 0l4.72-4.72M2 9.17h18a2 2 0 012 2v10.99" /></svg>
               Print Debit Note
@@ -2389,7 +2389,7 @@ function GSTTab() {
 const EMPTY_SR_ITEM = { medicine_name: '', unit: 'strip', batch_number: '', quantity: '1', mrp: '', discount_pct: '0', gst_rate: '12' };
 type SRItem = typeof EMPTY_SR_ITEM;
 
-function SaleReturnTab() {
+function SaleReturnTab({ setSelectedReturnId }: any) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [customerName, setCustomerName] = useState('');
@@ -2399,7 +2399,6 @@ function SaleReturnTab() {
   const [srItems, setSrItems] = useState<SRItem[]>([{ ...EMPTY_SR_ITEM }]);
   const [srSuggestions, setSrSuggestions] = useState<Record<number, { id: string; medicine_name: string; unit?: string; mrp: number; gst_rate: number }[]>>({});
   const [srHighlights, setSrHighlights] = useState<Record<number, number>>({});
-  const [selectedReturnId, setSelectedReturnId] = useState<string | null>(null);
   const [selectedBillId, setSelectedBillId] = useState('');
   const [billSearch, setBillSearch] = useState('');
   const [billSuggestions, setBillSuggestions] = useState<any[]>([]);
@@ -2627,7 +2626,6 @@ function SaleReturnTab() {
           {!(listData?.items?.length) && <p className="text-center text-gray-400 py-10 text-sm">No sale returns recorded</p>}
         </div>
       )}
-      {selectedReturnId && <SaleReturnDetailModal id={selectedReturnId} onClose={() => setSelectedReturnId(null)} />}
     </div>
   );
 }
@@ -2638,7 +2636,7 @@ function SaleReturnTab() {
 const EMPTY_PR_ITEM = { medicine_name: '', unit: 'strip', batch_number: '', quantity: '1', purchase_price: '', gst_rate: '12', selected: true };
 type PRItem = typeof EMPTY_PR_ITEM;
 
-function PurchaseReturnTab() {
+function PurchaseReturnTab({ setSelectedReturnId }: any) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [prSupplierId, setPrSupplierId] = useState('');
@@ -2649,7 +2647,6 @@ function PurchaseReturnTab() {
   const [prItems, setPrItems] = useState<PRItem[]>([{ ...EMPTY_PR_ITEM }]);
   const [prSuggestions, setPrSuggestions] = useState<Record<number, { id: string; medicine_name: string; unit?: string; mrp: number; gst_rate: number }[]>>({});
   const [prHighlights, setPrHighlights] = useState<Record<number, number>>({});
-  const [selectedReturnId, setSelectedReturnId] = useState<string | null>(null);
   const prTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
   const { data: supplierInvoicesRes } = useQuery({
@@ -2910,8 +2907,6 @@ function PurchaseReturnTab() {
           {!(listData?.items?.length) && <p className="text-center text-gray-400 py-10 text-sm">No purchase returns recorded</p>}
         </div>
       )}
-
-      {selectedReturnId && <PurchaseReturnDetailModal id={selectedReturnId} onClose={() => setSelectedReturnId(null)} />}
     </div>
   );
 }
@@ -3331,60 +3326,68 @@ function SettingsTab() {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AccountingPage() {
   const [activeTab, setActiveTab] = useState<Tab>('P&L');
+  const [selectedSaleReturnId, setSelectedSaleReturnId] = useState<string | null>(null);
+  const [selectedPurchaseReturnId, setSelectedPurchaseReturnId] = useState<string | null>(null);
   const { data: shopRes } = useQuery({ queryKey: ['shop-profile'], queryFn: () => shopApi.getMyShop() });
   const shop = shopRes?.data?.data;
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Page header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Financial Center</h1>
-          <p className="text-gray-500 text-sm font-medium">Manage ledger, expenses, and supplier invoices</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="px-4 py-2 bg-white rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
-            <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center text-violet-600">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Cash Balance</p>
-              <p className="text-lg font-black text-gray-900">₹45,230</p>
+      <div className="print:hidden space-y-6">
+        {/* Page header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-black text-gray-900 tracking-tight">Financial Center</h1>
+            <p className="text-gray-500 text-sm font-medium">Manage ledger, expenses, and supplier invoices</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="px-4 py-2 bg-white rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
+              <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center text-violet-600">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Cash Balance</p>
+                <p className="text-lg font-black text-gray-900">₹45,230</p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="sticky top-0 z-10 bg-gray-50/80 backdrop-blur-md py-2 border-b border-gray-100 -mx-6 px-6">
-        <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
-          {TABS.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 ${activeTab === tab
+        <div className="sticky top-0 z-10 bg-gray-50/80 backdrop-blur-md py-2 border-b border-gray-100 -mx-6 px-6">
+          <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+            {TABS.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 ${activeTab === tab
                   ? 'bg-violet-600 text-white shadow-lg shadow-violet-200 ring-2 ring-violet-100'
                   : 'text-gray-500 hover:bg-white hover:text-gray-900'
-                }`}
-            >
-              {tab}
-            </button>
-          ))}
+                  }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {/* Tab content */}
+        {activeTab === 'P&L' && <PLTab />}
+        {activeTab === 'Expenses' && <ExpensesTab />}
+        {activeTab === 'Suppliers' && <SuppliersTab shopGstType={shop?.gst_type} />}
+        {activeTab === 'Purchases' && <PurchasesTab />}
+        {activeTab === 'Outstandings' && <OutstandingsTab />}
+        {activeTab === 'GST' && <GSTTab />}
+        {activeTab === 'Sale Ret.' && <SaleReturnTab setSelectedReturnId={setSelectedSaleReturnId} />}
+        {activeTab === 'Pur. Ret.' && <PurchaseReturnTab setSelectedReturnId={setSelectedPurchaseReturnId} />}
+        {activeTab === 'Contra' && <ContraTab />}
+        {activeTab === 'Cashbook' && <CashbookTab />}
+        {activeTab === 'Bankbook' && <BankbookTab />}
+        {activeTab === 'Settings' && <SettingsTab />}
       </div>
 
-      {/* Tab content */}
-      {activeTab === 'P&L' && <PLTab />}
-      {activeTab === 'Expenses' && <ExpensesTab />}
-      {activeTab === 'Suppliers' && <SuppliersTab shopGstType={shop?.gst_type} />}
-      {activeTab === 'Purchases' && <PurchasesTab />}
-      {activeTab === 'Outstandings' && <OutstandingsTab />}
-      {activeTab === 'GST' && <GSTTab />}
-      {activeTab === 'Sale Ret.' && <SaleReturnTab />}
-      {activeTab === 'Pur. Ret.' && <PurchaseReturnTab />}
-      {activeTab === 'Contra' && <ContraTab />}
-      {activeTab === 'Cashbook' && <CashbookTab />}
-      {activeTab === 'Bankbook' && <BankbookTab />}
-      {activeTab === 'Settings' && <SettingsTab />}
+      {/* Modals - Rendered outside print-hidden content */}
+      {selectedSaleReturnId && <SaleReturnDetailModal id={selectedSaleReturnId} onClose={() => setSelectedSaleReturnId(null)} />}
+      {selectedPurchaseReturnId && <PurchaseReturnDetailModal id={selectedPurchaseReturnId} onClose={() => setSelectedPurchaseReturnId(null)} />}
     </div>
   );
 }
