@@ -41,7 +41,7 @@ router.get('/suppliers/:id/ledger', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.patch('/suppliers/:id', shopAuth, async (req, res, next) => {
+router.put('/suppliers/:id', shopAuth, async (req, res, next) => {
   try {
     const data = await service.updateSupplier(req.user!.id, req.params.id, req.body);
     res.json({ success: true, data });
@@ -263,25 +263,25 @@ router.get('/reports/gst-summary', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/reports/gstr1-csv', shopAuth, async (req, res, next) => {
+router.get('/reports/gstr1-excel', shopAuth, async (req, res, next) => {
   try {
     const month = req.query.month ? Number(req.query.month) : new Date().getMonth() + 1;
     const year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
-    const csv = await service.generateGstr1Csv(req.user!.id, month, year);
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename=GSTR1_${month}_${year}.csv`);
-    res.send(csv);
+    const buffer = await service.generateGstr1Excel(req.user!.id, month, year);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=GSTR1_${month}_${year}.xlsx`);
+    res.send(buffer);
   } catch (err) { next(err); }
 });
 
-router.get('/reports/gstr2a-csv', shopAuth, async (req, res, next) => {
+router.get('/reports/gstr2-excel', shopAuth, async (req, res, next) => {
   try {
     const month = req.query.month ? Number(req.query.month) : new Date().getMonth() + 1;
     const year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
-    const csv = await service.generateGstr2aCsv(req.user!.id, month, year);
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename=GSTR2A_${month}_${year}.csv`);
-    res.send(csv);
+    const buffer = await service.generateGstr2Excel(req.user!.id, month, year);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=GSTR2_${month}_${year}.xlsx`);
+    res.send(buffer);
   } catch (err) { next(err); }
 });
 

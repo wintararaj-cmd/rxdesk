@@ -461,19 +461,29 @@ function ExpensesTab() {
   );
 }
 
+const INDIAN_STATES = [
+  'Andaman and Nicobar Islands', 'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar',
+  'Chandigarh', 'Chhattisgarh', 'Dadra and Nagar Haveli and Daman and Diu', 'Delhi', 'Goa',
+  'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu and Kashmir', 'Jharkhand', 'Karnataka',
+  'Kerala', 'Ladakh', 'Lakshadweep', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya',
+  'Mizoram', 'Nagaland', 'Odisha', 'Puducherry', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
+  'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal'
+];
+
 // ─────────────────────────────────────────────────────────────────────────────
-//  Suppliers Tab
-// ─────────────────────────────────────────────────────────────────────────────
-function SuppliersTab() {
+function SuppliersTab({ shopGstType }: { shopGstType?: string }) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [supplierName, setSupplierName] = useState('');
   const [contactPerson, setContactPerson] = useState('');
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('');
+  const [pos, setPos] = useState('');
+  const [address, setAddress] = useState('');
   const [gstin, setGstin] = useState('');
   const [openingBalance, setOpeningBalance] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const supplierImportRef = useRef<HTMLInputElement>(null);
 
   const { data, isLoading } = useQuery<Supplier[]>({
@@ -487,19 +497,48 @@ function SuppliersTab() {
     enabled: !!expandedId,
   });
 
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: object }) => accountingApi.updateSupplier(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['web-suppliers'] });
+      setShowForm(false);
+      resetForm();
+    },
+  });
+
   const createMutation = useMutation({
     mutationFn: (d: object) => accountingApi.createSupplier(d),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['web-suppliers'] });
       setShowForm(false);
-      setSupplierName('');
-      setContactPerson('');
-      setPhone('');
-      setCity('');
-      setGstin('');
-      setOpeningBalance('');
+      resetForm();
     },
   });
+
+  const resetForm = () => {
+    setEditingId(null);
+    setSupplierName('');
+    setContactPerson('');
+    setPhone('');
+    setCity('');
+    setPos('');
+    setAddress('');
+    setGstin('');
+    setOpeningBalance('');
+  };
+
+  const startEdit = (s: Supplier) => {
+    setEditingId(s.id);
+    setSupplierName(s.name);
+    setContactPerson(s.contact_person ?? '');
+    setPhone(s.phone ?? '');
+    setCity(s.city ?? '');
+    setPos(s.state ?? '');
+    setAddress(s.address ?? '');
+    setGstin(s.gstin ?? s.gst_number ?? '');
+    setOpeningBalance('');
+    setShowForm(true);
+  };
 
   const deactivateMutation = useMutation({
     mutationFn: (id: string) => accountingApi.deactivateSupplier(id),
@@ -532,7 +571,7 @@ function SuppliersTab() {
     <div className="space-y-4">
       <div className="flex justify-end gap-3 items-center">
         <button
-          onClick={() => downloadCsv('suppliers_template.csv', 'name,contact_person,phone,city,gstin,opening_balance\n"Supplier A","John Doe","9876543210","Mumbai","27AAACR0345E1ZZ",0')}
+          onClick={() => downloadCsv('suppliers_template.csv', 'name,contact_person,phone,city,gstin,state,opening_balance\n"Supplier A","John Doe","9876543210","Mumbai","27AAACR0345E1ZZ","Maharashtra",0')}
           className="text-[10px] text-indigo-400 font-bold uppercase hover:underline"
         >
           Download Template
@@ -546,16 +585,16 @@ function SuppliersTab() {
           {importMutation.isPending ? 'Importing...' : 'Bulk Import'}
         </button>
         <button
-          onClick={() => setShowForm((v) => !v)}
+          onClick={() => { resetForm(); setShowForm((v) => !v); }}
           className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
         >
-          + Add Supplier
+          {showForm ? 'Close Form' : '+ Add Supplier'}
         </button>
       </div>
 
       {showForm && (
         <div className="bg-white rounded-xl p-5 shadow-sm border border-indigo-100">
-          <h3 className="font-semibold text-gray-700 mb-4">New Supplier</h3>
+          <h3 className="font-semibold text-gray-700 mb-4">{editingId ? 'Edit Supplier' : 'New Supplier'}</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
               { label: 'Supplier Name *', value: supplierName, set: setSupplierName, placeholder: 'Medico Pharma' },
@@ -563,16 +602,31 @@ function SuppliersTab() {
               { label: 'Phone', value: phone, set: setPhone, placeholder: '9876543210' },
               { label: 'City', value: city, set: setCity, placeholder: 'Mumbai' },
               { label: 'GSTIN', value: gstin, set: setGstin, placeholder: '27AAACR0345E1ZZ' },
+              ...(shopGstType === 'regular' ? [
+                { label: 'Place of Supply', value: pos, set: setPos },
+                { label: 'Address', value: address, set: setAddress, placeholder: 'Full address' }
+              ] : []),
             ].map((f) => (
               <div key={f.label}>
                 <label className="text-gray-500 text-xs block mb-1">{f.label}</label>
-                <input
-                  type="text"
-                  value={f.value}
-                  onChange={(e) => f.set(e.target.value)}
-                  placeholder={f.placeholder}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                />
+                {f.label === 'Place of Supply' ? (
+                  <select
+                    value={f.value}
+                    onChange={(e) => f.set(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                  >
+                    <option value="">Select State</option>
+                    {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={f.value}
+                    onChange={(e) => f.set(e.target.value)}
+                    placeholder={f.placeholder}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  />
+                )}
               </div>
             ))}
             <div>
@@ -591,19 +645,27 @@ function SuppliersTab() {
             <button
               onClick={() => {
                 if (!supplierName.trim()) return;
-                createMutation.mutate({
+                const payload: any = {
                   name: supplierName.trim(),
                   contact_person: contactPerson.trim() || undefined,
                   phone: phone.trim() || undefined,
                   city: city.trim() || undefined,
-                  gstin: gstin.trim() || undefined,
-                  opening_balance: parseFloat(openingBalance) || 0,
-                });
+                  state: pos.trim() || undefined,
+                  address: address.trim() || undefined,
+                  gst_number: gstin.trim() || undefined,
+                };
+                
+                if (editingId) {
+                  updateMutation.mutate({ id: editingId, data: payload });
+                } else {
+                  payload.opening_balance = parseFloat(openingBalance) || 0;
+                  createMutation.mutate(payload);
+                }
               }}
-              disabled={createMutation.isPending}
+              disabled={createMutation.isPending || updateMutation.isPending}
               className="bg-indigo-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
             >
-              {createMutation.isPending ? 'Saving...' : 'Save'}
+              {(createMutation.isPending || updateMutation.isPending) ? 'Saving...' : 'Save'}
             </button>
             <button onClick={() => setShowForm(false)} className="text-gray-500 text-sm px-4 py-2 hover:text-gray-700">Cancel</button>
           </div>
@@ -633,11 +695,17 @@ function SuppliersTab() {
                     <td className="px-5 py-3 font-medium text-gray-800">{s.name}</td>
                     <td className="px-5 py-3 text-gray-600">{s.contact_person ?? '—'}{s.phone ? ` · ${s.phone}` : ''}</td>
                     <td className="px-5 py-3 text-gray-500">{s.city ?? '—'}</td>
-                    <td className="px-5 py-3 text-gray-500 font-mono text-xs">{s.gstin ?? '—'}</td>
+                    <td className="px-5 py-3 text-gray-500 font-mono text-xs">{s.gst_number ?? s.gstin ?? '—'}</td>
                     <td className="px-5 py-3 text-right">
+                       <button
+                        onClick={() => startEdit(s)}
+                        className="text-indigo-400 hover:text-indigo-600 text-xs mr-4 transition-colors"
+                      >
+                        Edit
+                      </button>
                       <button
                         onClick={() => setExpandedId(expandedId === s.id ? null : s.id)}
-                        className="text-indigo-500 hover:text-indigo-700 text-xs mr-4 transition-colors"
+                        className="text-gray-400 hover:text-indigo-700 text-xs mr-4 transition-colors"
                       >
                         {expandedId === s.id ? 'Hide Ledger' : 'View Ledger'}
                       </button>
@@ -1973,11 +2041,11 @@ function GSTTab() {
           <button
             onClick={async () => {
               try {
-                const res = await accountingApi.getGstr1Csv(month, year);
+                const res = await accountingApi.getGstr1Excel(month, year);
                 const url = window.URL.createObjectURL(new Blob([res.data]));
                 const link = document.createElement('a');
                 link.href = url;
-                link.setAttribute('download', `GSTR1_${month}_${year}.csv`);
+                link.setAttribute('download', `GSTR1_${month}_${year}.xlsx`);
                 document.body.appendChild(link);
                 link.click();
                 link.remove();
@@ -1991,15 +2059,15 @@ function GSTTab() {
           <button
             onClick={async () => {
               try {
-                const res = await accountingApi.getGstr2aCsv(month, year);
+                const res = await accountingApi.getGstr2Excel(month, year);
                 const url = window.URL.createObjectURL(new Blob([res.data]));
                 const link = document.createElement('a');
                 link.href = url;
-                link.setAttribute('download', `GSTR2A_${month}_${year}.csv`);
+                link.setAttribute('download', `GSTR2_${month}_${year}.xlsx`);
                 document.body.appendChild(link);
                 link.click();
                 link.remove();
-              } catch (err) { alert('Failed to download GSTR-2A'); }
+              } catch (err) { alert('Failed to download GSTR-2'); }
             }}
             className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-emerald-100 hover:scale-[1.02] active:scale-95 transition-all"
           >
@@ -2901,6 +2969,8 @@ function SettingsTab() {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AccountingPage() {
   const [activeTab, setActiveTab] = useState<Tab>('P&L');
+  const { data: shopRes } = useQuery({ queryKey: ['shop-profile'], queryFn: () => shopApi.getMyShop() });
+  const shop = shopRes?.data?.data;
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -2944,7 +3014,7 @@ export default function AccountingPage() {
       {/* Tab content */}
       {activeTab === 'P&L' && <PLTab />}
       {activeTab === 'Expenses' && <ExpensesTab />}
-      {activeTab === 'Suppliers' && <SuppliersTab />}
+      {activeTab === 'Suppliers' && <SuppliersTab shopGstType={shop?.gst_type} />}
       {activeTab === 'Purchases' && <PurchasesTab />}
       {activeTab === 'Outstandings' && <OutstandingsTab />}
       {activeTab === 'GST' && <GSTTab />}

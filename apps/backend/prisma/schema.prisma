@@ -510,6 +510,9 @@ model Bill {
   patient_id      String?
   customer_name   String?
   customer_phone  String?
+  customer_gstin  String?
+  billing_address String?
+  billing_state   String?
   bill_number     String            @unique
   subtotal        Decimal           @db.Decimal(12, 2)
   discount_amount Decimal           @default(0) @db.Decimal(12, 2)
@@ -659,6 +662,8 @@ model Supplier {
   phone           String?
   email           String?
   address         String?
+  city            String?
+  state           String?
   gst_number      String?
   drug_license_no String?
   bank_name       String?

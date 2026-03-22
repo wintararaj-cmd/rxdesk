@@ -1,7 +1,53 @@
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
+import path from 'path';
 import logger from '../../utils/logger';
+
+const STATE_MAP: Record<string, string> = {
+  'wb': 'west bengal',
+  'mh': 'maharashtra',
+  'ka': 'karnataka',
+  'tn': 'tamil nadu',
+  'dl': 'delhi',
+  'up': 'uttar pradesh',
+  'ap': 'andhra pradesh',
+  'ts': 'telangana',
+  'tg': 'telangana',
+  'gj': 'gujarat',
+  'rj': 'rajasthan',
+  'mp': 'madhya pradesh',
+  'br': 'bihar',
+  'hr': 'haryana',
+  'pb': 'punjab',
+  'jk': 'jammu and kashmir',
+  'kl': 'kerala',
+  'od': 'odisha',
+  'as': 'assam',
+  'ct': 'chhattisgarh',
+  'jh': 'jharkhand',
+  'uk': 'uttarakhand',
+  'hp': 'himachal pradesh',
+  'ga': 'goa',
+  'tr': 'tripura',
+  'ml': 'meghalaya',
+  'mn': 'manipur',
+  'nl': 'nagaland',
+  'ar': 'arunachal pradesh',
+  'sk': 'sikkim',
+  'mz': 'mizoram',
+  'py': 'puducherry',
+  'an': 'andaman and nicobar islands',
+  'ch': 'chandigarh',
+  'dn': 'dadra and nagar haveli and daman and diu',
+  'ld': 'lakshadweep'
+};
+
+function normalizeState(s?: string | null): string {
+  if (!s) return '';
+  const cleaned = s.trim().toLowerCase();
+  return STATE_MAP[cleaned] || cleaned;
+}
 
 async function generateBillNumber(): Promise<string> {
   const year = new Date().getFullYear();
@@ -166,6 +212,10 @@ export async function createManualBill(
   data: {
     customer_name?: string;
     customer_phone?: string;
+    customer_gstin?: string;
+    billing_address?: string;
+    billing_state?: string;
+    save_customer?: boolean;
     items: { medicine_name: string; mrp: number; quantity: number; gst_rate?: number; inventory_id?: string; discount_type?: 'percentage' | 'amount'; discount_value?: number; hsn_code?: string }[];
     discount_amount?: number;
     payment_method?: 'cash' | 'upi' | 'card' | 'credit' | 'pending';
@@ -175,6 +225,10 @@ export async function createManualBill(
   const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });
   if (!shop) throw new AppError(403, 'FORBIDDEN', 'Only shop owners can create bills');
   const isTaxInvoice = shop.gst_type === 'regular';
+  const shopStateNormalized = normalizeState(shop.state);
+  const billingStateNormalized = normalizeState(data.billing_state);
+  // IGST applies if the supply is to a different state
+  const isInterState = billingStateNormalized && shopStateNormalized && billingStateNormalized !== shopStateNormalized;
 
   if (!data.items || data.items.length === 0) {
     throw new AppError(400, 'VALIDATION_ERROR', 'At least one item is required');
@@ -213,10 +267,10 @@ export async function createManualBill(
       const inv = await prisma.shopInventory.findUnique({ where: { id: item.inventory_id } });
       if (inv) {
         const take = Math.min(inv.stock_qty, remainingQty);
-        const discAmt = (itemDiscountType === 'percentage') 
-          ? (item.mrp * take * itemDiscountValue) / 100 
+        const discAmt = (itemDiscountType === 'percentage')
+          ? (item.mrp * take * itemDiscountValue) / 100
           : (take * itemDiscountValue);
-        
+
         itemBatches.push({
           inventory_id: inv.id,
           medicine_name: item.medicine_name,
@@ -250,8 +304,8 @@ export async function createManualBill(
       for (const b of otherBatches) {
         if (remainingQty <= 0) break;
         const take = Math.min(b.stock_qty, remainingQty);
-        const discAmt = (itemDiscountType === 'percentage') 
-          ? (item.mrp * take * itemDiscountValue) / 100 
+        const discAmt = (itemDiscountType === 'percentage')
+          ? (item.mrp * take * itemDiscountValue) / 100
           : (take * itemDiscountValue);
 
         itemBatches.push({
@@ -274,8 +328,8 @@ export async function createManualBill(
 
     // 3. Absolute Fallback: if quantity still left, add the remainder to the last known batch (or generic)
     if (remainingQty > 0) {
-      const discAmt = (itemDiscountType === 'percentage') 
-        ? (item.mrp * remainingQty * itemDiscountValue) / 100 
+      const discAmt = (itemDiscountType === 'percentage')
+        ? (item.mrp * remainingQty * itemDiscountValue) / 100
         : (remainingQty * itemDiscountValue);
 
       itemBatches.push({
@@ -298,7 +352,7 @@ export async function createManualBill(
           where: { id: ib.inventory_id },
           data: { stock_qty: { decrement: ib.quantity } },
         });
-        
+
         if (updatedInv.stock_qty <= updatedInv.reorder_level) {
           prisma.notification.create({
             data: {
@@ -331,6 +385,9 @@ export async function createManualBill(
         shop_id: shop.id,
         customer_name: data.customer_name ?? null,
         customer_phone: data.customer_phone ?? null,
+        customer_gstin: data.customer_gstin ?? null,
+        billing_address: data.billing_address ?? null,
+        billing_state: data.billing_state ?? null,
         bill_number: await generateBillNumber(),
         subtotal,
         discount_amount: totalDiscount,
@@ -343,6 +400,33 @@ export async function createManualBill(
       },
       include: { items: true },
     });
+
+    // Handle Persistent Customer Record (Quick Add)
+    if (data.customer_phone && (data.customer_name || data.customer_gstin)) {
+      const existing = await tx.creditCustomer.findFirst({
+        where: { shop_id: shop.id, phone: data.customer_phone }
+      });
+
+      if (existing) {
+        await tx.creditCustomer.update({
+          where: { id: existing.id },
+          data: {
+            name: data.customer_name || existing.name,
+            address: data.billing_address || existing.address,
+          }
+        });
+      } else {
+        await tx.creditCustomer.create({
+          data: {
+            shop_id: shop.id,
+            name: data.customer_name || 'Walk-in Customer',
+            phone: data.customer_phone,
+            address: data.billing_address,
+            total_outstanding: 0,
+          }
+        });
+      }
+    }
 
     // Auto-create IncomeEntry when paid immediately (not for credit)
     if (isPaid && paymentMethod !== 'credit') {
@@ -656,15 +740,47 @@ export async function searchCustomersByPhone(userId: string, phone: string) {
   const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId }, select: { id: true } });
   if (!shop) return [];
 
+  // 1. Search in CreditCustomer Master (Primary)
+  const master = await prisma.creditCustomer.findMany({
+    where: {
+      shop_id: shop.id,
+      phone: { startsWith: phone },
+    },
+    select: { name: true, phone: true, address: true },
+    take: 5,
+  });
+
+  const masterResults = master.map(c => ({
+    customer_name: c.name,
+    customer_phone: c.phone || '',
+    customer_gstin: null,
+    billing_address: c.address,
+    billing_state: null,
+    source: 'master'
+  }));
+
+  // 2. Search in Bill History (Fallback for walk-ins not in master)
+  const masterPhones = master.map(m => m.phone).filter(Boolean) as string[];
   const bills = await prisma.bill.findMany({
     where: {
       shop_id: shop.id,
       customer_phone: { startsWith: phone },
+      ...(masterPhones.length > 0 ? { NOT: { customer_phone: { in: masterPhones } } } : {})
     },
-    select: { customer_name: true, customer_phone: true },
+    select: { customer_name: true, customer_phone: true, customer_gstin: true, billing_address: true, billing_state: true },
     distinct: ['customer_phone'],
-    take: 8,
+    orderBy: { customer_phone: 'asc' },
+    take: 5,
   });
 
-  return bills.filter(b => b.customer_phone);
+  const billResults = bills.map(b => ({
+    customer_name: b.customer_name,
+    customer_phone: b.customer_phone || '',
+    customer_gstin: b.customer_gstin,
+    billing_address: b.billing_address,
+    billing_state: b.billing_state,
+    source: 'history'
+  }));
+
+  return [...masterResults, ...billResults];
 }

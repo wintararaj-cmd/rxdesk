@@ -4,6 +4,26 @@ import { Prisma } from '@prisma/client';
 import logger from '../../utils/logger';
 import path from 'path';
 import fs from 'fs/promises';
+import ExcelJS from 'exceljs';
+
+const STATE_MAP: Record<string, string> = {
+  'wb': 'west bengal', 'mh': 'maharashtra', 'ka': 'karnataka', 'tn': 'tamil nadu',
+  'dl': 'delhi', 'up': 'uttar pradesh', 'ap': 'andhra pradesh', 'ts': 'telangana',
+  'tg': 'telangana', 'gj': 'gujarat', 'rj': 'rajasthan', 'mp': 'madhya pradesh',
+  'br': 'bihar', 'hr': 'haryana', 'pb': 'punjab', 'jk': 'jammu and kashmir',
+  'kl': 'kerala', 'od': 'odisha', 'as': 'assam', 'ct': 'chhattisgarh',
+  'jh': 'jharkhand', 'uk': 'uttarakhand', 'hp': 'himachal pradesh', 'ga': 'goa',
+  'tr': 'tripura', 'ml': 'meghalaya', 'mn': 'manipur', 'nl': 'nagaland',
+  'ar': 'arunachal pradesh', 'sk': 'sikkim', 'mz': 'mizoram', 'py': 'puducherry',
+  'an': 'andaman and nicobar islands', 'ch': 'chandigarh',
+  'dn': 'dadra and nagar haveli and daman and diu', 'ld': 'lakshadweep'
+};
+
+function normalizeState(s?: string | null): string {
+  if (!s) return '';
+  const cleaned = s.trim().toLowerCase();
+  return STATE_MAP[cleaned] || cleaned;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Helpers
@@ -45,6 +65,7 @@ export async function createSupplier(userId: string, data: {
   payment_terms?: string;
   notes?: string;
   opening_balance?: number;
+  state?: string;
 }) {
   const shop = await getShopOrThrow(userId);
   return prisma.$transaction(async (tx) => {
@@ -64,6 +85,8 @@ export async function createSupplier(userId: string, data: {
         credit_limit: data.credit_limit ?? 0,
         payment_terms: data.payment_terms,
         notes: data.notes,
+        city: data.city,
+        state: data.state,
       },
     });
 
@@ -169,6 +192,8 @@ export async function importSuppliers(userId: string, suppliers: any[]) {
             phone: s.phone,
             email: s.email,
             address: s.address,
+            city: s.city,
+            state: s.state,
             gst_number: s.gst_number,
             notes: s.notes,
           },
@@ -182,6 +207,8 @@ export async function importSuppliers(userId: string, suppliers: any[]) {
             phone: s.phone,
             email: s.email,
             address: s.address,
+            city: s.city,
+            state: s.state,
             gst_number: s.gst_number,
             notes: s.notes,
           },
@@ -2068,8 +2095,10 @@ export async function triggerManualLocalBackup(userId: string) {
   return { filename: fileName, path: filePath };
 }
 
-export async function generateGstr1Csv(userId: string, month: number, year: number) {
+export async function generateGstr1Excel(userId: string, month: number, year: number) {
   const shop = await getShopOrThrow(userId);
+  const shopStateNormalized = normalizeState(shop.state);
+  
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 0, 23, 59, 59);
 
@@ -2079,130 +2108,281 @@ export async function generateGstr1Csv(userId: string, month: number, year: numb
     orderBy: { created_at: 'asc' },
   });
 
-  const header = ['Invoice Date', 'Invoice Number', 'Customer Name', 'Customer Phone', 'HSN Code', 'Medicine Name', 'Quantity', 'MRP', 'Taxable Value', 'GST Rate', 'CGST', 'SGST', 'IGST', 'Total GST', 'Total Amount'].join(',');
-  const rows = [header];
+  const workbook = new ExcelJS.Workbook();
+  
+  // 1. B2b Sheet
+  const b2bSheet = workbook.addWorksheet('B2b');
+  b2bSheet.columns = [
+    { header: 'GSTIN/UIN of Recipient*', key: 'gstin', width: 20 },
+    { header: 'Name of Recipient', key: 'name', width: 25 },
+    { header: 'Invoice number *', key: 'inv_no', width: 15 },
+    { header: 'Invoice Date*', key: 'inv_date', width: 15 },
+    { header: 'Invoice value*', key: 'inv_val', width: 15 },
+    { header: 'Place of Supply(POS)*', key: 'pos', width: 20 },
+    { header: 'Applicable % of Tax Rate', key: 'tax_rate', width: 15 },
+    { header: 'Reverse Charge*', key: 'rev_charge', width: 10 },
+    { header: 'Invoice Type*', key: 'inv_type', width: 15 },
+  ];
 
-  const hsnSummary: Record<string, { taxable: number; gst: number; total: number; qty: number }> = {};
+  // 2. B2c Sheet
+  const b2cSheet = workbook.addWorksheet('B2c');
+  b2cSheet.columns = [
+    { header: 'Invoice number*', key: 'inv_no', width: 15 },
+    { header: 'Invoice Date', key: 'inv_date', width: 15 },
+    { header: 'Invoice value*', key: 'inv_val', width: 15 },
+    { header: 'Applicable % of Tax Rate', key: 'applicable_pct', width: 15 },
+    { header: 'Place of Supply(POS)*', key: 'pos', width: 20 },
+    { header: 'Rate*', key: 'rate', width: 10 },
+    { header: 'Taxable Value*', key: 'taxable_val', width: 15 },
+    { header: 'Cess Amount', key: 'cess', width: 12 },
+  ];
+
+  // 3. HSNB2B Sheet
+  const hsnB2bSheet = workbook.addWorksheet('HSNB2B');
+  const hsnColumns = [
+    { header: 'HSN*', key: 'hsn', width: 15 },
+    { header: 'Description', key: 'desc', width: 25 },
+    { header: 'UQC*', key: 'uqc', width: 10 },
+    { header: 'Total Quantity*', key: 'qty', width: 15 },
+    { header: 'Total Value', key: 'total_val', width: 15 },
+    { header: 'Rate', key: 'rate', width: 10 },
+    { header: 'Taxable Value*', key: 'taxable_val', width: 15 },
+    { header: 'Integrated Tax Amount', key: 'igst', width: 15 },
+    { header: 'Central Tax Amount', key: 'cgst', width: 15 },
+    { header: 'State/UT Tax Amount', key: 'sgst', width: 15 },
+    { header: 'Cess Amount', key: 'cess', width: 12 },
+  ];
+  hsnB2bSheet.columns = hsnColumns;
+
+  // 4. HSNB2C Sheet
+  const hsnB2cSheet = workbook.addWorksheet('HSNB2C');
+  hsnB2cSheet.columns = hsnColumns;
+
+  // Formatting: Bold headers for all sheets
+  [b2bSheet, b2cSheet, hsnB2bSheet, hsnB2cSheet].forEach(sheet => {
+    sheet.getRow(1).font = { bold: true };
+  });
+
+  const hsnSummaryB2B: Record<string, any> = {};
+  const hsnSummaryB2C: Record<string, any> = {};
 
   for (const bill of bills) {
-    for (const item of bill.items) {
-      const taxableVal = Number(item.line_total);
-      const gstRate = Number(item.gst_rate);
-      const gstAmt = taxableVal * (gstRate / 100);
-      const cgst = Math.round((gstAmt / 2) * 100) / 100;
-      const sgst = cgst;
-      const lineTotalAmount = taxableVal + gstAmt;
-      const dateStr = bill.created_at.toISOString().split('T')[0];
-      const hsn = item.hsn_code || 'N/A';
-      
-      rows.push([
-        dateStr,
-        bill.bill_number ?? '-',
-        `"${bill.customer_name ?? 'Walk-in'}"`,
-        bill.customer_phone ?? '-',
-        hsn,
-        `"${item.medicine_name}"`,
-        item.quantity,
-        item.mrp,
-        taxableVal.toFixed(2),
-        gstRate,
-        cgst.toFixed(2),
-        sgst.toFixed(2),
-        '0.00',
-        gstAmt.toFixed(2),
-        lineTotalAmount.toFixed(2),
-      ].join(','));
+    const isB2B = !!bill.customer_gstin;
+    const billingStateNormalized = normalizeState(bill.billing_state || shop.state);
+    const isInterState = billingStateNormalized && shopStateNormalized && billingStateNormalized !== shopStateNormalized;
+    const pos = bill.billing_state || shop.state || 'N/A';
+    const dateStr = bill.created_at.toISOString().split('T')[0];
 
-      if (!hsnSummary[hsn]) hsnSummary[hsn] = { taxable: 0, gst: 0, total: 0, qty: 0 };
-      hsnSummary[hsn].taxable += taxableVal;
-      hsnSummary[hsn].gst += gstAmt;
-      hsnSummary[hsn].total += lineTotalAmount;
-      hsnSummary[hsn].qty += item.quantity;
+    if (isB2B) {
+      // Group by tax rate for B2B if needed, but standard GSTR-1 lists per rate per invoice
+      // For now, follow the requested columns per bill item if they have different rates
+      const rates = Array.from(new Set(bill.items.map(i => Number(i.gst_rate))));
+      for (const rate of rates) {
+        const itemsAtRate = bill.items.filter(i => Number(i.gst_rate) === rate);
+        const taxableAtRate = itemsAtRate.reduce((sum, item) => sum + Number(item.line_total), 0);
+        const invValue = Number(bill.total_amount);
+        
+        b2bSheet.addRow({
+          gstin: bill.customer_gstin,
+          name: bill.customer_name || 'Walk-in',
+          inv_no: bill.bill_number,
+          inv_date: dateStr,
+          inv_val: invValue,
+          pos: pos,
+          tax_rate: rate,
+          rev_charge: 'N',
+          inv_type: 'Regular',
+        });
+      }
+    } else {
+      const rates = Array.from(new Set(bill.items.map(i => Number(i.gst_rate))));
+      for (const rate of rates) {
+        const itemsAtRate = bill.items.filter(i => Number(i.gst_rate) === rate);
+        const taxableAtRate = itemsAtRate.reduce((sum, item) => sum + Number(item.line_total), 0);
+        const gstAmt = (taxableAtRate * rate) / 100;
+        
+        b2cSheet.addRow({
+          inv_no: bill.bill_number,
+          inv_date: dateStr,
+          inv_val: taxableAtRate + gstAmt,
+          applicable_pct: '',
+          pos: pos,
+          rate: rate,
+          taxable_val: taxableAtRate,
+          cess: 0,
+        });
+      }
+    }
+
+    // HSN Summary logic
+    for (const item of bill.items) {
+      const hsn = item.hsn_code || 'N/A';
+      const taxableVal = Number(item.line_total);
+      const rate = Number(item.gst_rate);
+      const totalGst = (taxableVal * rate) / 100;
+      
+      let cgst = 0, sgst = 0, igst = 0;
+      if (isInterState) igst = totalGst;
+      else { cgst = totalGst / 2; sgst = totalGst / 2; }
+
+      const summary = isB2B ? hsnSummaryB2B : hsnSummaryB2C;
+      const key = `${hsn}_${rate}`;
+
+      if (!summary[key]) {
+        summary[key] = {
+          hsn,
+          desc: item.medicine_name,
+          uqc: 'OTH', // Default UQC
+          qty: 0,
+          total_val: 0,
+          rate: rate,
+          taxable_val: 0,
+          igst: 0,
+          cgst: 0,
+          sgst: 0,
+          cess: 0
+        };
+      }
+      summary[key].qty += item.quantity;
+      summary[key].taxable_val += taxableVal;
+      summary[key].igst += igst;
+      summary[key].cgst += cgst;
+      summary[key].sgst += sgst;
+      summary[key].total_val += (taxableVal + totalGst);
     }
   }
 
-  rows.push('');
-  rows.push('HSN SUMMARY');
-  rows.push(['HSN Code', 'Total Quantity', 'Taxable Value', 'Total GST', 'Total Value'].join(','));
-  for (const [hsn, data] of Object.entries(hsnSummary)) {
-    rows.push([
-      hsn,
-      data.qty,
-      data.taxable.toFixed(2),
-      data.gst.toFixed(2),
-      data.total.toFixed(2)
-    ].join(','));
-  }
+  // Populate HSN Sheets
+  Object.values(hsnSummaryB2B).forEach(s => hsnB2bSheet.addRow(s));
+  Object.values(hsnSummaryB2C).forEach(s => hsnB2cSheet.addRow(s));
 
-  return rows.join('\n');
+  return workbook.xlsx.writeBuffer();
 }
 
-export async function generateGstr2aCsv(userId: string, month: number, year: number) {
+
+export async function generateGstr2Excel(userId: string, month: number, year: number) {
   const shop = await getShopOrThrow(userId);
+  const shopStateNormalized = normalizeState(shop.state);
+  
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 0, 23, 59, 59);
 
   const purchases = await prisma.purchaseEntry.findMany({
     where: { shop_id: shop.id, received_date: { gte: start, lte: end } },
-    include: { items: { include: { medicine: true } }, supplier: true },
+    include: { items: true, supplier: true },
     orderBy: { received_date: 'asc' },
   });
 
-  const header = ['Received Date', 'Invoice Date', 'Invoice Number', 'Supplier Name', 'Supplier GSTIN', 'HSN Code', 'Medicine Name', 'Quantity', 'Purchase Price', 'Taxable Value', 'GST Rate', 'CGST', 'SGST', 'IGST', 'Total GST', 'Line Total'].join(',');
-  const rows = [header];
+  const workbook = new ExcelJS.Workbook();
+  
+  // 1. B2B Sheet (Registered Suppliers)
+  const b2bSheet = workbook.addWorksheet('B2B');
+  b2bSheet.columns = [
+    { header: 'GSTIN of Supplier', key: 'gstin', width: 20 },
+    { header: 'Supplier Name', key: 'name', width: 25 },
+    { header: 'Invoice Number', key: 'inv_no', width: 15 },
+    { header: 'Invoice date', key: 'inv_date', width: 15 },
+    { header: 'Invoice Value', key: 'inv_val', width: 15 },
+    { header: 'Place Of Supply', key: 'pos', width: 20 },
+    { header: 'Reverse Charge', key: 'rev_charge', width: 15 },
+    { header: 'Invoice Type', key: 'inv_type', width: 15 },
+    { header: 'Rate', key: 'rate', width: 10 },
+    { header: 'Taxable Value', key: 'taxable_val', width: 15 },
+    { header: 'Integrated Tax Paid', key: 'igst', width: 15 },
+    { header: 'Central Tax Paid', key: 'cgst', width: 15 },
+    { header: 'State/UT Tax Paid', key: 'sgst', width: 15 },
+    { header: 'Cess Paid', key: 'cess', width: 12 },
+    { header: 'Eligibility For ITC', key: 'itc_eligibility', width: 20 },
+    { header: 'Availed ITC Integrated Tax', key: 'itc_igst', width: 20 },
+    { header: 'Availed ITC Central Tax', key: 'itc_cgst', width: 18 },
+    { header: 'Availed ITC State/UT Tax', key: 'itc_sgst', width: 20 },
+    { header: 'Availed ITC Cess', key: 'itc_cess', width: 15 },
+  ];
 
-  const hsnSummary: Record<string, { taxable: number; gst: number; total: number; qty: number }> = {};
+  // 2. B2BUR Sheet (Unregistered Suppliers)
+  const b2burSheet = workbook.addWorksheet('B2BUR');
+  b2burSheet.columns = [
+    { header: 'Supplier Name', key: 'name', width: 25 },
+    { header: 'Invoice Number', key: 'inv_no', width: 15 },
+    { header: 'Invoice date', key: 'inv_date', width: 15 },
+    { header: 'Invoice Value', key: 'inv_val', width: 15 },
+    { header: 'Place Of Supply', key: 'pos', width: 20 },
+    { header: 'Supply Type', key: 'supply_type', width: 15 },
+    { header: 'Rate', key: 'rate', width: 10 },
+    { header: 'Taxable Value', key: 'taxable_val', width: 15 },
+    { header: 'Integrated Tax Paid', key: 'igst', width: 15 },
+    { header: 'Central Tax Paid', key: 'cgst', width: 15 },
+    { header: 'State/UT Tax Paid', key: 'sgst', width: 15 },
+    { header: 'Cess Paid', key: 'cess', width: 12 },
+    { header: 'Eligibility For ITC', key: 'itc_eligibility', width: 20 },
+    { header: 'Availed ITC Integrated Tax', key: 'itc_igst', width: 20 },
+    { header: 'Availed ITC Central Tax', key: 'itc_cgst', width: 18 },
+    { header: 'Availed ITC State/UT Tax', key: 'itc_sgst', width: 20 },
+    { header: 'Availed ITC Cess', key: 'itc_cess', width: 15 },
+  ];
+
+  // Formatting: Bold headers
+  [b2bSheet, b2burSheet].forEach(sheet => {
+    sheet.getRow(1).font = { bold: true };
+  });
 
   for (const pur of purchases) {
-    for (const item of pur.items) {
-      const taxableVal = Number(item.purchase_price) * item.quantity * (1 - Number(item.discount_pct) / 100);
-      const gstRate = Number(item.gst_rate);
-      const gstAmt = taxableVal * (gstRate / 100);
-      const cgst = Math.round((gstAmt / 2) * 100) / 100;
-      const sgst = cgst;
-      const hsn = item.medicine?.hsn_code ?? '-';
-      const lineTotal = Number(item.line_total);
-      
-      rows.push([
-        pur.received_date.toISOString().split('T')[0],
-        pur.invoice_date.toISOString().split('T')[0],
-        pur.invoice_number ?? '-',
-        `"${pur.supplier?.name ?? 'Unknown Supplier'}"`,
-        pur.supplier?.gst_number ?? '-',
-        hsn,
-        `"${item.medicine_name}"`,
-        item.quantity,
-        item.purchase_price,
-        taxableVal.toFixed(2),
-        gstRate,
-        cgst.toFixed(2),
-        sgst.toFixed(2),
-        '0.00',
-        gstAmt.toFixed(2),
-        lineTotal.toFixed(2),
-      ].join(','));
+    const isRegistered = !!pur.supplier?.gst_number;
+    const supplierStateNormalized = normalizeState(pur.supplier?.state || shop.state);
+    const isInterState = supplierStateNormalized && shopStateNormalized && supplierStateNormalized !== shopStateNormalized;
+    const pos = pur.supplier?.state || shop.state || 'N/A';
+    const dateStr = pur.invoice_date.toISOString().split('T')[0];
 
-      if (!hsnSummary[hsn]) hsnSummary[hsn] = { taxable: 0, gst: 0, total: 0, qty: 0 };
-      hsnSummary[hsn].taxable += taxableVal;
-      hsnSummary[hsn].gst += gstAmt;
-      hsnSummary[hsn].total += lineTotal;
-      hsnSummary[hsn].qty += item.quantity;
+    // Group items by tax rate for GSTR-2 reporting
+    const rates = Array.from(new Set(pur.items.map(i => Number(i.gst_rate))));
+    
+    for (const rate of rates) {
+      const itemsAtRate = pur.items.filter(i => Number(i.gst_rate) === rate);
+      // PurchaseItem.line_total is taxable + GST, so we reverse it
+      const totalLineAtRate = itemsAtRate.reduce((sum, item) => sum + Number(item.line_total), 0);
+      const taxableAtRate = totalLineAtRate / (1 + rate / 100);
+      const totalGst = totalLineAtRate - taxableAtRate;
+      
+      let cgst = 0, sgst = 0, igst = 0;
+      if (isInterState) igst = totalGst;
+      else { cgst = totalGst / 2; sgst = totalGst / 2; }
+      
+      const rowData = {
+        name: pur.supplier?.name || 'Unregistered Supplier',
+        inv_no: pur.invoice_number || '-',
+        inv_date: dateStr,
+        inv_val: Number(pur.total_amount),
+        pos: pos,
+        rate: rate,
+        taxable_val: taxableAtRate,
+        igst: igst,
+        cgst: cgst,
+        sgst: sgst,
+        cess: 0,
+        itc_eligibility: 'Inputs',
+        itc_igst: igst,
+        itc_cgst: cgst,
+        itc_sgst: sgst,
+        itc_cess: 0,
+      };
+
+      if (isRegistered) {
+        b2bSheet.addRow({
+          ...rowData,
+          gstin: pur.supplier?.gst_number,
+          rev_charge: 'N',
+          inv_type: 'Regular',
+        });
+      } else {
+        b2burSheet.addRow({
+          ...rowData,
+          supply_type: isInterState ? 'Inter-State' : 'Intra-State',
+        });
+      }
     }
   }
 
-  rows.push('');
-  rows.push('HSN SUMMARY');
-  rows.push(['HSN Code', 'Total Quantity', 'Taxable Value', 'Total GST', 'Total Value'].join(','));
-  for (const [hsn, data] of Object.entries(hsnSummary)) {
-    rows.push([
-      hsn,
-      data.qty,
-      data.taxable.toFixed(2),
-      data.gst.toFixed(2),
-      data.total.toFixed(2)
-    ].join(','));
-  }
-
-  return rows.join('\n');
+  return workbook.xlsx.writeBuffer();
 }
+
 

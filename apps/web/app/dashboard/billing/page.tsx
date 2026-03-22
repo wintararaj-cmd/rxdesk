@@ -32,6 +32,9 @@ interface BillData {
   patient?: { full_name?: string; phone?: string; user_id?: string };
   customer_name?: string | null;
   customer_phone?: string | null;
+  customer_gstin?: string | null;
+  billing_address?: string | null;
+  billing_state?: string | null;
 }
 
 interface BillStats {
@@ -60,6 +63,25 @@ const fmtDateTime = (iso: string) =>
     hour: '2-digit', minute: '2-digit', hour12: true,
   });
 
+const STATE_MAP: Record<string, string> = {
+  'wb': 'west bengal', 'mh': 'maharashtra', 'ka': 'karnataka', 'tn': 'tamil nadu',
+  'dl': 'delhi', 'up': 'uttar pradesh', 'ap': 'andhra pradesh', 'ts': 'telangana',
+  'tg': 'telangana', 'gj': 'gujarat', 'rj': 'rajasthan', 'mp': 'madhya pradesh',
+  'br': 'bihar', 'hr': 'haryana', 'pb': 'punjab', 'jk': 'jammu and kashmir',
+  'kl': 'kerala', 'od': 'odisha', 'as': 'assam', 'ct': 'chhattisgarh',
+  'jh': 'jharkhand', 'uk': 'uttarakhand', 'hp': 'himachal pradesh', 'ga': 'goa',
+  'tr': 'tripura', 'ml': 'meghalaya', 'mn': 'manipur', 'nl': 'nagaland',
+  'ar': 'arunachal pradesh', 'sk': 'sikkim', 'mz': 'mizoram', 'py': 'puducherry',
+  'an': 'andaman and nicobar islands', 'ch': 'chandigarh',
+  'dn': 'dadra and nagar haveli and daman and diu', 'ld': 'lakshadweep'
+};
+
+function normalizeState(s?: string | null): string {
+  if (!s) return '';
+  const cleaned = s.trim().toLowerCase();
+  return STATE_MAP[cleaned] || cleaned;
+}
+
 // ── Thermal Print & WhatsApp ─────────────────────────────────────────────────
 
 function printInvoice(bill: BillData, shopData: any) {
@@ -77,6 +99,13 @@ function printA4Invoice(bill: BillData, shopData: any) {
 
   const displayName = bill.customer_name ?? bill.patient?.full_name ?? 'Walk-in Customer';
   const displayPhone = bill.customer_phone ?? bill.patient?.phone ?? '';
+  const customerGstin = bill.customer_gstin ?? '';
+  const customerAddress = [bill.billing_address, bill.billing_state].filter(Boolean).join(', ');
+
+  const shopStateNormalized = normalizeState(shopData?.state);
+  const billingStateNormalized = normalizeState(bill.billing_state);
+  const isInterState = billingStateNormalized && shopStateNormalized && billingStateNormalized !== shopStateNormalized;
+
   const date = new Date(bill.created_at).toLocaleString('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit', hour12: true,
@@ -136,8 +165,12 @@ function printA4Invoice(bill: BillData, shopData: any) {
   <div style="display:flex;justify-content:space-between;border:1px solid #e5e7eb;padding:20px;border-radius:8px;background:#f9fafb;">
     <div>
       <p style="margin-bottom:4px;font-size:11px;text-transform:uppercase;color:#6b7280;font-weight:bold;">Billed To</p>
-      <p style="font-size:15px;font-weight:bold">${displayName}</p>
-      ${displayPhone ? `<p style="margin-top:2px;">Phone: ${displayPhone}</p>` : ''}
+      <div style="font-size:12px;color:#555;">
+        <div><b>Bill To:</b> ${displayName}</div>
+        ${displayPhone ? `<div>Ph: ${displayPhone}</div>` : ''}
+        ${customerGstin ? `<div>GSTIN: <b>${customerGstin}</b></div>` : ''}
+        ${customerAddress ? `<div>Add: ${customerAddress}</div>` : ''}
+      </div>
     </div>
     <div style="text-align:right">
       <p style="margin-bottom:4px"><b>Invoice No:</b> ${bill.bill_number}</p>
@@ -170,12 +203,17 @@ function printA4Invoice(bill: BillData, shopData: any) {
         <span>Discount</span><span style="font-weight:600;">-${cur(bill.discount_amount)}</span>
       </div>` : ''}
       ${isTax ? `
+      ${isInterState ? `
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e2e8f0;color:#475569;">
+        <span>IGST</span><span style="font-weight:600;">${cur(bill.gst_amount)}</span>
+      </div>` : `
       <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e2e8f0;color:#475569;">
         <span>CGST</span><span style="font-weight:600;">${cur(bill.gst_amount / 2)}</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e2e8f0;color:#475569;">
         <span>SGST</span><span style="font-weight:600;">${cur(bill.gst_amount / 2)}</span>
-      </div>` : ''}
+      </div>`}
+      ` : ''}
       <div style="display:flex;justify-content:space-between;padding-top:12px;margin-top:6px;font-size:18px;font-weight:900;">
         <span>Total Amount</span><span>${cur(Math.round(bill.total_amount))}</span>
       </div>
@@ -184,6 +222,7 @@ function printA4Invoice(bill: BillData, shopData: any) {
 
   <div style="margin-top:60px;padding-top:20px;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280;text-align:center">
     <p>Thank you for your purchase!</p>
+    ${shopData?.gst_type === 'composite' ? `<p style="margin-top:4px;font-weight:bold;color:#374151;">Composition taxable person, not eligible to collect tax on supplies</p>` : ''}
     <p style="margin-top:4px;">Powered by <b>RxDesk</b></p>
   </div>
 </body></html>`;
@@ -202,6 +241,12 @@ function printThermalReceipt(bill: BillData, shopData: any) {
   const showBatch = shopData?.show_batch_no !== false;
 
   const displayName = bill.customer_name ?? bill.patient?.full_name ?? 'Walk-in Customer';
+  const customerGstin = bill.customer_gstin ?? '';
+
+  const shopStateNormalized = normalizeState(shopData?.state);
+  const billingStateNormalized = normalizeState(bill.billing_state);
+  const isInterState = billingStateNormalized && shopStateNormalized && billingStateNormalized !== shopStateNormalized;
+
   const date = new Date(bill.created_at).toLocaleString('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit', hour12: true,
@@ -253,8 +298,11 @@ ${bill.customer_phone ? `<div><b>Phone:</b> ${bill.customer_phone}</div>` : ''}
   <tfoot>
     <tr><td colspan="3" style="padding-top:3px">Subtotal</td><td style="text-align:right;padding-top:3px">${cur(bill.subtotal)}</td></tr>
     ${bill.discount_amount > 0 ? `<tr><td colspan="3">Discount</td><td style="text-align:right">-${cur(bill.discount_amount)}</td></tr>` : ''}
-    ${isTax ? `<tr><td colspan="3">CGST</td><td style="text-align:right">${cur(bill.gst_amount / 2)}</td></tr>
-    <tr><td colspan="3">SGST</td><td style="text-align:right">${cur(bill.gst_amount / 2)}</td></tr>` : ''}
+    ${isTax ? `
+    ${isInterState ? `<tr><td colspan="3">IGST</td><td style="text-align:right">${cur(bill.gst_amount)}</td></tr>` : `
+    <tr><td colspan="3">CGST</td><td style="text-align:right">${cur(bill.gst_amount / 2)}</td></tr>
+    <tr><td colspan="3">SGST</td><td style="text-align:right">${cur(bill.gst_amount / 2)}</td></tr>`}
+    ` : ''}
     <tr class="tot"><td colspan="3">TOTAL</td><td style="text-align:right">${cur(Math.round(bill.total_amount))}</td></tr>
   </tfoot>
 </table>
@@ -262,6 +310,7 @@ ${bill.customer_phone ? `<div><b>Phone:</b> ${bill.customer_phone}</div>` : ''}
 <div><b>Payment:</b> ${(bill.payment_method ?? '').toUpperCase()} | <b>Status:</b> ${(bill.payment_status ?? '').toUpperCase()}</div>
 <div class="div"></div>
 <div class="c" style="margin-top:4px">Thank you for your purchase!</div>
+${shopData?.gst_type === 'composite' ? `<div class="c b" style="margin-top:3px;font-size:8px">Composition taxable person,<br/>not eligible to collect tax on supplies</div>` : ''}
 <div class="c" style="font-size:9px;margin-top:2px">Powered by RxDesk</div>
 </body></html>`;
   const w = window.open('', '_blank', 'width=440,height=680');
@@ -272,8 +321,14 @@ ${bill.customer_phone ? `<div><b>Phone:</b> ${bill.customer_phone}</div>` : ''}
   setTimeout(() => { w.print(); setTimeout(() => w.close(), 600); }, 300);
 }
 
-function sendWhatsApp(bill: BillData, shopName = 'Medical Shop') {
+function sendWhatsApp(bill: BillData, shopName = 'Medical Shop', shopData?: any) {
   const displayName = bill.customer_name ?? bill.patient?.full_name ?? 'Walk-in Customer';
+  const customerGstin = bill.customer_gstin ?? '';
+
+  const shopStateNormalized = normalizeState(shopData?.state || 'West Bengal');
+  const billingStateNormalized = normalizeState(bill.billing_state);
+  const isInterState = billingStateNormalized && shopStateNormalized && billingStateNormalized !== shopStateNormalized;
+
   const date = new Date(bill.created_at).toLocaleDateString('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric',
   });
@@ -285,13 +340,18 @@ function sendWhatsApp(bill: BillData, shopName = 'Medical Shop') {
   msg += `📋 Bill: *${bill.bill_number}*\n`;
   msg += `📅 Date: ${date}\n`;
   msg += `👤 Customer: ${displayName}\n`;
+  if (customerGstin) msg += `🆔 GSTIN: ${customerGstin}\n`;
   if (bill.customer_phone) msg += `📞 Phone: ${bill.customer_phone}\n`;
   msg += `\n*Items:*\n${itemLines}\n\n`;
   msg += `Subtotal: ${cur(bill.subtotal)}\n`;
   if (bill.discount_amount > 0) msg += `Discount: -${cur(bill.discount_amount)}\n`;
   if (bill.gst_amount > 0) {
-    msg += `CGST: ${cur(bill.gst_amount / 2)}\n`;
-    msg += `SGST: ${cur(bill.gst_amount / 2)}\n`;
+    if (isInterState) {
+      msg += `IGST: ${cur(bill.gst_amount)}\n`;
+    } else {
+      msg += `CGST: ${cur(bill.gst_amount / 2)}\n`;
+      msg += `SGST: ${cur(bill.gst_amount / 2)}\n`;
+    }
   }
   msg += `💰 *Total: ${cur(Math.round(bill.total_amount))}*\n`;
   msg += `\nPayment: ${(bill.payment_method ?? '').toUpperCase()} | ${(bill.payment_status ?? '').toUpperCase()}\n`;
@@ -487,12 +547,22 @@ function NewBillTab() {
             {bill.discount_amount > 0 && (
               <div className="flex justify-between text-emerald-600"><span>Discount</span><span>-{fmtCurrency(bill.discount_amount)}</span></div>
             )}
-            {bill.gst_amount > 0 && (
-              <>
-                <div className="flex justify-between text-gray-500"><span>CGST</span><span>{fmtCurrency(bill.gst_amount / 2)}</span></div>
-                <div className="flex justify-between text-gray-500"><span>SGST</span><span>{fmtCurrency(bill.gst_amount / 2)}</span></div>
-              </>
-            )}
+            {(() => {
+              if (bill.gst_amount <= 0) return null;
+              const shopStateNormalized = normalizeState(shopData?.state);
+              const billingStateNormalized = normalizeState(bill.billing_state);
+              const isInterState = billingStateNormalized && shopStateNormalized && billingStateNormalized !== shopStateNormalized;
+
+              if (isInterState) {
+                return <div className="flex justify-between text-gray-500"><span>IGST</span><span>{fmtCurrency(bill.gst_amount)}</span></div>;
+              }
+              return (
+                <>
+                  <div className="flex justify-between text-gray-500"><span>CGST</span><span>{fmtCurrency(bill.gst_amount / 2)}</span></div>
+                  <div className="flex justify-between text-gray-500"><span>SGST</span><span>{fmtCurrency(bill.gst_amount / 2)}</span></div>
+                </>
+              );
+            })()}
             <div className="flex justify-between font-bold text-gray-900 text-lg mt-2 pt-3 border-t border-gray-200">
               <span>Total</span><span>{fmtCurrency(Math.round(bill.total_amount))}</span>
             </div>
@@ -522,7 +592,7 @@ function NewBillTab() {
               🖨️ Print Receipt
             </button>
             <button
-              onClick={() => sendWhatsApp(bill!, shopName)}
+              onClick={() => sendWhatsApp(bill!, shopName, shopData)}
               className="flex-1 flex items-center justify-center gap-1.5 bg-green-50 border border-green-200 rounded-xl py-2.5 text-sm font-semibold text-green-700 hover:bg-green-100 transition-all"
             >
               💬 WhatsApp
@@ -621,12 +691,22 @@ function BillDetailModal({ bill, onClose, onPay }: {
             {bill.discount_amount > 0 && (
               <div className="flex justify-between text-sm text-emerald-600"><span>Discount</span><span className="font-medium">−{fmtCurrency(bill.discount_amount)}</span></div>
             )}
-            {bill.gst_amount > 0 && (
-              <>
-                <div className="flex justify-between text-sm text-gray-500"><span>CGST</span><span className="font-medium">{fmtCurrency(bill.gst_amount / 2)}</span></div>
-                <div className="flex justify-between text-sm text-gray-500"><span>SGST</span><span className="font-medium">{fmtCurrency(bill.gst_amount / 2)}</span></div>
-              </>
-            )}
+            {(() => {
+              if (bill.gst_amount <= 0) return null;
+              const shopStateNormalized = normalizeState(shopData?.state);
+              const billingStateNormalized = normalizeState(bill.billing_state);
+              const isInterState = billingStateNormalized && shopStateNormalized && billingStateNormalized !== shopStateNormalized;
+
+              if (isInterState) {
+                return <div className="flex justify-between text-sm text-gray-500"><span>IGST</span><span className="font-medium">{fmtCurrency(bill.gst_amount)}</span></div>;
+              }
+              return (
+                <>
+                  <div className="flex justify-between text-sm text-gray-500"><span>CGST</span><span className="font-medium">{fmtCurrency(bill.gst_amount / 2)}</span></div>
+                  <div className="flex justify-between text-sm text-gray-500"><span>SGST</span><span className="font-medium">{fmtCurrency(bill.gst_amount / 2)}</span></div>
+                </>
+              );
+            })()}
             <div className="flex justify-between font-black text-violet-800 text-2xl pt-3 border-t border-violet-200/50 mt-1">
               <span>Total</span><span>{fmtCurrency(Math.round(bill.total_amount))}</span>
             </div>
@@ -657,10 +737,10 @@ function BillDetailModal({ bill, onClose, onPay }: {
               Print Invoice
             </button>
             <button
-              onClick={() => sendWhatsApp(bill, shopName)}
+              onClick={() => sendWhatsApp(bill, shopName, shopData)}
               className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 text-white rounded-xl py-3 text-sm font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100 active:scale-95"
             >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" /></svg>
               WhatsApp
             </button>
           </div>
@@ -930,6 +1010,15 @@ interface WalkInItem {
   inventory_id?: string;
   stock_qty?: number;
 }
+const INDIAN_STATES = [
+  'Andaman and Nicobar Islands', 'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar',
+  'Chandigarh', 'Chhattisgarh', 'Dadra and Nagar Haveli and Daman and Diu', 'Delhi', 'Goa',
+  'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu and Kashmir', 'Jharkhand', 'Karnataka',
+  'Kerala', 'Ladakh', 'Lakshadweep', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya',
+  'Mizoram', 'Nagaland', 'Odisha', 'Puducherry', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
+  'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal'
+];
+
 const EMPTY_ITEM: WalkInItem = {
   medicine_name: '',
   unit: 'strip',
@@ -948,6 +1037,10 @@ function WalkInSaleTab() {
   const qc = useQueryClient();
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [customerGstin, setCustomerGstin] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [customerState, setCustomerState] = useState('');
+  const [showCustomerDetails, setShowCustomerDetails] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'card' | 'credit' | 'pending'>('cash');
   const [globalDiscount, setGlobalDiscount] = useState('');
   const [items, setItems] = useState<WalkInItem[]>([{ ...EMPTY_ITEM }]);
@@ -1114,7 +1207,7 @@ function WalkInSaleTab() {
     setValidationError(null);
 
     const activeItems = items.filter(it => it.medicine_name.trim() !== '' || Number(it.mrp) > 0 || Number(it.quantity) > 0);
-    
+
     if (activeItems.length === 0) {
       setValidationError('Please add at least one medicine item');
       return;
@@ -1127,10 +1220,13 @@ function WalkInSaleTab() {
     }
 
     const validItems = activeItems.filter((it) => it.medicine_name.trim() && Number(it.mrp) > 0 && Number(it.quantity) > 0);
-    
+
     createMutation.mutate({
       customer_name: customerName || undefined,
       customer_phone: customerPhone || undefined,
+      customer_gstin: customerGstin || undefined,
+      billing_address: customerAddress || undefined,
+      billing_state: customerState || undefined,
       payment_method: paymentMethod,
       discount_amount: calcGlobalDiscount,
       items: validItems.map((it) => ({
@@ -1155,6 +1251,10 @@ function WalkInSaleTab() {
     { id: 'credit', label: 'Credit', icon: '📝' },
     { id: 'pending', label: 'Pay Later', icon: '⏳' },
   ];
+
+  useEffect(() => {
+    if (isTaxInvoice) setShowCustomerDetails(true);
+  }, [isTaxInvoice]);
 
   if (createdBill) {
     const displayName = createdBill.customer_name ?? createdBill.patient?.full_name ?? 'Walk-in Customer';
@@ -1192,12 +1292,22 @@ function WalkInSaleTab() {
           <div className="space-y-1.5 text-sm mb-5">
             <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{fmtCurrency(createdBill.subtotal)}</span></div>
             {createdBill.discount_amount > 0 && <div className="flex justify-between text-emerald-600"><span>Discount</span><span>−{fmtCurrency(createdBill.discount_amount)}</span></div>}
-            {createdBill.gst_amount > 0 && (
-              <>
-                <div className="flex justify-between text-gray-500"><span>CGST</span><span>{fmtCurrency(createdBill.gst_amount / 2)}</span></div>
-                <div className="flex justify-between text-gray-500"><span>SGST</span><span>{fmtCurrency(createdBill.gst_amount / 2)}</span></div>
-              </>
-            )}
+            {(() => {
+              if (createdBill.gst_amount <= 0) return null;
+              const shopStateNormalized = normalizeState(shopData?.state);
+              const billingStateNormalized = normalizeState(createdBill.billing_state);
+              const isInterState = billingStateNormalized && shopStateNormalized && billingStateNormalized !== shopStateNormalized;
+
+              if (isInterState) {
+                return <div className="flex justify-between text-gray-500"><span>IGST</span><span>{fmtCurrency(createdBill.gst_amount)}</span></div>;
+              }
+              return (
+                <>
+                  <div className="flex justify-between text-gray-500"><span>CGST</span><span>{fmtCurrency(createdBill.gst_amount / 2)}</span></div>
+                  <div className="flex justify-between text-gray-500"><span>SGST</span><span>{fmtCurrency(createdBill.gst_amount / 2)}</span></div>
+                </>
+              );
+            })()}
             <div className="flex justify-between font-bold text-gray-900 text-xl pt-3 border-t border-gray-200"><span>Total</span><span className="text-violet-700">{fmtCurrency(Math.round(createdBill.total_amount))}</span></div>
           </div>
 
@@ -1226,7 +1336,7 @@ function WalkInSaleTab() {
               🖨️ Print Receipt
             </button>
             <button
-              onClick={() => sendWhatsApp(createdBill, shopName)}
+              onClick={() => sendWhatsApp(createdBill, shopName, shopData)}
               className="flex-1 flex items-center justify-center gap-1.5 bg-green-50 border border-green-200 rounded-xl py-2.5 text-sm font-semibold text-green-700 hover:bg-green-100 transition-all"
             >
               💬 WhatsApp
@@ -1282,8 +1392,13 @@ function WalkInSaleTab() {
                   else if (e.key === 'Enter' && customerHighlight >= 0 && customerSearchResults[customerHighlight]) {
                     e.preventDefault();
                     const c = customerSearchResults[customerHighlight];
-                    setCustomerPhone(c.customer_phone); setCustomerName(c.customer_name ?? '');
+                    setCustomerPhone(c.customer_phone);
+                    setCustomerName(c.customer_name ?? '');
+                    setCustomerGstin(c.customer_gstin ?? '');
+                    setCustomerAddress(c.billing_address ?? '');
+                    setCustomerState(c.billing_state ?? '');
                     setShowCustomerDropdown(false); setCustomerHighlight(-1);
+                    if (c.customer_gstin || c.billing_address) setShowCustomerDetails(true);
                     setTimeout(() => medicineInputRefs.current[0]?.focus(), 0);
                   } else if (e.key === 'Escape') {
                     setCustomerName(''); setCustomerPhone('');
@@ -1302,7 +1417,11 @@ function WalkInSaleTab() {
                       onMouseDown={() => {
                         setCustomerPhone(c.customer_phone);
                         setCustomerName(c.customer_name ?? '');
+                        setCustomerGstin(c.customer_gstin ?? '');
+                        setCustomerAddress(c.billing_address ?? '');
+                        setCustomerState(c.billing_state ?? '');
                         setShowCustomerDropdown(false); setCustomerHighlight(-1);
+                        if (c.customer_gstin || c.billing_address) setShowCustomerDetails(true);
                         setTimeout(() => medicineInputRefs.current[0]?.focus(), 0);
                       }}
                       className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors ${i === customerHighlight ? 'bg-violet-100' : 'hover:bg-violet-50'}`}
@@ -1331,6 +1450,61 @@ function WalkInSaleTab() {
               />
             </div>
           </div>
+
+          {/* New Customer / GST Details Toggle */}
+          <div className="mt-3">
+            {!showCustomerDetails ? (
+              <button
+                type="button"
+                onClick={() => setShowCustomerDetails(true)}
+                className="text-xs font-medium text-violet-600 hover:text-violet-700 flex items-center gap-1 border border-violet-100 bg-violet-50/50 px-3 py-1.5 rounded-lg"
+              >
+                + Add Customer GSTIN / Address (B2B Sale)
+              </button>
+            ) : (
+              <div className="bg-gray-50 rounded-xl p-4 border border-dashed border-gray-200 space-y-3">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">GST & Billing Details</span>
+                  <button type="button" onClick={() => setShowCustomerDetails(false)} className="text-gray-400 hover:text-red-500">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-1">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">GSTIN</label>
+                    <input
+                      type="text"
+                      placeholder="19XXXXX..."
+                      value={customerGstin}
+                      onChange={(e) => setCustomerGstin(e.target.value.toUpperCase())}
+                      className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500"
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">State / Place of Supply</label>
+                    <select
+                      value={customerState}
+                      onChange={(e) => setCustomerState(e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500"
+                    >
+                      <option value="">Select State</option>
+                      {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Address</label>
+                    <input
+                      type="text"
+                      placeholder="Billing Address"
+                      value={customerAddress}
+                      onChange={(e) => setCustomerAddress(e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Items */}
@@ -1341,7 +1515,7 @@ function WalkInSaleTab() {
           </h3>
           <div className="space-y-2">
             {/* Header row */}
-            <div className="grid gap-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-1" style={{gridTemplateColumns: isTaxInvoice ? '2fr 0.8fr 1fr 1fr 0.7fr 1.1fr 1.2fr 0.8fr 40px' : '2fr 0.8fr 1fr 1fr 0.7fr 1.2fr 1.2fr 40px'}}>
+            <div className="grid gap-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-1" style={{ gridTemplateColumns: isTaxInvoice ? '2fr 0.8fr 1fr 1fr 0.7fr 1.1fr 1.2fr 0.8fr 40px' : '2fr 0.8fr 1fr 1fr 0.7fr 1.2fr 1.2fr 40px' }}>
               <div>Medicine</div>
               <div>Unit</div>
               <div>Batch</div>
@@ -1354,7 +1528,7 @@ function WalkInSaleTab() {
             </div>
             {items.map((item, idx) => (
               <div key={idx} className="relative">
-                <div className="grid gap-2 items-center" style={{gridTemplateColumns: isTaxInvoice ? '2fr 0.8fr 1fr 1fr 0.7fr 1.1fr 1.2fr 0.8fr 40px' : '2fr 0.8fr 1fr 1fr 0.7fr 1.2fr 1.2fr 40px'}}>
+                <div className="grid gap-2 items-center" style={{ gridTemplateColumns: isTaxInvoice ? '2fr 0.8fr 1fr 1fr 0.7fr 1.1fr 1.2fr 0.8fr 40px' : '2fr 0.8fr 1fr 1fr 0.7fr 1.2fr 1.2fr 40px' }}>
                   <div className="relative">
                     <input
                       ref={(el) => { medicineInputRefs.current[idx] = el; }}
@@ -1368,20 +1542,20 @@ function WalkInSaleTab() {
                         if (e.key === 'ArrowDown') { e.preventDefault(); setSuggHighlights((p) => ({ ...p, [idx]: Math.min(h + 1, suggs.length - 1) })); }
                         else if (e.key === 'ArrowUp') { e.preventDefault(); setSuggHighlights((p) => ({ ...p, [idx]: Math.max(h - 1, 0) })); }
                         else if (e.key === 'Enter' && h >= 0 && suggs[h]) { e.preventDefault(); selectSuggestion(idx, suggs[h]); }
-                        else if (e.key === 'Enter' && (h < 0 || suggs.length === 0)) { 
-                          e.preventDefault(); 
+                        else if (e.key === 'Enter' && (h < 0 || suggs.length === 0)) {
+                          e.preventDefault();
                           if (!item.medicine_name.trim()) {
                             setTriedToSubmit(true);
                             setValidationError('Medicine name cannot be blank');
                           } else {
-                            setSuggestions((p) => ({ ...p, [idx]: [] })); 
-                            unitSelectRefs.current[idx]?.focus(); 
+                            setSuggestions((p) => ({ ...p, [idx]: [] }));
+                            unitSelectRefs.current[idx]?.focus();
                           }
                         }
-                        else if (e.key === 'Escape') { 
+                        else if (e.key === 'Escape') {
                           if ((suggestions[idx]?.length ?? 0) > 0) {
-                            setSuggestions((p) => ({ ...p, [idx]: [] })); 
-                            setSuggHighlights((p) => ({ ...p, [idx]: -1 })); 
+                            setSuggestions((p) => ({ ...p, [idx]: [] }));
+                            setSuggHighlights((p) => ({ ...p, [idx]: -1 }));
                           } else {
                             if (!item.medicine_name.trim() && items.length > 1) {
                               removeItem(idx);
@@ -1495,15 +1669,15 @@ function WalkInSaleTab() {
                     />
                   </div>
                   {isTaxInvoice && (
-                  <div>
-                    <select
-                      value={item.gst_rate}
-                      onChange={(e) => updateItem(idx, 'gst_rate', e.target.value)}
-                      className="w-full border border-gray-200 rounded-lg px-2 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 bg-white"
-                    >
-                      {['0', '5', '12', '18', '28'].map((r) => <option key={r} value={r}>{r}%</option>)}
-                    </select>
-                  </div>
+                    <div>
+                      <select
+                        value={item.gst_rate}
+                        onChange={(e) => updateItem(idx, 'gst_rate', e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg px-2 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 bg-white"
+                      >
+                        {['0', '5', '12', '18', '28'].map((r) => <option key={r} value={r}>{r}%</option>)}
+                      </select>
+                    </div>
                   )}
                   <div className="flex justify-center">
                     <button
@@ -1569,11 +1743,10 @@ function WalkInSaleTab() {
                 <button
                   key={m.id}
                   onClick={() => setPaymentMethod(m.id)}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                    paymentMethod === m.id
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${paymentMethod === m.id
                       ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
                       : 'border-gray-200 text-gray-600 hover:border-violet-300 hover:text-violet-600'
-                  }`}
+                    }`}
                 >
                   {m.icon} {m.label}
                 </button>
@@ -1628,7 +1801,7 @@ function WalkInSaleTab() {
             <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Creating Bill…</>
           ) : (
             <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
-            Generate Bill</>
+              Generate Bill</>
           )}
         </button>
       </div>
@@ -1652,7 +1825,7 @@ export default function BillingPage() {
           <h1 className="text-3xl font-black text-gray-900 tracking-tight">Billing Center</h1>
           <p className="text-gray-400 text-sm mt-1 font-medium italic">Efficient sales & prescription management</p>
         </div>
-        
+
         {/* Today's Mini Dashboard */}
         <div className="flex gap-3">
           <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 shadow-sm flex items-center gap-3">
@@ -1696,8 +1869,8 @@ export default function BillingPage() {
             key={id}
             onClick={() => setTab(id)}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${tab === id
-                ? 'bg-white text-gray-900 shadow-sm border border-gray-200/80'
-                : 'text-gray-500 hover:text-gray-700'
+              ? 'bg-white text-gray-900 shadow-sm border border-gray-200/80'
+              : 'text-gray-500 hover:text-gray-700'
               }`}
           >
             {icon}
