@@ -1047,7 +1047,7 @@ function WalkInSaleTab() {
   const [createdBill, setCreatedBill] = useState<BillData | null>(null);
   const [suggestions, setSuggestions] = useState<Record<number, { id: string; medicine_name: string; unit?: string; mrp: number; gst_rate: number; batch_number: string; expiry_date: string; stock_qty: number }[]>>({});
   const searchTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
-  const [customerSearchResults, setCustomerSearchResults] = useState<{ customer_name: string | null; customer_phone: string }[]>([]);
+  const [customerSearchResults, setCustomerSearchResults] = useState<{ customer_name: string | null; customer_phone: string; customer_gstin?: string; billing_address?: string; billing_state?: string }[]>([]);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const customerSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const medicineInputRefs = useRef<(HTMLInputElement | null)[]>([]);
