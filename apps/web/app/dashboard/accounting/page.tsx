@@ -2467,7 +2467,7 @@ function SaleReturnTab() {
     setBillSearch(q);
     if (q.length < 2) { setBillSuggestions([]); return; }
     try {
-      const res = await billApi.list({ q, limit: 10 });
+      const res = await billApi.list({ search: q, limit: 10 });
       setBillSuggestions(res.data.data.items || []);
     } catch (err) { console.error(err); }
   };
