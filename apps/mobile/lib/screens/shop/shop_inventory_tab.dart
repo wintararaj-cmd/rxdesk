@@ -116,7 +116,11 @@ class _ShopInventoryTabState extends State<ShopInventoryTab> {
                           ),
                         ),
                         title: Text(item['medicine_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                        subtitle: Text('Qty: $stock  |  MRP: ₹${item['mrp'] ?? 0}', style: const TextStyle(fontSize: 12)),
+                        subtitle: Text(
+                          'Qty: $stock  |  MRP: ₹${item['mrp'] ?? 0}\n'
+                          'Batch: ${item['batch_number'] ?? 'N/A'}  |  Exp: ${item['expiry_date'] != null ? (item['expiry_date'] as String).split('T')[0] : 'N/A'}',
+                          style: const TextStyle(fontSize: 11),
+                        ),
                         trailing: isLow
                             ? Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),

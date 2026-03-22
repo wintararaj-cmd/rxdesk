@@ -20,15 +20,29 @@ class _ShopSaleScreenState extends State<ShopSaleScreen> {
   bool _isLoading = false;
 
   final _nameCtrl     = TextEditingController(text: 'Walk-in Customer');
+  final _gstinCtrl    = TextEditingController();
+  final _addressCtrl  = TextEditingController();
   final _discountCtrl = TextEditingController();
   String _customerPhone = '';
   String _paymentMethod = 'cash';
+  String? _selectedState;
+  bool _showGstDetails = false;
 
   final _paymentOptions = const [
     ('cash', 'Cash', Icons.payments_outlined),
     ('upi', 'UPI', Icons.qr_code),
     ('card', 'Card', Icons.credit_card),
     ('pending', 'Pay Later', Icons.schedule),
+  ];
+
+  final _indianStates = const [
+    'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+    'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
+    'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
+    'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
+    'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+    'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Puducherry', 'Chandigarh',
+    'Dadra and Nagar Haveli and Daman and Diu', 'Lakshadweep', 'Andaman and Nicobar Islands'
   ];
 
   // Items list
@@ -49,6 +63,8 @@ class _ShopSaleScreenState extends State<ShopSaleScreen> {
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _gstinCtrl.dispose();
+    _addressCtrl.dispose();
     _discountCtrl.dispose();
     for (var i in _items) { i.dispose(); }
     _customerDebounce?.cancel();
@@ -143,6 +159,9 @@ class _ShopSaleScreenState extends State<ShopSaleScreen> {
       final payload = {
         'customer_phone': _customerPhone.trim(),
         'customer_name': _nameCtrl.text.trim(),
+        'customer_gstin': _gstinCtrl.text.trim().isEmpty ? null : _gstinCtrl.text.trim(),
+        'billing_address': _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
+        'billing_state': _selectedState,
         'items': payloadItems,
         'discount_amount': double.tryParse(_discountCtrl.text) ?? 0.0,
         'payment_method': _paymentMethod,
@@ -168,6 +187,10 @@ class _ShopSaleScreenState extends State<ShopSaleScreen> {
 
   void _reset() {
     _nameCtrl.text = 'Walk-in Customer';
+    _gstinCtrl.clear();
+    _addressCtrl.clear();
+    _selectedState = null;
+    _showGstDetails = false;
     _discountCtrl.clear();
     _customerPhone = '';
     for (final item in _items) { item.dispose(); }
@@ -234,6 +257,12 @@ class _ShopSaleScreenState extends State<ShopSaleScreen> {
             pw.Text('Medical Shop', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center),
             pw.SizedBox(height: 10),
             pw.Text('Bill: $billNo', style: const pw.TextStyle(fontSize: 10)),
+            if (bill['customer_name'] != null && bill['customer_name'] != 'Walk-in Customer')
+              pw.Text('Customer: ${bill['customer_name']}', style: const pw.TextStyle(fontSize: 9)),
+            if (bill['customer_gstin'] != null)
+              pw.Text('GSTIN: ${bill['customer_gstin']}', style: const pw.TextStyle(fontSize: 9)),
+            if (bill['billing_address'] != null)
+              pw.Text('Address: ${bill['billing_address']}', style: const pw.TextStyle(fontSize: 9), maxLines: 2),
             pw.Divider(),
             pw.Row(
               children: [
@@ -317,9 +346,14 @@ class _ShopSaleScreenState extends State<ShopSaleScreen> {
     final billNo = bill['bill_number'] ?? 'N/A';
     final total = bill['total_amount'] ?? 0;
     final gst = bill['gst_amount'] ?? 0;
+    final name = bill['customer_name'] ?? 'Walk-in Customer';
+    final gstin = bill['customer_gstin'];
     
     String gstText = gst > 0 ? '\nCGST: Rs.${(gst/2).toStringAsFixed(2)}\nSGST: Rs.${(gst/2).toStringAsFixed(2)}' : '';
-    String msg = '🧾 *Medical Shop*\n📋 Bill: *$billNo*$gstText\n💰 *Total: Rs.${(total as num).round()}*\n\nThank you!';
+    String customerInfo = name != 'Walk-in Customer' ? '\nCust: $name' : '';
+    if (gstin != null) customerInfo += '\nGSTIN: $gstin';
+
+    String msg = '🧾 *Medical Shop*\n📋 Bill: *$billNo*$customerInfo$gstText\n💰 *Total: Rs.${(total as num).round()}*\n\nThank you!';
     final encoded = Uri.encodeComponent(msg);
     final raw = customerPhone.replaceAll(RegExp(r'\D'), '');
     final phone = raw.length == 10 ? '91$raw' : raw;
@@ -384,11 +418,19 @@ class _ShopSaleScreenState extends State<ShopSaleScreen> {
                       title: Text(c['customer_phone'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
                       subtitle: Text(c['customer_name'] ?? ''),
                       onTap: () {
-                        _customerPhone = c['customer_phone'] ?? '';
-                        if ((c['customer_name'] ?? '').toString().isNotEmpty) {
-                          _nameCtrl.text = c['customer_name'];
-                        }
-                        setState(() => _customerSuggestions = []);
+                        setState(() {
+                          _customerPhone = c['customer_phone'] ?? '';
+                          if ((c['customer_name'] ?? '').toString().isNotEmpty) {
+                            _nameCtrl.text = c['customer_name'];
+                          }
+                          _gstinCtrl.text = c['customer_gstin'] ?? '';
+                          _addressCtrl.text = c['billing_address'] ?? '';
+                          _selectedState = c['billing_state'];
+                          if (_gstinCtrl.text.isNotEmpty || _addressCtrl.text.isNotEmpty) {
+                            _showGstDetails = true;
+                          }
+                          _customerSuggestions = [];
+                        });
                       },
                     )).toList(),
                   ),
@@ -401,6 +443,63 @@ class _ShopSaleScreenState extends State<ShopSaleScreen> {
                   prefixIcon: Icon(Icons.person_outline),
                 ),
               ),
+              const SizedBox(height: 12),
+              
+              // GST Toggle Button
+              if (!_showGstDetails)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => setState(() => _showGstDetails = true),
+                    icon: const Icon(Icons.add_business_outlined, size: 16, color: Color(0xFF7C3AED)),
+                    label: const Text('Add GST & Billing Details', style: TextStyle(color: Color(0xFF7C3AED), fontSize: 13, fontWeight: FontWeight.w600)),
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 0), tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                  ),
+                ),
+
+              if (_showGstDetails) ...[
+                const Divider(height: 24),
+                Row(
+                  children: [
+                    const Text('GST & BILLING', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF9CA3AF), letterSpacing: 0.5)),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 16, color: Color(0xFF9CA3AF)),
+                      onPressed: () => setState(() => _showGstDetails = false),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _gstinCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'GSTIN',
+                    hintText: '19XXXXX...',
+                    prefixIcon: Icon(Icons.verified_user_outlined),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _selectedState,
+                  decoration: const InputDecoration(
+                    labelText: 'State / Place of Supply',
+                    prefixIcon: Icon(Icons.map_outlined),
+                  ),
+                  items: _indianStates.map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 14)))).toList(),
+                  onChanged: (v) => setState(() => _selectedState = v),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _addressCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Billing Address',
+                    prefixIcon: Icon(Icons.location_on_outlined),
+                  ),
+                  maxLines: 2,
+                ),
+              ],
             ]),
           ),
 
