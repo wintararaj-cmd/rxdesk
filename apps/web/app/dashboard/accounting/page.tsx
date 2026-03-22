@@ -73,7 +73,10 @@ interface Supplier {
   contact_person: string | null;
   phone: string | null;
   city: string | null;
+  state: string | null;
+  address: string | null;
   gstin: string | null;
+  gst_number: string | null;
 }
 
 interface Purchase {
