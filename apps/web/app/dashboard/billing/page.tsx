@@ -1252,9 +1252,7 @@ function WalkInSaleTab() {
     { id: 'pending', label: 'Pay Later', icon: '⏳' },
   ];
 
-  useEffect(() => {
-    if (isTaxInvoice) setShowCustomerDetails(true);
-  }, [isTaxInvoice]);
+  // Automatically expanding is removed to keep it minimized by default as requested.
 
   if (createdBill) {
     const displayName = createdBill.customer_name ?? createdBill.patient?.full_name ?? 'Walk-in Customer';
