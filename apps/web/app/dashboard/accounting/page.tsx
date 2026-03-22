@@ -1525,6 +1525,105 @@ function PurchaseDetailModal({ id, onClose }: { id: string; onClose: () => void 
   );
 }
 
+function PurchaseReturnDetailModal({ id, onClose }: { id: string; onClose: () => void }) {
+  const { data: r, isLoading } = useQuery<any>({
+    queryKey: ['web-purchase-return-detail', id],
+    queryFn: () => accountingApi.getPurchaseReturnById(id).then((res) => res.data.data),
+  });
+
+  if (isLoading || !r) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+      <div className="bg-white rounded-[2rem] w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+        {/* Modal Header */}
+        <div className="p-8 border-b border-gray-100 flex items-start justify-between relative overflow-hidden bg-rose-50/50">
+          <div className="absolute top-0 right-0 p-8 opacity-5">
+            <svg className="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c0 .621 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
+          </div>
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <span className="px-2.5 py-1 bg-rose-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest">Debit Note (Purchase Return)</span>
+              <span className="text-gray-400 font-mono text-sm font-bold">#{r.return_number}</span>
+            </div>
+            <h2 className="text-3xl font-black text-gray-900 tracking-tight">{r.supplier?.name ?? '—'}</h2>
+            <div className="flex gap-4 mt-2 text-sm text-gray-500 font-medium">
+              <span className="flex items-center gap-1.5">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>
+                Return Date: {new Date(r.return_date).toLocaleDateString()}
+              </span>
+              {r.invoice_ref && (
+                <span className="flex items-center gap-1.5">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  Invoice Ref: {r.invoice_ref}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+             <button onClick={() => window.print()} className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2 shadow-sm transition-all">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.89l-4.72-4.72m0 0l4.72-4.72M2 9.17h18a2 2 0 012 2v10.99" /></svg>
+              Print Debit Note
+            </button>
+            <button onClick={onClose} className="w-10 h-10 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-900 transition-colors shadow-sm">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Modal Content */}
+        <div className="flex-1 overflow-y-auto p-8 space-y-8 no-scrollbar print:p-0">
+          <div>
+            <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 ml-1">Returned Items</h4>
+            <div className="border border-gray-100 rounded-3xl overflow-hidden shadow-sm">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50/50">
+                  <tr className="text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100">
+                    <th className="px-5 py-4">Medicine & Batch</th>
+                    <th className="px-5 py-4 text-center">GST</th>
+                    <th className="px-5 py-4 text-right">Price × Qty</th>
+                    <th className="px-5 py-4 text-right">Line Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {r.items?.map((item: any) => (
+                    <tr key={item.id}>
+                      <td className="px-5 py-4">
+                        <p className="font-bold text-gray-900">{item.medicine_name}</p>
+                        <p className="text-[10px] font-mono text-gray-400">BATCH: {item.batch_number || '—'}</p>
+                      </td>
+                      <td className="px-5 py-4 text-center text-gray-600 font-medium">
+                        {item.gst_rate}%
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <p className="font-medium text-gray-900">{fmt(item.purchase_price)} × {item.quantity}</p>
+                      </td>
+                      <td className="px-5 py-4 text-right font-black text-gray-900">{fmt(item.line_total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-rose-50/30">
+                  <tr>
+                    <td colSpan={3} className="px-5 py-4 text-right text-xs font-black text-gray-500 uppercase tracking-widest">Grand Total Value</td>
+                    <td className="px-5 py-4 text-right font-black text-rose-600 text-lg">{fmt(r.total_amount)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          {r.reason && (
+            <div className="bg-amber-50 rounded-2xl p-6 border border-amber-100">
+              <h4 className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-2">Reason for Return</h4>
+              <p className="text-sm text-amber-900 font-medium">{r.reason}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  Outstandings Tab
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1911,6 +2010,13 @@ function LedgerPanel({ data, type, ledger, payAmount, setPayAmount, payMethod, s
           notes: 'Payment Made', 
           type: 'payment_received', 
           amount: py.amount 
+        })) ?? []),
+        ...(ledger?.purchase_returns?.map((pr: any) => ({ 
+          id: pr.id, 
+          transaction_date: pr.return_date, 
+          notes: `Purchase Return - ${pr.return_number}`, 
+          type: 'payment_received', 
+          amount: pr.total_amount 
         })) ?? [])
       ]
   ).sort((a: any, b: any) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime());
@@ -2369,20 +2475,61 @@ function SaleReturnTab() {
 // ─────────────────────────────────────────────────────────────────────────────
 //  Purchase Return Tab
 // ─────────────────────────────────────────────────────────────────────────────
-const EMPTY_PR_ITEM = { medicine_name: '', unit: 'strip', batch_number: '', quantity: '1', purchase_price: '', gst_rate: '12' };
+const EMPTY_PR_ITEM = { medicine_name: '', unit: 'strip', batch_number: '', quantity: '1', purchase_price: '', gst_rate: '12', selected: true };
 type PRItem = typeof EMPTY_PR_ITEM;
 
 function PurchaseReturnTab() {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [prSupplierId, setPrSupplierId] = useState('');
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
   const [invoiceRef, setInvoiceRef] = useState('');
   const [prReturnDate, setPrReturnDate] = useState(TODAY_STR);
   const [prReason, setPrReason] = useState('');
   const [prItems, setPrItems] = useState<PRItem[]>([{ ...EMPTY_PR_ITEM }]);
   const [prSuggestions, setPrSuggestions] = useState<Record<number, { id: string; medicine_name: string; unit?: string; mrp: number; gst_rate: number }[]>>({});
   const [prHighlights, setPrHighlights] = useState<Record<number, number>>({});
+  const [selectedReturnId, setSelectedReturnId] = useState<string | null>(null);
   const prTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+
+  const { data: supplierInvoicesRes } = useQuery({
+    queryKey: ['web-supplier-purchases', prSupplierId],
+    queryFn: () => accountingApi.listPurchases({ supplier_id: prSupplierId, limit: 100 }).then(r => r.data.data),
+    enabled: !!prSupplierId,
+  });
+  const supplierInvoices = supplierInvoicesRes?.items ?? [];
+
+  const loadInvoiceItems = async (purchaseId: string) => {
+    if (!purchaseId) {
+      setSelectedInvoiceId('');
+      setInvoiceRef('');
+      return;
+    }
+    const inv = supplierInvoices.find((i: any) => i.id === purchaseId);
+    if (!inv) return;
+    
+    setSelectedInvoiceId(purchaseId);
+    setInvoiceRef(inv.invoice_number);
+
+    try {
+      const res = await accountingApi.getPurchaseById(purchaseId);
+      const data = res.data.data;
+      if (data?.items?.length) {
+        setPrItems(data.items.map((it: any) => ({
+          medicine_name: it.medicine_name,
+          unit: it.unit || 'strip',
+          batch_number: it.batch_number || '',
+          quantity: String(it.quantity),
+          purchase_price: String(it.purchase_price),
+          gst_rate: String(it.gst_rate || 12),
+          selected: true,
+        })));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to load invoice items');
+    }
+  };
 
   const { data: suppliersData } = useQuery<{ id: string; name: string }[]>({
     queryKey: ['web-suppliers'],
@@ -2399,7 +2546,7 @@ function PurchaseReturnTab() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['web-purchase-returns'] });
       setPrItems([{ ...EMPTY_PR_ITEM }]); setPrSuggestions({}); setPrHighlights({});
-      setPrSupplierId(''); setInvoiceRef(''); setPrReturnDate(TODAY_STR); setPrReason('');
+      setPrSupplierId(''); setSelectedInvoiceId(''); setInvoiceRef(''); setPrReturnDate(TODAY_STR); setPrReason('');
       setShowForm(false);
     },
   });
@@ -2421,7 +2568,7 @@ function PurchaseReturnTab() {
     setPrHighlights((p) => ({ ...p, [idx]: -1 }));
   };
 
-  const prLineTotal = (it: PRItem) => Number(it.quantity) * Number(it.purchase_price) * (1 + (Number(it.gst_rate) || 0) / 100);
+  const prLineTotal = (it: PRItem) => it.selected ? (Number(it.quantity) * Number(it.purchase_price) * (1 + (Number(it.gst_rate) || 0) / 100)) : 0;
   const prCalcTotal = prItems.reduce((s, it) => s + prLineTotal(it), 0);
 
   return (
@@ -2448,8 +2595,25 @@ function PurchaseReturnTab() {
             </div>
             <div>
               <label className="text-xs font-medium text-gray-500 block mb-1">Invoice Ref</label>
-              <input type="text" placeholder="Original invoice no." value={invoiceRef} onChange={(e) => setInvoiceRef(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              <div className="flex gap-2">
+                <select 
+                  value={selectedInvoiceId} 
+                  onChange={(e) => loadInvoiceItems(e.target.value)}
+                  className="flex-1 border border-gray-200 rounded-lg px-2 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                >
+                  <option value="">— Select Invoice —</option>
+                  {supplierInvoices.map((inv: any) => (
+                    <option key={inv.id} value={inv.id}>{inv.invoice_number} ({new Date(inv.invoice_date).toLocaleDateString()})</option>
+                  ))}
+                </select>
+                <input 
+                  type="text" 
+                  placeholder="Manual Ref" 
+                  value={invoiceRef} 
+                  onChange={(e) => { setInvoiceRef(e.target.value); setSelectedInvoiceId(''); }}
+                  className="w-24 border border-gray-200 rounded-lg px-2 h-9 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400" 
+                />
+              </div>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-500 block mb-1">Return Date *</label>
@@ -2464,16 +2628,25 @@ function PurchaseReturnTab() {
           </div>
 
           <div>
-            <div className="grid gap-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-1 mb-1" style={{gridTemplateColumns:'2.5fr 0.9fr 1.5fr 0.8fr 1.5fr 0.9fr 1fr'}}>
-              <div>Medicine</div><div>Unit</div><div>Batch</div>
+            <div className="grid gap-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-1 mb-1" style={{gridTemplateColumns:'0.3fr 2.5fr 0.9fr 1.5fr 0.8fr 1.5fr 0.9fr 1fr'}}>
+              <div className="text-center">✔</div><div>Medicine</div><div>Unit</div><div>Batch</div>
               <div>Qty</div><div>Cost (₹)</div>
               <div>GST%</div><div className="text-right">Total</div>
             </div>
             <div className="space-y-2">
               {prItems.map((item, idx) => (
-                <div key={idx} className="grid gap-1.5 items-center" style={{gridTemplateColumns:'2.5fr 0.9fr 1.5fr 0.8fr 1.5fr 0.9fr 1fr'}}>
+                <div key={idx} className={`grid gap-1.5 items-center p-1 rounded-lg transition-colors ${item.selected ? 'bg-blue-50/30' : 'opacity-40 grayscale'}`} style={{gridTemplateColumns:'0.3fr 2.5fr 0.9fr 1.5fr 0.8fr 1.5fr 0.9fr 1fr'}}>
+                  <div className="flex justify-center">
+                    <input 
+                      type="checkbox" 
+                      checked={item.selected} 
+                      onChange={(e) => updatePrItem(idx, 'selected' as any, e.target.checked as any)}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+                    />
+                  </div>
                   <div className="relative">
                     <input type="text" placeholder="Medicine name" value={item.medicine_name} onChange={(e) => updatePrItem(idx, 'medicine_name', e.target.value)}
+                      disabled={!item.selected}
                       onKeyDown={(e) => {
                         const suggs = prSuggestions[idx] ?? [];
                         const h = prHighlights[idx] ?? -1;
@@ -2482,7 +2655,7 @@ function PurchaseReturnTab() {
                         else if (e.key === 'Enter' && h >= 0 && suggs[h]) { e.preventDefault(); selectPrSug(idx, suggs[h]); }
                         else if (e.key === 'Escape') { setPrSuggestions((p) => ({ ...p, [idx]: [] })); setPrHighlights((p) => ({ ...p, [idx]: -1 })); }
                       }}
-                      className="w-full border border-gray-200 rounded-lg px-2 h-8 text-xs outline-none focus:border-blue-500" />
+                      className="w-full border border-gray-200 rounded-lg px-2 h-8 text-xs outline-none focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400" />
                     {prSuggestions[idx]?.length > 0 && (
                       <div className="absolute z-30 top-full mt-0.5 left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg max-h-36 overflow-y-auto">
                         {prSuggestions[idx].map((s, si) => (
@@ -2494,11 +2667,11 @@ function PurchaseReturnTab() {
                       </div>
                     )}
                   </div>
-                  <div><select value={item.unit} onChange={(e) => updatePrItem(idx, 'unit', e.target.value)} className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs bg-white outline-none focus:border-blue-500">{['strip','bottle','packet','vial','tube','piece','box'].map((u) => <option key={u} value={u}>{u}</option>)}</select></div>
-                  <div><input type="text" placeholder="Batch" value={item.batch_number} onChange={(e) => updatePrItem(idx, 'batch_number', e.target.value)} className="w-full border border-gray-200 rounded-lg px-2 h-8 text-xs outline-none focus:border-blue-500" /></div>
-                  <div><input type="number" min="1" value={item.quantity} onChange={(e) => updatePrItem(idx, 'quantity', e.target.value)} className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs outline-none text-center focus:border-blue-500" /></div>
-                  <div><input type="number" min="0" step="0.01" placeholder="0.00" value={item.purchase_price} onChange={(e) => updatePrItem(idx, 'purchase_price', e.target.value)} className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs outline-none focus:border-blue-500" /></div>
-                  <div><select value={item.gst_rate} onChange={(e) => updatePrItem(idx, 'gst_rate', e.target.value)} className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs bg-white outline-none focus:border-blue-500">{GST_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}</select></div>
+                  <div><select value={item.unit} disabled={!item.selected} onChange={(e) => updatePrItem(idx, 'unit', e.target.value)} className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs bg-white outline-none focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400">{['strip','bottle','packet','vial','tube','piece','box'].map((u) => <option key={u} value={u}>{u}</option>)}</select></div>
+                  <div><input type="text" placeholder="Batch" value={item.batch_number} disabled={!item.selected} onChange={(e) => updatePrItem(idx, 'batch_number', e.target.value)} className="w-full border border-gray-200 rounded-lg px-2 h-8 text-xs outline-none focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400" /></div>
+                  <div><input type="number" min="1" value={item.quantity} disabled={!item.selected} onChange={(e) => updatePrItem(idx, 'quantity', e.target.value)} className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs outline-none text-center focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400" /></div>
+                  <div><input type="number" min="0" step="0.01" placeholder="0.00" value={item.purchase_price} disabled={!item.selected} onChange={(e) => updatePrItem(idx, 'purchase_price', e.target.value)} className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs outline-none focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400" /></div>
+                  <div><select value={item.gst_rate} disabled={!item.selected} onChange={(e) => updatePrItem(idx, 'gst_rate', e.target.value)} className="w-full border border-gray-200 rounded-lg px-1 h-8 text-xs bg-white outline-none focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400">{GST_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}</select></div>
                   <div className="flex items-center justify-between gap-1">
                     <span className="text-xs font-semibold text-blue-700 truncate">{prLineTotal(item) > 0 ? fmt(prLineTotal(item)) : '—'}</span>
                     <button onClick={() => setPrItems((p) => p.filter((_, i) => i !== idx))} disabled={prItems.length === 1} className="text-gray-300 hover:text-red-500 disabled:opacity-20 shrink-0"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
@@ -2516,10 +2689,24 @@ function PurchaseReturnTab() {
             <div className="flex gap-3">
               <button onClick={() => setShowForm(false)} className="text-gray-500 text-sm px-4 py-2 hover:text-gray-700">Cancel</button>
               <button onClick={() => {
-                const valid = prItems.filter((it) => it.medicine_name && Number(it.quantity) > 0 && Number(it.purchase_price) > 0);
+                const valid = prItems.filter((it) => it.selected && it.medicine_name && Number(it.quantity) > 0 && Number(it.purchase_price) > 0);
                 if (!valid.length) return;
-                createMutation.mutate({ supplier_id: prSupplierId || undefined, invoice_ref: invoiceRef || undefined, return_date: prReturnDate, reason: prReason || undefined, items: valid.map((it) => ({ medicine_name: it.medicine_name, unit: it.unit || 'strip', batch_number: it.batch_number || undefined, quantity: Number(it.quantity), purchase_price: Number(it.purchase_price), gst_rate: Number(it.gst_rate) || 12 })) });
-              }} disabled={createMutation.isPending || !prItems.some((it) => it.medicine_name && Number(it.quantity) > 0 && Number(it.purchase_price) > 0)}
+                createMutation.mutate({ 
+                  supplier_id: prSupplierId || undefined, 
+                  invoice_ref: invoiceRef || undefined, 
+                  purchase_entry_id: selectedInvoiceId || undefined,
+                  return_date: prReturnDate, 
+                  reason: prReason || undefined, 
+                  items: valid.map((it) => ({ 
+                    medicine_name: it.medicine_name, 
+                    unit: it.unit || 'strip', 
+                    batch_number: it.batch_number || undefined, 
+                    quantity: Number(it.quantity), 
+                    purchase_price: Number(it.purchase_price), 
+                    gst_rate: Number(it.gst_rate) || 12 
+                  })) 
+                });
+              }} disabled={createMutation.isPending || !prItems.some((it) => it.selected && it.medicine_name && Number(it.quantity) > 0 && Number(it.purchase_price) > 0)}
                 className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
                 {createMutation.isPending ? 'Saving…' : 'Save Return'}
               </button>
@@ -2539,13 +2726,23 @@ function PurchaseReturnTab() {
             </tr></thead>
             <tbody className="divide-y divide-gray-50">
               {(listData?.items ?? []).map((r: any) => (
-                <tr key={r.id} className="hover:bg-gray-50/50">
+                <tr key={r.id} className="hover:bg-gray-50/50 group">
                   <td className="px-5 py-3 font-mono text-xs text-gray-600">{r.return_number}</td>
                   <td className="px-5 py-3 text-gray-600">{new Date(r.return_date).toLocaleDateString('en-IN')}</td>
-                  <td className="px-5 py-3 text-gray-800">{r.supplier?.name ?? '—'}</td>
+                  <td className="px-5 py-3 text-gray-800 font-medium">{r.supplier?.name ?? '—'}</td>
                   <td className="px-5 py-3 text-gray-500 text-xs">{r.invoice_ref ?? '—'}</td>
-                  <td className="px-5 py-3 text-gray-500 text-xs">{r.reason ?? '—'}</td>
-                  <td className="px-5 py-3 text-right font-semibold text-blue-600">{fmt(r.total_amount)}</td>
+                  <td className="px-5 py-4 text-right">
+                    <div className="flex items-center justify-end gap-3">
+                      <span className="font-bold text-rose-600">{fmt(r.total_amount)}</span>
+                      <button 
+                        onClick={() => setSelectedReturnId(r.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-all"
+                        title="View Debit Note"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -2553,6 +2750,8 @@ function PurchaseReturnTab() {
           {!(listData?.items?.length) && <p className="text-center text-gray-400 py-10 text-sm">No purchase returns recorded</p>}
         </div>
       )}
+
+      {selectedReturnId && <PurchaseReturnDetailModal id={selectedReturnId} onClose={() => setSelectedReturnId(null)} />}
     </div>
   );
 }

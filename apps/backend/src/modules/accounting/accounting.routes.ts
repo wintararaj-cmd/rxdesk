@@ -365,6 +365,13 @@ router.post('/purchase-returns', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/purchase-returns/:id', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.getPurchaseReturnById(req.user!.id, req.params.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 // ─── Contra Entries ────────────────────────────────────────────────────────────────────────────
 
 router.get('/contra-entries', shopAuth, async (req, res, next) => {

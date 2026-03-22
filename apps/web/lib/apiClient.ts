@@ -211,6 +211,7 @@ export const accountingApi = {
   // Purchase Returns
   listPurchaseReturns: (params?: object) => apiClient.get('/accounting/purchase-returns', { params }),
   createPurchaseReturn: (data: object) => apiClient.post('/accounting/purchase-returns', data),
+  getPurchaseReturnById: (id: string) => apiClient.get(`/accounting/purchase-returns/${id}`),
 
   // Contra Entries
   listContraEntries: (params?: object) => apiClient.get('/accounting/contra-entries', { params }),

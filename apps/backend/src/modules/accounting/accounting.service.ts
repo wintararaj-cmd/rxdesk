@@ -136,24 +136,43 @@ export async function getSupplierWithLedger(userId: string, supplierId: string) 
           payment_date: true, reference_no: true,
         },
       },
+      purchase_returns: {
+        orderBy: { return_date: 'desc' },
+        take: 20,
+        select: {
+          id: true, return_number: true, return_date: true,
+          total_amount: true, reason: true,
+        },
+      },
     },
   });
   if (!supplier) throw new AppError(404, 'NOT_FOUND', 'Supplier not found');
 
-  const totalPurchases = await prisma.purchaseEntry.aggregate({
-    where: { supplier_id: supplierId, shop_id: shop.id },
-    _sum: { total_amount: true },
-  });
-  const totalPaid = await prisma.supplierPayment.aggregate({
-    where: { supplier_id: supplierId, shop_id: shop.id },
-    _sum: { amount: true },
-  });
+  const [totalPurchases, totalPaid, totalReturned] = await Promise.all([
+    prisma.purchaseEntry.aggregate({
+      where: { supplier_id: supplierId, shop_id: shop.id },
+      _sum: { total_amount: true },
+    }),
+    prisma.supplierPayment.aggregate({
+      where: { supplier_id: supplierId, shop_id: shop.id },
+      _sum: { amount: true },
+    }),
+    prisma.purchaseReturn.aggregate({
+      where: { supplier_id: supplierId, shop_id: shop.id },
+      _sum: { total_amount: true },
+    }),
+  ]);
+
+  const purchased = Number(totalPurchases._sum.total_amount ?? 0);
+  const paid = Number(totalPaid._sum.amount ?? 0);
+  const returned = Number(totalReturned._sum.total_amount ?? 0);
 
   return {
     ...supplier,
-    total_purchases: Number(totalPurchases._sum.total_amount ?? 0),
-    total_paid: Number(totalPaid._sum.amount ?? 0),
-    outstanding: Number(totalPurchases._sum.total_amount ?? 0) - Number(totalPaid._sum.amount ?? 0),
+    total_purchases: purchased,
+    total_paid: paid,
+    total_returned: returned,
+    outstanding: purchased - paid - returned,
   };
 }
 
@@ -1111,14 +1130,21 @@ export async function listOutstandings(userId: string) {
       _sum: { amount: true },
     });
 
+    const returnSums = await prisma.purchaseReturn.groupBy({
+      by: ['supplier_id'],
+      where: { shop_id: shop.id, supplier_id: { not: null } },
+      _sum: { total_amount: true },
+    });
+
     const suppliersWithStats = suppliers.map((s) => {
       const totalPurchased = Number(purchaseSums.find((p) => p.supplier_id === s.id)?._sum.total_amount ?? 0);
       const totalPaid = Number(paymentSums.find((p) => p.supplier_id === s.id)?._sum.amount ?? 0);
+      const totalReturned = Number(returnSums.find((p) => p.supplier_id === s.id)?._sum.total_amount ?? 0);
       return {
         ...s,
-        total_outstanding: totalPurchased - totalPaid,
+        total_outstanding: totalPurchased - totalPaid - totalReturned,
       };
-    }).filter(s => s.total_outstanding !== 0);
+    }).filter(s => Math.abs(s.total_outstanding) > 0.01);
 
     return {
       receivables: customers,
@@ -1138,7 +1164,7 @@ export async function getProfitAndLoss(userId: string, from: string, to: string)
   const shop = await getShopOrThrow(userId);
   const dateFilter = { gte: new Date(from), lte: new Date(to) };
 
-  const [salesIncome, otherIncome, allPurchasesInRange, allExpenses] = await Promise.all([
+  const [salesIncome, otherIncome, allPurchasesInRange, allReturnsInRange, allExpenses] = await Promise.all([
     // Revenue: bill payments received in range
     prisma.incomeEntry.aggregate({
       where: { shop_id: shop.id, entry_type: 'sale_income', entry_date: dateFilter },
@@ -1154,6 +1180,11 @@ export async function getProfitAndLoss(userId: string, from: string, to: string)
       where: { shop_id: shop.id, received_date: dateFilter },
       _sum: { total_amount: true },
     }),
+    // Returns adjustment for COGS
+    prisma.purchaseReturn.aggregate({
+      where: { shop_id: shop.id, return_date: dateFilter },
+      _sum: { total_amount: true },
+    }),
     // Expenses (manual only)
     prisma.expenseEntry.groupBy({
       by: ['category'],
@@ -1163,7 +1194,9 @@ export async function getProfitAndLoss(userId: string, from: string, to: string)
   ]);
 
   const totalRevenue = Number(salesIncome._sum.amount ?? 0) + Number(otherIncome._sum.amount ?? 0);
-  const cogs = Number(allPurchasesInRange._sum.total_amount ?? 0);
+  const costOfPurchases = Number(allPurchasesInRange._sum.total_amount ?? 0);
+  const costOfReturns = Number(allReturnsInRange._sum.total_amount ?? 0);
+  const cogs = costOfPurchases - costOfReturns;
   const grossProfit = totalRevenue - cogs;
 
   const expensesByCategory: Record<string, number> = {};
@@ -1669,6 +1702,7 @@ export async function listSaleReturns(userId: string, opts: { from?: string; to?
 
 export interface CreatePurchaseReturnInput {
   supplier_id?: string;
+  purchase_entry_id?: string;
   invoice_ref?: string;
   return_date?: string;
   reason?: string;
@@ -1699,6 +1733,7 @@ export async function createPurchaseReturn(userId: string, input: CreatePurchase
         shop_id: shop.id,
         return_number: returnNumber,
         supplier_id: input.supplier_id ?? null,
+        purchase_entry_id: input.purchase_entry_id ?? null,
         invoice_ref: input.invoice_ref,
         return_date: new Date(input.return_date ?? new Date()),
         total_amount: totalAmount,
@@ -1746,6 +1781,20 @@ export async function listPurchaseReturns(userId: string, opts: { from?: string;
     prisma.purchaseReturn.findMany({ where, include: { items: true, supplier: { select: { id: true, name: true } } }, orderBy: { return_date: 'desc' }, skip: (page - 1) * limit, take: limit }),
   ]);
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+}
+
+export async function getPurchaseReturnById(userId: string, id: string) {
+  const shop = await getShopOrThrow(userId);
+  const data = await prisma.purchaseReturn.findFirst({
+    where: { id, shop_id: shop.id },
+    include: {
+      items: true,
+      supplier: { select: { id: true, name: true, phone: true, address: true, city: true, state: true, gst_number: true } },
+      purchase_entry: { select: { id: true, invoice_number: true, invoice_date: true } },
+    },
+  });
+  if (!data) throw new AppError(404, 'NOT_FOUND', 'Purchase return not found');
+  return data;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

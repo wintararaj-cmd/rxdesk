@@ -416,6 +416,42 @@ Response: {
 }
 ```
 
+#### Purchase Returns (Debit Notes)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/accounting/purchase-returns` | List purchase returns (paginated, filter by date) |
+| POST | `/accounting/purchase-returns` | Record purchase return (decrements inventory) |
+| GET | `/accounting/purchase-returns/:id` | View debit note detail with items |
+
+```json
+// POST /accounting/purchase-returns
+Request: {
+  "supplier_id": "uuid",
+  "purchase_entry_id": "uuid", // optional reference
+  "invoice_ref": "SUP-2026-4421",
+  "return_date": "2026-03-22",
+  "reason": "Damaged goods",
+  "items": [
+    {
+      "medicine_name": "Paracetamol 500mg",
+      "batch_number": "B2245",
+      "quantity": 10,
+      "purchase_price": 2.10,
+      "gst_rate": 12
+    }
+  ]
+}
+Response: {
+  "data": {
+    "id": "uuid",
+    "return_number": "PR-0001",
+    "total_amount": 23.52,
+    "inventory_updated": true
+  }
+}
+```
+
 #### Supplier Payments
 
 | Method | Endpoint | Description |
