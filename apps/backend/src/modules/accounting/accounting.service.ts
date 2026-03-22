@@ -2440,10 +2440,18 @@ export async function generateGstr2Excel(userId: string, month: number, year: nu
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 0, 23, 59, 59);
 
+  // Fetch Purchases (B2B, B2BUR)
   const purchases = await prisma.purchaseEntry.findMany({
     where: { shop_id: shop.id, received_date: { gte: start, lte: end } },
     include: { items: true, supplier: true },
     orderBy: { received_date: 'asc' },
+  });
+
+  // Fetch Purchase Returns (CDNR, CDNUR)
+  const purchaseReturns = await prisma.purchaseReturn.findMany({
+    where: { shop_id: shop.id, return_date: { gte: start, lte: end } },
+    include: { items: true, supplier: true },
+    orderBy: { return_date: 'asc' },
   });
 
   const workbook = new ExcelJS.Workbook();
@@ -2494,11 +2502,56 @@ export async function generateGstr2Excel(userId: string, month: number, year: nu
     { header: 'Availed ITC Cess', key: 'itc_cess', width: 15 },
   ];
 
+  // 3. CDNR Sheet (Credit/Debit Note - Registered)
+  const cdnrSheet = workbook.addWorksheet('CDNR');
+  cdnrSheet.columns = [
+    { header: 'GSTIN of Supplier', key: 'gstin', width: 20 },
+    { header: 'Note/Refund Voucher Number', key: 'note_no', width: 20 },
+    { header: 'Note/Refund Voucher Date', key: 'note_date', width: 15 },
+    { header: 'Note/Refund Voucher Value', key: 'note_val', width: 15 },
+    { header: 'Place Of Supply', key: 'pos', width: 20 },
+    { header: 'Note Type', key: 'note_type', width: 10 },
+    { header: 'Reverse Charge', key: 'rev_charge', width: 15 },
+    { header: 'Rate', key: 'rate', width: 10 },
+    { header: 'Taxable Value', key: 'taxable_val', width: 15 },
+    { header: 'Integrated Tax Paid', key: 'igst', width: 15 },
+    { header: 'Central Tax Paid', key: 'cgst', width: 15 },
+    { header: 'State/UT Tax Paid', key: 'sgst', width: 15 },
+    { header: 'Cess Paid', key: 'cess', width: 12 },
+    { header: 'Eligibility For ITC', key: 'itc_eligibility', width: 20 },
+    { header: 'Availed ITC Integrated Tax', key: 'itc_igst', width: 20 },
+    { header: 'Availed ITC Central Tax', key: 'itc_cgst', width: 18 },
+    { header: 'Availed ITC State/UT Tax', key: 'itc_sgst', width: 20 },
+    { header: 'Availed ITC Cess', key: 'itc_cess', width: 15 },
+  ];
+
+  // 4. CDNUR Sheet (Credit/Debit Note - Unregistered)
+  const cdnurSheet = workbook.addWorksheet('CDNUR');
+  cdnurSheet.columns = [
+    { header: 'Note/Refund Voucher Number', key: 'note_no', width: 20 },
+    { header: 'Note/Refund Voucher Date', key: 'note_date', width: 15 },
+    { header: 'Note/Refund Voucher Value', key: 'note_val', width: 15 },
+    { header: 'Place Of Supply', key: 'pos', width: 20 },
+    { header: 'Note Type', key: 'note_type', width: 10 },
+    { header: 'Rate', key: 'rate', width: 10 },
+    { header: 'Taxable Value', key: 'taxable_val', width: 15 },
+    { header: 'Integrated Tax Paid', key: 'igst', width: 15 },
+    { header: 'Central Tax Paid', key: 'cgst', width: 15 },
+    { header: 'State/UT Tax Paid', key: 'sgst', width: 15 },
+    { header: 'Cess Paid', key: 'cess', width: 12 },
+    { header: 'Eligibility For ITC', key: 'itc_eligibility', width: 20 },
+    { header: 'Availed ITC Integrated Tax', key: 'itc_igst', width: 20 },
+    { header: 'Availed ITC Central Tax', key: 'itc_cgst', width: 18 },
+    { header: 'Availed ITC State/UT Tax', key: 'itc_sgst', width: 20 },
+    { header: 'Availed ITC Cess', key: 'itc_cess', width: 15 },
+  ];
+
   // Formatting: Bold headers
-  [b2bSheet, b2burSheet].forEach(sheet => {
+  [b2bSheet, b2burSheet, cdnrSheet, cdnurSheet].forEach(sheet => {
     sheet.getRow(1).font = { bold: true };
   });
 
+  // Populate B2B & B2BUR
   for (const pur of purchases) {
     const isRegistered = !!pur.supplier?.gst_number;
     const supplierStateNormalized = normalizeState(pur.supplier?.state || shop.state);
@@ -2506,12 +2559,11 @@ export async function generateGstr2Excel(userId: string, month: number, year: nu
     const pos = pur.supplier?.state || shop.state || 'N/A';
     const dateStr = pur.invoice_date.toISOString().split('T')[0];
 
-    // Group items by tax rate for GSTR-2 reporting
+    // Group items by tax rate
     const rates = Array.from(new Set(pur.items.map(i => Number(i.gst_rate))));
     
     for (const rate of rates) {
       const itemsAtRate = pur.items.filter(i => Number(i.gst_rate) === rate);
-      // PurchaseItem.line_total is taxable + GST, so we reverse it
       const totalLineAtRate = itemsAtRate.reduce((sum, item) => sum + Number(item.line_total), 0);
       const taxableAtRate = totalLineAtRate / (1 + rate / 100);
       const totalGst = totalLineAtRate - taxableAtRate;
@@ -2555,7 +2607,61 @@ export async function generateGstr2Excel(userId: string, month: number, year: nu
     }
   }
 
+  // Populate CDNR & CDNUR
+  for (const ret of purchaseReturns) {
+    const isRegistered = !!ret.supplier?.gst_number;
+    const supplierStateNormalized = normalizeState(ret.supplier?.state || shop.state);
+    const isInterState = supplierStateNormalized && shopStateNormalized && supplierStateNormalized !== shopStateNormalized;
+    const pos = ret.supplier?.state || shop.state || 'N/A';
+    const dateStr = ret.return_date.toISOString().split('T')[0];
+    const totalVal = Number(ret.total_amount);
+
+    // Group items by tax rate
+    const rates = Array.from(new Set(ret.items.map(i => Number(i.gst_rate))));
+    
+    for (const rate of rates) {
+      const itemsAtRate = ret.items.filter(i => Number(i.gst_rate) === rate);
+      const totalLineAtRate = itemsAtRate.reduce((sum, item) => sum + Number(item.line_total), 0);
+      const taxableAtRate = totalLineAtRate / (1 + rate / 100);
+      const totalGst = totalLineAtRate - taxableAtRate;
+      
+      let cgst = 0, sgst = 0, igst = 0;
+      if (isInterState) igst = totalGst;
+      else { cgst = totalGst / 2; sgst = totalGst / 2; }
+      
+      const rowData = {
+        note_no: ret.return_number,
+        note_date: dateStr,
+        note_val: totalVal,
+        pos: pos,
+        note_type: 'D', // Typically D for purchase return (Debit Note)
+        rate: rate,
+        taxable_val: taxableAtRate,
+        igst: igst,
+        cgst: cgst,
+        sgst: sgst,
+        cess: 0,
+        itc_eligibility: 'Inputs',
+        itc_igst: igst,
+        itc_cgst: cgst,
+        itc_sgst: sgst,
+        itc_cess: 0,
+      };
+
+      if (isRegistered) {
+        cdnrSheet.addRow({
+          ...rowData,
+          gstin: ret.supplier?.gst_number,
+          rev_charge: 'N',
+        });
+      } else {
+        cdnurSheet.addRow(rowData);
+      }
+    }
+  }
+
   return workbook.xlsx.writeBuffer();
 }
+
 
 
