@@ -299,6 +299,10 @@ model MedicalShop {
   show_hsn_code       Boolean            @default(true)
   show_batch_no       Boolean            @default(true)
   printer_type        PrinterType        @default(thermal)
+  // Backup Settings
+  auto_backup_enabled Boolean            @default(false)
+  backup_time         String?
+  backup_path         String?            @default("/rxdesk")
   created_at          DateTime           @default(now())
   updated_at          DateTime           @updatedAt
 
