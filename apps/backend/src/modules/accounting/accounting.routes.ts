@@ -438,4 +438,32 @@ router.post('/backups/trigger', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ─── GSTR Reports (Excel) ────────────────────────────────────────────────────────
+router.get('/reports/gstr1-excel', shopAuth, async (req, res, next) => {
+  try {
+    const month = parseInt(req.query.month as string);
+    const year = parseInt(req.query.year as string);
+    if (!month || !year) return res.status(400).json({ success: false, message: 'Month and year are required' });
+    
+    const buffer = await service.generateGstr1Excel(req.user!.id, month, year);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=GSTR1_${month}_${year}.xlsx`);
+    res.send(buffer);
+  } catch (err) { next(err); }
+});
+
+router.get('/reports/gstr2-excel', shopAuth, async (req, res, next) => {
+  try {
+    const month = parseInt(req.query.month as string);
+    const year = parseInt(req.query.year as string);
+    if (!month || !year) return res.status(400).json({ success: false, message: 'Month and year are required' });
+
+    const buffer = await service.generateGstr2Excel(req.user!.id, month, year);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=GSTR2_${month}_${year}.xlsx`);
+    res.send(buffer);
+  } catch (err) { next(err); }
+});
+
 export default router;
+

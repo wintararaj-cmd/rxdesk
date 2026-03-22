@@ -1391,7 +1391,7 @@ function WalkInSaleTab() {
                   else if (e.key === 'ArrowUp') { e.preventDefault(); setCustomerHighlight((h) => Math.max(h - 1, 0)); }
                   else if (e.key === 'Enter' && customerHighlight >= 0 && customerSearchResults[customerHighlight]) {
                     e.preventDefault();
-                    const c = customerSearchResults[customerHighlight];
+                    const c = customerSearchResults[customerHighlight] as any;
                     setCustomerPhone(c.customer_phone);
                     setCustomerName(c.customer_name ?? '');
                     setCustomerGstin(c.customer_gstin ?? '');
@@ -1415,6 +1415,7 @@ function WalkInSaleTab() {
                       key={i}
                       type="button"
                       onMouseDown={() => {
+                        const c = customerSearchResults[i] as any;
                         setCustomerPhone(c.customer_phone);
                         setCustomerName(c.customer_name ?? '');
                         setCustomerGstin(c.customer_gstin ?? '');
