@@ -94,7 +94,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       final refreshToken = data['refresh_token']  as String;
       final user   = data['user'] as Map<String, dynamic>? ?? {};
       final role   = user['role'] as String? ?? 'patient';
-      final hasPass = data['has_password'] as bool? ?? false;
+      final requiresSetup = user['requires_password_setup'] as bool? ?? false;
 
       await AuthService.saveSession(
         accessToken: accessToken,
@@ -104,7 +104,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         name: user['name']?.toString(),
       );
 
-      if (!hasPass) {
+      if (requiresSetup) {
         // First login — ask to set a password
         _setStep(_Step.setPassword);
         return;

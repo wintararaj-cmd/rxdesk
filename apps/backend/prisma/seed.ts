@@ -85,38 +85,21 @@ async function main() {
   // ── Medicines ───────────────────────────────────────────────────────────────
   await seedMedicineCatalog();
 
-  // Admin User
+  // ── Admin User ───────────────────────────────────────────────────────────────
+  // Phone must be stored in E.164 format (+91XXXXXXXXXX) to match the auth flow
   const rawAdminPhone = process.env.ADMIN_PHONE ?? '9999999999';
   const adminPhone = rawAdminPhone.startsWith('+91') ? rawAdminPhone : `+91${rawAdminPhone}`;
-  
-  const hashedPassword = await bcrypt.hash('RxDesk@123', 12);
-
   const adminUser = await prisma.user.upsert({
     where: { phone: adminPhone },
-    update: { 
-      role: UserRole.admin, 
-      is_verified: true, 
-      is_active: true,
-      // Only set password if it doesn't exist
-    },
+    update: { role: UserRole.admin, is_verified: true, is_active: true },
     create: {
       phone: adminPhone,
-      password: hashedPassword,
       role: UserRole.admin,
       is_verified: true,
       is_active: true,
     },
   });
-  
-  // If user exists but has no password, set it
-  if (!adminUser.password) {
-    await prisma.user.update({
-      where: { id: adminUser.id },
-      data: { password: hashedPassword }
-    });
-  }
-  
-  console.log(`✅ Admin user ready: ${adminUser.phone} (Role: ${adminUser.role})`);
+  console.log(`✅ Admin user ready: ${adminUser.phone}`);
 
   // ── Auto-upgrade Basic to Standard (fix for current users) ──────────────────────
   const standardPlan = plans.find(p => p.name === 'Standard');

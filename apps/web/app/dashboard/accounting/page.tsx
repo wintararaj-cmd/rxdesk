@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, Fragment, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { accountingApi, inventoryApi, medicinesApi, shopApi } from '../../../lib/apiClient';
+import { accountingApi, inventoryApi, medicinesApi, shopApi, billApi } from '../../../lib/apiClient';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function fmt(n: number) {
