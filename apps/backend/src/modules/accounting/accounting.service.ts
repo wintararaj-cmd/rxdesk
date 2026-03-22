@@ -1696,6 +1696,14 @@ export async function listSaleReturns(userId: string, opts: { from?: string; to?
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
 }
 
+export async function getSaleReturnById(userId: string, id: string) {
+  const shop = await getShopOrThrow(userId);
+  return prisma.saleReturn.findFirst({
+    where: { id, shop_id: shop.id },
+    include: { items: true, shop: true },
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  Purchase Returns
 // ─────────────────────────────────────────────────────────────────────────────

@@ -1525,6 +1525,104 @@ function PurchaseDetailModal({ id, onClose }: { id: string; onClose: () => void 
   );
 }
 
+function SaleReturnDetailModal({ id, onClose }: { id: string; onClose: () => void }) {
+  const { data: r, isLoading } = useQuery<any>({
+    queryKey: ['web-sale-return-detail', id],
+    queryFn: () => accountingApi.getSaleReturnById(id).then((res) => res.data.data),
+  });
+
+  if (isLoading || !r) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+      <div className="bg-white rounded-[2rem] w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+        {/* Modal Header */}
+        <div className="p-8 border-b border-gray-100 flex items-start justify-between relative overflow-hidden bg-orange-50/50">
+          <div className="absolute top-0 right-0 p-8 opacity-5">
+            <svg className="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c0 .621 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
+          </div>
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <span className="px-2.5 py-1 bg-orange-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest">Credit Note (Sale Return)</span>
+              <span className="text-gray-400 font-mono text-sm font-bold">#{r.return_number}</span>
+            </div>
+            <h2 className="text-3xl font-black text-gray-900 tracking-tight">{r.customer_name ?? 'Walk-in Customer'}</h2>
+            <div className="flex gap-4 mt-2 text-sm text-gray-500 font-medium">
+              <span className="flex items-center gap-1.5">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>
+                Return Date: {new Date(r.return_date).toLocaleDateString()}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3" /></svg>
+                Refund: {r.refund_method.toUpperCase()}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+             <button onClick={() => window.print()} className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2 shadow-sm transition-all">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.89l-4.72-4.72m0 0l4.72-4.72M2 9.17h18a2 2 0 012 2v10.99" /></svg>
+              Print Credit Note
+            </button>
+            <button onClick={onClose} className="w-10 h-10 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-900 transition-colors shadow-sm">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Modal Content */}
+        <div className="flex-1 overflow-y-auto p-8 space-y-8 no-scrollbar print:p-0">
+          <div>
+            <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 ml-1">Returned Items</h4>
+            <div className="border border-gray-100 rounded-3xl overflow-hidden shadow-sm">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50/50">
+                  <tr className="text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100">
+                    <th className="px-5 py-4">Medicine & Batch</th>
+                    <th className="px-5 py-4 text-center">GST</th>
+                    <th className="px-5 py-4 text-right">MRP × Qty</th>
+                    <th className="px-5 py-4 text-right">Line Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {r.items?.map((item: any) => (
+                    <tr key={item.id}>
+                      <td className="px-5 py-4">
+                        <p className="font-bold text-gray-900">{item.medicine_name}</p>
+                        <p className="text-[10px] font-mono text-gray-400">BATCH: {item.batch_number || '—'}</p>
+                      </td>
+                      <td className="px-5 py-4 text-center text-gray-600 font-medium">
+                        {item.gst_rate}%
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <p className="font-medium text-gray-900">{fmt(item.mrp)} × {item.quantity}</p>
+                        {Number(item.discount_pct) > 0 && <p className="text-[10px] text-orange-500 font-bold">-{item.discount_pct}% OFF</p>}
+                      </td>
+                      <td className="px-5 py-4 text-right font-black text-gray-900">{fmt(item.line_total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-orange-50/30">
+                  <tr>
+                    <td colSpan={3} className="px-5 py-4 text-right text-xs font-black text-gray-500 uppercase tracking-widest">Total Refund Value</td>
+                    <td className="px-5 py-4 text-right font-black text-orange-600 text-lg">{fmt(r.total_amount)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          {r.reason && (
+            <div className="bg-blue-50 rounded-2xl p-6 border border-blue-100">
+              <h4 className="text-[10px] font-black text-blue-700 uppercase tracking-widest mb-2">Reason for Return</h4>
+              <p className="text-sm text-blue-900 font-medium">{r.reason}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PurchaseReturnDetailModal({ id, onClose }: { id: string; onClose: () => void }) {
   const { data: r, isLoading } = useQuery<any>({
     queryKey: ['web-purchase-return-detail', id],
@@ -2302,6 +2400,10 @@ function SaleReturnTab() {
   const [srItems, setSrItems] = useState<SRItem[]>([{ ...EMPTY_SR_ITEM }]);
   const [srSuggestions, setSrSuggestions] = useState<Record<number, { id: string; medicine_name: string; unit?: string; mrp: number; gst_rate: number }[]>>({});
   const [srHighlights, setSrHighlights] = useState<Record<number, number>>({});
+  const [selectedReturnId, setSelectedReturnId] = useState<string | null>(null);
+  const [selectedBillId, setSelectedBillId] = useState('');
+  const [billSearch, setBillSearch] = useState('');
+  const [billSuggestions, setBillSuggestions] = useState<any[]>([]);
   const srTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
   const { data: listData, isLoading } = useQuery<{ items: any[]; total: number }>({
@@ -2339,6 +2441,37 @@ function SaleReturnTab() {
   const srLineTotal = (it: SRItem) => Number(it.quantity) * Number(it.mrp) * (1 - (Number(it.discount_pct) || 0) / 100);
   const srCalcTotal = srItems.reduce((s, it) => s + srLineTotal(it), 0);
 
+  const loadBillItems = async (bill: any) => {
+    setSelectedBillId(bill.id);
+    setCustomerName(bill.customer_name || 'Walk-in');
+    setBillSearch(bill.bill_number);
+    setBillSuggestions([]);
+    try {
+      const res = await billApi.getById(bill.id);
+      const data = res.data.data;
+      if (data?.items?.length) {
+        setSrItems(data.items.map((it: any) => ({
+          medicine_name: it.medicine_name,
+          unit: it.unit || 'strip',
+          batch_number: it.batch_number || '',
+          quantity: String(it.quantity),
+          mrp: String(it.mrp),
+          gst_rate: String(it.gst_rate || 12),
+          discount_pct: String(it.discount_value && it.mrp ? (Number(it.discount_value) / (Number(it.mrp) * Number(it.quantity))) * 100 : 0),
+        })));
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const searchBills = async (q: string) => {
+    setBillSearch(q);
+    if (q.length < 2) { setBillSuggestions([]); return; }
+    try {
+      const res = await billApi.list({ q, limit: 10 });
+      setBillSuggestions(res.data.data.items || []);
+    } catch (err) { console.error(err); }
+  };
+
   const METHODS = ['cash', 'upi', 'card', 'neft', 'cheque'];
 
   return (
@@ -2353,8 +2486,29 @@ function SaleReturnTab() {
 
       {showForm && (
         <div className="bg-white rounded-2xl border border-orange-100 shadow-sm p-6 space-y-5">
-          <h3 className="font-bold text-gray-800">New Sale Return</h3>
+          <h3 className="font-bold text-gray-800">New Sale Return (Credit Note)</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="relative">
+              <label className="text-xs font-medium text-gray-500 block mb-1">Search Bill #</label>
+              <input type="text" value={billSearch} onChange={(e) => searchBills(e.target.value)} placeholder="Type bill no..."
+                className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 font-mono" />
+              {billSuggestions.length > 0 && (
+                <div className="absolute z-40 top-full mt-1 left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto p-1">
+                  {billSuggestions.map((b) => (
+                    <button key={b.id} onClick={() => loadBillItems(b)} className="w-full text-left px-3 py-2 hover:bg-orange-50 rounded-lg transition-colors border-b border-gray-50 last:border-0">
+                      <div className="flex justify-between items-center mb-0.5">
+                        <span className="font-mono text-xs font-bold text-orange-700">{b.bill_number}</span>
+                        <span className="text-[10px] text-gray-400">{new Date(b.created_at).toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-medium text-gray-600 truncate">{b.customer_name || 'Walk-in'}</span>
+                        <span className="text-xs font-black text-gray-800">₹{b.total_amount}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             {[{ label: 'Customer Name', val: customerName, set: setCustomerName, placeholder: 'Walk-in customer', type: 'text' },
               { label: 'Reason', val: reason, set: setReason, placeholder: 'Damaged / Wrong item', type: 'text' }].map((f) => (
               <div key={f.label}>
@@ -2368,7 +2522,9 @@ function SaleReturnTab() {
               <input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
             </div>
-            <div>
+          </div>
+          <div className="flex gap-4 items-end">
+            <div className="w-48">
               <label className="text-xs font-medium text-gray-500 block mb-1">Refund Method</label>
               <select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-400">
@@ -2433,7 +2589,7 @@ function SaleReturnTab() {
               <button onClick={() => {
                 const valid = srItems.filter((it) => it.medicine_name && Number(it.quantity) > 0 && Number(it.mrp) > 0);
                 if (!valid.length) return;
-                createMutation.mutate({ customer_name: customerName || undefined, return_date: returnDate, refund_method: refundMethod, reason: reason || undefined, items: valid.map((it) => ({ medicine_name: it.medicine_name, unit: it.unit || 'strip', batch_number: it.batch_number || undefined, quantity: Number(it.quantity), mrp: Number(it.mrp), gst_rate: Number(it.gst_rate) || 12, discount_pct: Number(it.discount_pct) || 0 })) });
+                createMutation.mutate({ bill_id: selectedBillId || undefined, customer_name: customerName || undefined, return_date: returnDate, refund_method: refundMethod, reason: reason || undefined, items: valid.map((it) => ({ medicine_name: it.medicine_name, unit: it.unit || 'strip', batch_number: it.batch_number || undefined, quantity: Number(it.quantity), mrp: Number(it.mrp), gst_rate: Number(it.gst_rate) || 12, discount_pct: Number(it.discount_pct) || 0 })) });
               }} disabled={createMutation.isPending || !srItems.some((it) => it.medicine_name && Number(it.quantity) > 0 && Number(it.mrp) > 0)}
                 className="bg-orange-500 text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-orange-600 disabled:opacity-50 transition-colors">
                 {createMutation.isPending ? 'Saving…' : 'Save Return'}
@@ -2451,6 +2607,7 @@ function SaleReturnTab() {
               <th className="text-left px-5 py-3">Return No.</th><th className="text-left px-5 py-3">Date</th>
               <th className="text-left px-5 py-3">Customer</th><th className="text-left px-5 py-3">Reason</th>
               <th className="text-left px-5 py-3">Method</th><th className="text-right px-5 py-3">Amount</th>
+              <th className="px-5 py-3"></th>
             </tr></thead>
             <tbody className="divide-y divide-gray-50">
               {(listData?.items ?? []).map((r: any) => (
@@ -2461,6 +2618,9 @@ function SaleReturnTab() {
                   <td className="px-5 py-3 text-gray-500 text-xs">{r.reason ?? '—'}</td>
                   <td className="px-5 py-3 text-gray-500 uppercase text-xs">{r.refund_method}</td>
                   <td className="px-5 py-3 text-right font-semibold text-orange-600">{fmt(r.total_amount)}</td>
+                  <td className="px-5 py-3 text-right">
+                    <button onClick={() => setSelectedReturnId(r.id)} className="text-orange-600 hover:text-orange-800 font-bold text-xs uppercase tracking-wider">View Credit Note</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -2468,6 +2628,7 @@ function SaleReturnTab() {
           {!(listData?.items?.length) && <p className="text-center text-gray-400 py-10 text-sm">No sale returns recorded</p>}
         </div>
       )}
+      {selectedReturnId && <SaleReturnDetailModal id={selectedReturnId} onClose={() => setSelectedReturnId(null)} />}
     </div>
   );
 }

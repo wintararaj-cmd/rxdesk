@@ -344,6 +344,14 @@ router.post('/sale-returns', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/sale-returns/:id', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.getSaleReturnById(req.user!.id, req.params.id);
+    if (!data) return res.status(404).json({ success: false, error: 'Return not found' });
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 // ─── Purchase Returns ─────────────────────────────────────────────────────────────────────────
 
 router.get('/purchase-returns', shopAuth, async (req, res, next) => {
