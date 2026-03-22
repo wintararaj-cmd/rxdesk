@@ -2216,8 +2216,60 @@ export async function generateGstr1Excel(userId: string, month: number, year: nu
   const hsnB2cSheet = workbook.addWorksheet('HSNB2C');
   hsnB2cSheet.columns = hsnColumns;
 
+  // 5. CDNR Sheet (Credit/Debit Note - Registered)
+  const cdnrSheet = workbook.addWorksheet('CDNR');
+  cdnrSheet.columns = [
+    { header: 'GSTIN/UIN of Recipient', key: 'gstin', width: 20 },
+    { header: 'Receiver Name', key: 'name', width: 25 },
+    { header: 'Note/Refund Voucher Number', key: 'note_no', width: 20 },
+    { header: 'Note/Refund Voucher Date', key: 'note_date', width: 15 },
+    { header: 'Note/Refund Voucher Value', key: 'note_val', width: 15 },
+    { header: 'Place of Supply (POS)', key: 'pos', width: 20 },
+    { header: 'Note Type', key: 'note_type', width: 10 },
+    { header: 'Applicable % of Tax Rate', key: 'applicable_pct', width: 15 },
+    { header: 'Rate', key: 'rate', width: 10 },
+    { header: 'Taxable Value', key: 'taxable_val', width: 15 },
+    { header: 'Cess Amount', key: 'cess', width: 12 },
+    { header: 'Pre GST', key: 'pre_gst', width: 10 },
+  ];
+
+  // 6. CDNUR Sheet (Credit/Debit Note - Unregistered)
+  const cdnurSheet = workbook.addWorksheet('CDNUR');
+  cdnurSheet.columns = [
+    { header: 'UR Type', key: 'ur_type', width: 15 },
+    { header: 'Note/Refund Voucher Number', key: 'note_no', width: 20 },
+    { header: 'Note/Refund Voucher Date', key: 'note_date', width: 15 },
+    { header: 'Note/Refund Voucher Value', key: 'note_val', width: 15 },
+    { header: 'Place Of Supply (POS)', key: 'pos', width: 20 },
+    { header: 'Note Type', key: 'note_type', width: 10 },
+    { header: 'Applicable % of Tax Rate', key: 'applicable_pct', width: 15 },
+    { header: 'Rate', key: 'rate', width: 10 },
+    { header: 'Taxable Value', key: 'taxable_val', width: 15 },
+    { header: 'Cess Amount', key: 'cess', width: 12 },
+    { header: 'Pre GST', key: 'pre_gst', width: 10 },
+  ];
+
+  // 7. CDNRA Sheet (Amended Credit/Debit Note)
+  const cdnraSheet = workbook.addWorksheet('CDNRA');
+  cdnraSheet.columns = [
+    { header: 'Original Note/Refund Voucher Number', key: 'orig_note_no', width: 20 },
+    { header: 'Original Note/Refund Voucher Date', key: 'orig_note_date', width: 15 },
+    { header: 'GSTIN/UIN of Recipient', key: 'gstin', width: 20 },
+    { header: 'Receiver Name', key: 'name', width: 25 },
+    { header: 'Revised Note/Refund Voucher Number', key: 'rev_note_no', width: 20 },
+    { header: 'Revised Note/Refund Voucher Date', key: 'rev_note_date', width: 15 },
+    { header: 'Revised Note Value', key: 'rev_note_val', width: 15 },
+    { header: 'Place Of Supply (POS)', key: 'pos', width: 20 },
+    { header: 'Note Type', key: 'note_type', width: 10 },
+    { header: 'Applicable % of Tax Rate', key: 'applicable_pct', width: 15 },
+    { header: 'Rate', key: 'rate', width: 10 },
+    { header: 'Taxable Value', key: 'taxable_val', width: 15 },
+    { header: 'Cess Amount', key: 'cess', width: 12 },
+    { header: 'Pre GST', key: 'pre_gst', width: 10 },
+  ];
+
   // Formatting: Bold headers for all sheets
-  [b2bSheet, b2cSheet, hsnB2bSheet, hsnB2cSheet].forEach(sheet => {
+  [b2bSheet, b2cSheet, hsnB2bSheet, hsnB2cSheet, cdnrSheet, cdnurSheet, cdnraSheet].forEach(sheet => {
     sheet.getRow(1).font = { bold: true };
   });
 
@@ -2313,6 +2365,69 @@ export async function generateGstr1Excel(userId: string, month: number, year: nu
   // Populate HSN Sheets
   Object.values(hsnSummaryB2B).forEach(s => hsnB2bSheet.addRow(s));
   Object.values(hsnSummaryB2C).forEach(s => hsnB2cSheet.addRow(s));
+
+  // --- Sale Returns (Credit Notes) ---
+  const saleReturns = await prisma.saleReturn.findMany({
+    where: { shop_id: shop.id, return_date: { gte: start, lte: end } },
+    include: { items: true },
+    orderBy: { return_date: 'asc' },
+  });
+
+  // Get associated bills to check for GSTIN (no formal relation in schema yet, so fetch manually)
+  const billIdsSet = new Set(saleReturns.map(r => r.bill_id).filter(Boolean) as string[]);
+  const associatedBills = await prisma.bill.findMany({
+    where: { id: { in: Array.from(billIdsSet) } },
+    select: { id: true, customer_gstin: true, billing_state: true }
+  });
+  const billInfoMap = new Map(associatedBills.map(b => [b.id, b]));
+
+  for (const ret of saleReturns) {
+    const bill = ret.bill_id ? billInfoMap.get(ret.bill_id) : null;
+    const gstin = bill?.customer_gstin;
+    const isB2B = !!gstin;
+    const billingStateNormalized = normalizeState(bill?.billing_state || shop.state);
+    const pos = bill?.billing_state || shop.state || 'N/A';
+    const dateStr = ret.return_date.toISOString().split('T')[0];
+    const totalVal = Number(ret.total_amount);
+
+    // Group items by rate
+    const rates = Array.from(new Set(ret.items.map(i => Number(i.gst_rate))));
+    for (const rate of rates) {
+      const itemsAtRate = ret.items.filter(i => Number(i.gst_rate) === rate);
+      const taxableAtRate = itemsAtRate.reduce((sum, item) => sum + Number(item.line_total), 0);
+      
+      if (isB2B) {
+        cdnrSheet.addRow({
+          gstin: gstin,
+          name: ret.customer_name || 'Registered Customer',
+          note_no: ret.return_number,
+          note_date: dateStr,
+          note_val: totalVal,
+          pos: pos,
+          note_type: 'C',
+          applicable_pct: '',
+          rate: rate,
+          taxable_val: taxableAtRate,
+          cess: 0,
+          pre_gst: 'N',
+        });
+      } else {
+        cdnurSheet.addRow({
+          ur_type: 'B2CS', // Default to B2CS for retail medical sales
+          note_no: ret.return_number,
+          note_date: dateStr,
+          note_val: totalVal,
+          pos: pos,
+          note_type: 'C',
+          applicable_pct: '',
+          rate: rate,
+          taxable_val: taxableAtRate,
+          cess: 0,
+          pre_gst: 'N',
+        });
+      }
+    }
+  }
 
   return workbook.xlsx.writeBuffer();
 }
