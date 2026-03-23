@@ -847,6 +847,18 @@ function PurchasesTab() {
     },
   });
 
+  const voidMutation = useMutation({
+    mutationFn: (id: string) => accountingApi.voidPurchase(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['web-purchases'] });
+      qc.invalidateQueries({ queryKey: ['web-outstandings'] });
+      alert('Purchase successfully voided');
+    },
+    onError: (err: any) => {
+      alert(err?.response?.data?.message || 'Failed to void purchase');
+    }
+  });
+
   const resetForm = () => {
     setSupplierId(''); setInvoiceNumber(''); setInvoiceDate(TODAY_STR);
     setReceivedDate(TODAY_STR); setNotes('');
@@ -1335,6 +1347,19 @@ function PurchaseDetailModal({ id, onClose }: { id: string; onClose: () => void 
     queryFn: () => accountingApi.getPurchaseById(id).then((r) => r.data.data),
   });
 
+  const voidMutation = useMutation({
+    mutationFn: (id: string) => accountingApi.voidPurchase(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['web-purchases'] });
+      qc.invalidateQueries({ queryKey: ['web-outstandings'] });
+      alert('Purchase successfully voided');
+      onClose();
+    },
+    onError: (err: any) => {
+      alert(err?.response?.data?.message || 'Failed to void purchase');
+    }
+  });
+
   const payMutation = useMutation({
     mutationFn: (d: any) => accountingApi.recordSupplierPayment(d),
     onSuccess: () => {
@@ -1375,9 +1400,21 @@ function PurchaseDetailModal({ id, onClose }: { id: string; onClose: () => void 
               </span>
             </div>
           </div>
-          <button onClick={onClose} className="w-10 h-10 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-900 transition-colors shadow-sm">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
+          <div className="flex gap-2">
+            {p?.payment_status === 'pending' && (
+              <button
+                onClick={() => { if(confirm('Confirm VOID this purchase? Inventory will be reversed.')) voidMutation.mutate(p.id); }}
+                disabled={voidMutation.isPending}
+                className="w-10 h-10 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-300 hover:text-red-500 hover:border-red-200 transition-all shadow-sm"
+                title="Void Purchase"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.34 9m-4.74 0L9.26 9m9.96-2.14c.88.14 1.53.58 1.53 1.14v0c0 .56-.65 1-1.53 1.14m-16.92 0c-.88-.14-1.53-.58-1.53-1.14v0c0-.56.65-1 1.53-1.14m1.14-2.14A1.875 1.875 0 015.25 4.5h11.5a1.875 1.875 0 011.875 1.875v14.25A1.875 1.875 0 0116.75 22.5H7.25A1.875 1.875 0 015.375 20.625V6.375z" /></svg>
+              </button>
+            )}
+            <button onClick={onClose} className="w-10 h-10 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-900 transition-colors shadow-sm">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
         </div>
 
         {/* Modal Content */}
