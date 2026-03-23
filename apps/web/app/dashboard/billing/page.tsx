@@ -868,6 +868,17 @@ function BillHistoryTab() {
     onError: (err: any) => alert(err.response?.data?.error?.message || 'Failed to void bill')
   });
 
+  const payMutation = useMutation({
+    mutationFn: ({ id, method }: { id: string, method: string }) => billApi.update(id, { payment_status: 'paid', payment_method: method }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['bill-history'] });
+      qc.invalidateQueries({ queryKey: ['bill-stats'] });
+      alert('Payment recorded successfully');
+      setSelectedBill(null);
+    },
+    onError: (err: any) => alert(err.response?.data?.error?.message || 'Failed to record payment')
+  });
+
   const bills: BillData[] = data?.bills ?? [];
   const pagination: Pagination | null = data?.pagination ?? null;
 
