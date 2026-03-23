@@ -856,7 +856,7 @@ export async function updateBill(billId: string, userId: string, data: any) {
     },
     include: {
       items: true,
-      patient: { select: { full_name: true, phone: true, user_id: true } }
+      patient: { select: { full_name: true, user_id: true } }
     }
   });
 }

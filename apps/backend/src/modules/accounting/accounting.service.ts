@@ -1073,8 +1073,6 @@ export async function updateCreditCustomer(userId: string, id: string, data: any
       name: data.name ?? exists.name,
       phone: data.phone ?? exists.phone,
       address: data.address ?? exists.address,
-      gst_number: data.gstin ?? data.gst_number ?? exists.gst_number,
-      email: data.email ?? exists.email,
       notes: data.notes ?? exists.notes,
     },
   });
@@ -2704,7 +2702,7 @@ export async function voidPurchase(userId: string, id: string) {
             batch_number: item.batch_number,
           },
           data: {
-            quantity: { decrement: item.quantity + (item.free_qty || 0) },
+            stock_qty: { decrement: item.quantity + (item.free_qty || 0) },
           },
         });
       }
@@ -2742,11 +2740,11 @@ export async function deleteSaleReturn(userId: string, id: string) {
     for (const item of sr.items) {
       await tx.shopInventory.updateMany({
         where: { shop_id: shop.id, medicine_name: item.medicine_name },
-        data: { quantity: { decrement: item.quantity } },
+        data: { stock_qty: { decrement: item.quantity } },
       });
     }
 
-    await tx.saleReturnItem.deleteMany({ where: { sale_return_id: id } });
+    await tx.saleReturnItem.deleteMany({ where: { return_id: id } });
     return await tx.saleReturn.delete({ where: { id } });
   });
 }
@@ -2764,11 +2762,11 @@ export async function deletePurchaseReturn(userId: string, id: string) {
     for (const item of pr.items) {
       await tx.shopInventory.updateMany({
         where: { shop_id: shop.id, medicine_name: item.medicine_name },
-        data: { quantity: { increment: item.quantity } },
+        data: { stock_qty: { increment: item.quantity } },
       });
     }
 
-    await tx.purchaseReturnItem.deleteMany({ where: { purchase_return_id: id } });
+    await tx.purchaseReturnItem.deleteMany({ where: { return_id: id } });
     return await tx.purchaseReturn.delete({ where: { id } });
   });
 }
