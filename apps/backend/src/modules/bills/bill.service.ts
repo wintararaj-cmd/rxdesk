@@ -784,3 +784,50 @@ export async function searchCustomersByPhone(userId: string, phone: string) {
 
   return [...masterResults, ...billResults];
 }
+export async function voidBill(billId: string, userId: string) {
+  const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });
+  if (!shop) throw new AppError(403, 'FORBIDDEN', 'Only shop owners can void bills');
+
+  const bill = await prisma.bill.findUnique({
+    where: { id: billId },
+    include: { items: true, income_entry: true, credit_transactions: true },
+  });
+  if (!bill) throw new AppError(404, 'NOT_FOUND', 'Bill not found');
+  if (bill.shop_id !== shop.id) throw new AppError(403, 'FORBIDDEN', 'Bill not for your shop');
+
+  return await prisma.$transaction(async (tx) => {
+    // 1. Restore stock
+    for (const item of bill.items) {
+      if (item.inventory_id) {
+        await tx.shopInventory.update({
+          where: { id: item.inventory_id },
+          data: { stock_qty: { increment: item.quantity } },
+        });
+      }
+    }
+
+    // 2. Adjust credit customer outstanding if applicable
+    if (bill.payment_method === 'credit') {
+      for (const txn of bill.credit_transactions) {
+        await tx.creditCustomer.update({
+          where: { id: txn.customer_id },
+          data: { total_outstanding: { decrement: txn.amount } },
+        });
+      }
+    }
+
+    // 3. Delete related entries (Prisma doesn't auto-cascade some relations if not defined in schema)
+    if (bill.income_entry) {
+      await tx.incomeEntry.delete({ where: { id: bill.income_entry.id } });
+    }
+    
+    // Credit transactions will be deleted if they don't have cascade. 
+    // Wait, let's check schema again. CreditTransaction doesn't have onDelete: Cascade for Bill.
+    await tx.creditTransaction.deleteMany({ where: { bill_id: billId } });
+
+    // 4. Finally delete the bill (BillItem will cascade-delete)
+    await tx.bill.delete({ where: { id: billId } });
+
+    return { success: true };
+  });
+}

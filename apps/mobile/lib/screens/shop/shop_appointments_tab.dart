@@ -167,6 +167,21 @@ class _ApptCard extends StatelessWidget {
               decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
               child: Text(statusLabel, style: TextStyle(color: statusColor, fontWeight: FontWeight.w700, fontSize: 11)),
             ),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, size: 20, color: Color(0xFF9CA3AF)),
+              onSelected: (v) {
+                if (v == 'cancel') _updateStatus(context, appt['id'], 'cancelled');
+                if (v == 'no_show') _updateStatus(context, appt['id'], 'no_show');
+                if (v == 'booked') _updateStatus(context, appt['id'], 'booked');
+                if (v == 'confirmed') _updateStatus(context, appt['id'], 'confirmed');
+              },
+              itemBuilder: (ctx) => [
+                const PopupMenuItem(value: 'booked', child: Text('Mark as Booked')),
+                const PopupMenuItem(value: 'confirmed', child: Text('Mark as Confirmed')),
+                const PopupMenuItem(value: 'no_show', child: Text('Mark as No Show')),
+                const PopupMenuItem(value: 'cancel', child: Text('Cancel Appointment', style: TextStyle(color: Colors.red))),
+              ],
+            ),
           ]),
           if (doctor['full_name'] != null) ...[
             const SizedBox(height: 8),
@@ -202,10 +217,13 @@ class _ApptCard extends StatelessWidget {
 
   Future<void> _updateStatus(BuildContext ctx, String id, String status) async {
     try {
-      // Use a simple PATCH call
-      await ApiService.getTodayAppointments(); // placeholder — real update below
-    } catch (_) {}
-    onUpdate();
+      await ApiService.updateAppointmentStatus(id, status);
+      onUpdate();
+    } catch (e) {
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
   }
 }
 

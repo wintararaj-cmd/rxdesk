@@ -108,6 +108,22 @@ class ApiService {
     final r = await http.get(uri, headers: await _headers());
     return _decode(r);
   }
+  
+  static Future<Map<String, dynamic>> addInventoryItem(Map<String, dynamic> data) async {
+    final r = await http.post(Uri.parse('$_base/inventory'),
+        headers: await _headers(), body: jsonEncode(data));
+    return _decode(r);
+  }
+
+  static Future<Map<String, dynamic>> updateInventoryItem(String id, Map<String, dynamic> data) async {
+    final r = await http.put(Uri.parse('$_base/inventory/$id'),
+        headers: await _headers(), body: jsonEncode(data));
+    return _decode(r);
+  }
+
+  static Future<void> deleteInventoryItem(String id) async {
+    await http.delete(Uri.parse('$_base/inventory/$id'), headers: await _headers());
+  }
 
   static Future<List<dynamic>> searchInventory(String q) async {
     final uri = Uri.parse('$_base/inventory').replace(queryParameters: {'q': q, 'limit': '10'});
@@ -137,6 +153,12 @@ class ApiService {
     return (_decode(r)['data'] as List?) ?? [];
   }
 
+  static Future<Map<String, dynamic>> voidBill(String id) async {
+    // Assuming voiding means updating status or deleting
+    final r = await http.delete(Uri.parse('$_base/bills/$id'), headers: await _headers());
+    return _decode(r);
+  }
+
   // ── DOCTOR ───────────────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> getDoctorProfile() async {
     final r = await http.get(Uri.parse('$_base/doctors/me'), headers: await _headers());
@@ -146,6 +168,13 @@ class ApiService {
   static Future<List<dynamic>> getDoctorAppointments() async {
     final r = await http.get(Uri.parse('$_base/appointments/today'), headers: await _headers());
     return (_decode(r)['data'] as List?) ?? [];
+  }
+
+  static Future<Map<String, dynamic>> updateAppointmentStatus(String id, String status, {String? reason}) async {
+    final r = await http.patch(Uri.parse('$_base/appointments/$id/status'),
+        headers: await _headers(),
+        body: jsonEncode({'status': status, if (reason != null) 'cancel_reason': reason}));
+    return _decode(r);
   }
 
   static Future<List<dynamic>> getDoctorIssuedPrescriptions() async {

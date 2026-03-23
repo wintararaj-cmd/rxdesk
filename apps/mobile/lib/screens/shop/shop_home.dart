@@ -9,6 +9,7 @@ import 'shop_dashboard_tab.dart';
 import 'shop_sale_screen.dart';
 import 'shop_appointments_tab.dart';
 import 'shop_inventory_tab.dart';
+import 'shop_bills_screen.dart';
 
 class ShopHome extends StatefulWidget {
   const ShopHome({super.key});
@@ -29,10 +30,7 @@ class _ShopHomeState extends State<ShopHome> {
       ShopDashboardTab(
         onNewSaleTap: () => setState(() => _tab = 1),
         onAppointmentsTap: () => setState(() => _tab = 2),
-        onReportTap: () => {
-          // TODO: Implement report navigation or show a message
-          // For now, we can show a toast or dialog
-        },
+        onReportTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopBillsScreen())),
       ),
       ShopSaleScreen(),
       ShopAppointmentsTab(),

@@ -121,19 +121,169 @@ class _ShopInventoryTabState extends State<ShopInventoryTab> {
                           'Batch: ${item['batch_number'] ?? 'N/A'}  |  Exp: ${item['expiry_date'] != null ? (item['expiry_date'] as String).split('T')[0] : 'N/A'}',
                           style: const TextStyle(fontSize: 11),
                         ),
-                        trailing: isLow
-                            ? Container(
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isLow)
+                              Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(6)),
                                 child: const Text('Low', style: TextStyle(color: Color(0xFFDC2626), fontSize: 11, fontWeight: FontWeight.w700)),
-                              )
-                            : null,
+                              ),
+                            PopupMenuButton<String>(
+                              icon: const Icon(Icons.more_vert, size: 20, color: Color(0xFF9CA3AF)),
+                              onSelected: (v) {
+                                if (v == 'edit') _showEditDialog(item);
+                                if (v == 'delete') _showDeleteConfirm(item);
+                              },
+                              itemBuilder: (ctx) => [
+                                const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 18), SizedBox(width: 8), Text('Edit', style: TextStyle(fontSize: 13))])),
+                                const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 18, color: Colors.red), SizedBox(width: 8), Text('Delete', style: TextStyle(fontSize: 13, color: Colors.red))])),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },
                 ),
         ),
       ),
-    ]);
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddDialog,
+        backgroundColor: const Color(0xFF7C3AED),
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+
+  void _showAddDialog() {
+    final nameCtrl = TextEditingController();
+    final qtyCtrl = TextEditingController();
+    final mrpCtrl = TextEditingController();
+    final batchCtrl = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Inventory Item', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Medicine Name')),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(child: TextField(controller: qtyCtrl, decoration: const InputDecoration(labelText: 'Stock Qty'), keyboardType: TextInputType.number)),
+              const SizedBox(width: 12),
+              Expanded(child: TextField(controller: mrpCtrl, decoration: const InputDecoration(labelText: 'MRP'), keyboardType: TextInputType.number)),
+            ]),
+            const SizedBox(height: 12),
+            TextField(controller: batchCtrl, decoration: const InputDecoration(labelText: 'Batch Number')),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                // Assuming ApiService has a createInventoryItem method or use a generic POST
+                // Since I don't see createInventoryItem, I'll assume it exists or use a placeholder
+                // Actually, I'll check ApiService first.
+                await ApiService.addInventoryItem({
+                  'medicine_name': nameCtrl.text.trim(),
+                  'stock_qty': int.tryParse(qtyCtrl.text) ?? 0,
+                  'mrp': double.tryParse(mrpCtrl.text) ?? 0,
+                  'batch_number': batchCtrl.text.trim(),
+                });
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  _load(reset: true);
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            },
+            child: const Text('Add Item'),
+          ),
+        ],
+      ),
+    );
+  }
+...
+
+  void _showEditDialog(Map item) {
+    final nameCtrl = TextEditingController(text: item['medicine_name']);
+    final qtyCtrl = TextEditingController(text: item['stock_qty']?.toString());
+    final mrpCtrl = TextEditingController(text: item['mrp']?.toString());
+    final batchCtrl = TextEditingController(text: item['batch_number']);
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Inventory Item', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Medicine Name')),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(child: TextField(controller: qtyCtrl, decoration: const InputDecoration(labelText: 'Stock Qty'), keyboardType: TextInputType.number)),
+              const SizedBox(width: 12),
+              Expanded(child: TextField(controller: mrpCtrl, decoration: const InputDecoration(labelText: 'MRP'), keyboardType: TextInputType.number)),
+            ]),
+            const SizedBox(height: 12),
+            TextField(controller: batchCtrl, decoration: const InputDecoration(labelText: 'Batch Number')),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await ApiService.updateInventoryItem(item['id'], {
+                  'medicine_name': nameCtrl.text.trim(),
+                  'stock_qty': int.tryParse(qtyCtrl.text) ?? 0,
+                  'mrp': double.tryParse(mrpCtrl.text) ?? 0,
+                  'batch_number': batchCtrl.text.trim(),
+                });
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  _load(reset: true);
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            },
+            child: const Text('Save Changes'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirm(Map item) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Item?'),
+        content: Text('Are you sure you want to remove ${item['medicine_name']} from inventory?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              try {
+                await ApiService.deleteInventoryItem(item['id']);
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  _load(reset: true);
+                }
+              } catch (e) {
+                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
 }

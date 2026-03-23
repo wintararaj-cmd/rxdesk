@@ -88,4 +88,12 @@ router.patch('/:id/payment', requireRole('shop_owner'), async (req, res, next) =
   } catch (err) { next(err); }
 });
 
+// DELETE /bills/:id  (Void bill)
+router.delete('/:id', requireRole('shop_owner'), async (req, res, next) => {
+  try {
+    const data = await service.voidBill(req.params.id, req.user!.id);
+    res.json({ success: true, data, message: 'Bill voided successfully' });
+  } catch (err) { next(err); }
+});
+
 export default router;
