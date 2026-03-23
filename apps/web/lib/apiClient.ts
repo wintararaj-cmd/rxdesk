@@ -134,6 +134,8 @@ export const billApi = {
     apiClient.get<{ success: boolean; data: { customer_name: string | null; customer_phone: string }[] }>(
       '/bills/customers/search', { params: { phone } }
     ),
+  void: (id: string) => apiClient.delete(`/bills/${id}`),
+  update: (id: string, data: object) => apiClient.patch(`/bills/${id}`, data),
 };
 
 export const prescriptionApi = {
@@ -178,6 +180,8 @@ export const accountingApi = {
   listCreditCustomers: () => apiClient.get('/accounting/credit-customers'),
   createCreditCustomer: (data: object) => apiClient.post('/accounting/credit-customers', data),
   importCreditCustomers: (items: any[]) => apiClient.post('/accounting/credit-customers/import', { items }),
+  updateCreditCustomer: (id: string, data: object) => apiClient.put(`/accounting/credit-customers/${id}`, data),
+  deleteCreditCustomer: (id: string) => apiClient.delete(`/accounting/credit-customers/${id}`),
   getCreditLedger: (id: string) => apiClient.get(`/accounting/credit-customers/${id}/ledger`),
   recordCreditPayment: (id: string, data: object) =>
     apiClient.post(`/accounting/credit-customers/${id}/payment`, data),
@@ -204,19 +208,26 @@ export const accountingApi = {
   closeCashRegister: (data: object) =>
     apiClient.post('/accounting/reports/cash-register/close', data),
 
+  // Purchases
+  voidPurchase: (id: string) => apiClient.delete(`/accounting/purchases/${id}`),
+
   // Sale Returns
   listSaleReturns: (params?: object) => apiClient.get('/accounting/sale-returns', { params }),
   createSaleReturn: (data: object) => apiClient.post('/accounting/sale-returns', data),
   getSaleReturnById: (id: string) => apiClient.get(`/accounting/sale-returns/${id}`),
+  deleteSaleReturn: (id: string) => apiClient.delete(`/accounting/sale-returns/${id}`),
 
   // Purchase Returns
   listPurchaseReturns: (params?: object) => apiClient.get('/accounting/purchase-returns', { params }),
   createPurchaseReturn: (data: object) => apiClient.post('/accounting/purchase-returns', data),
   getPurchaseReturnById: (id: string) => apiClient.get(`/accounting/purchase-returns/${id}`),
+  deletePurchaseReturn: (id: string) => apiClient.delete(`/accounting/purchase-returns/${id}`),
 
   // Contra Entries
   listContraEntries: (params?: object) => apiClient.get('/accounting/contra-entries', { params }),
   createContraEntry: (data: object) => apiClient.post('/accounting/contra-entries', data),
+  updateContraEntry: (id: string, data: object) => apiClient.put(`/accounting/contra-entries/${id}`, data),
+  deleteContraEntry: (id: string) => apiClient.delete(`/accounting/contra-entries/${id}`),
 
   // Books
   getCashbook: (from: string, to: string) =>

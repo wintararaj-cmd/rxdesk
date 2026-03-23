@@ -831,3 +831,33 @@ export async function voidBill(billId: string, userId: string) {
     return { success: true };
   });
 }
+
+/**
+ * Update basic bill details (customer info, payment meta)
+ */
+export async function updateBill(billId: string, userId: string, data: any) {
+  const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });
+  if (!shop) throw new AppError(403, 'FORBIDDEN', 'Access denied');
+
+  const bill = await prisma.bill.findUnique({ where: { id: billId } });
+  if (!bill) throw new AppError(404, 'NOT_FOUND', 'Bill not found');
+  if (bill.shop_id !== shop.id) throw new AppError(403, 'FORBIDDEN', 'Access denied');
+
+  return await prisma.bill.update({
+    where: { id: billId },
+    data: {
+      customer_name: data.customer_name ?? bill.customer_name,
+      customer_phone: data.customer_phone ?? bill.customer_phone,
+      customer_gstin: data.customer_gstin ?? bill.customer_gstin,
+      billing_address: data.billing_address ?? bill.billing_address,
+      billing_state: data.billing_state ?? bill.billing_state,
+      payment_method: data.payment_method ?? bill.payment_method,
+      payment_status: data.payment_status ?? bill.payment_status,
+    },
+    include: {
+      items: true,
+      patient: { select: { full_name: true, phone: true, user_id: true } }
+    }
+  });
+}
+

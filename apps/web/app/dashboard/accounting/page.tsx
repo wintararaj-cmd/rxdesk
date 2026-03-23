@@ -299,8 +299,9 @@ function ExpensesTab() {
   const [category, setCategory] = useState('miscellaneous');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
-  const [payMethod, setPayMethod] = useState('cash');
+   const [payMethod, setPayMethod] = useState('cash');
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const CATS = ['rent', 'salary', 'electricity', 'water', 'phone', 'internet', 'maintenance', 'transport', 'advertising', 'miscellaneous'];
 
@@ -309,12 +310,13 @@ function ExpensesTab() {
     queryFn: () => accountingApi.listExpenses().then((r) => r.data.data),
   });
 
-  const createMutation = useMutation({
-    mutationFn: (d: object) => accountingApi.createExpense(d),
+   const createMutation = useMutation({
+    mutationFn: (d: object) => editingId ? accountingApi.updateExpense(editingId, d) : accountingApi.createExpense(d),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['web-expenses'] });
       qc.invalidateQueries({ queryKey: ['web-pl'] });
       setShowForm(false);
+      setEditingId(null);
       setAmount('');
       setDescription('');
     },
@@ -342,9 +344,9 @@ function ExpensesTab() {
         </button>
       </div>
 
-      {showForm && (
+       {showForm && (
         <div className="bg-white rounded-xl p-5 shadow-sm border border-red-100">
-          <h3 className="font-semibold text-gray-700 mb-4">New Expense</h3>
+          <h3 className="font-semibold text-gray-700 mb-4">{editingId ? 'Edit Expense' : 'New Expense'}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-gray-500 text-xs block mb-1">Category</label>
@@ -441,15 +443,32 @@ function ExpensesTab() {
                   <td className="px-5 py-3 text-gray-600 max-w-[200px] truncate">{e.description ?? '—'}</td>
                   <td className="px-5 py-3 text-gray-500 capitalize">{e.payment_method}</td>
                   <td className="px-5 py-3 text-right font-semibold text-gray-800">{fmt(e.amount)}</td>
-                  <td className="px-5 py-3 text-right">
-                    {!e.is_auto_entry && (
-                      <button
-                        onClick={() => deleteMutation.mutate(e.id)}
-                        className="text-red-400 hover:text-red-600 transition-colors text-xs"
-                      >
-                        Delete
-                      </button>
-                    )}
+                   <td className="px-5 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                       {!e.is_auto_entry && (
+                        <>
+                          <button
+                            onClick={() => {
+                              setEditingId(e.id);
+                              setCategory(e.category);
+                              setAmount(String(e.amount));
+                              setDescription(e.description || '');
+                              setPayMethod(e.payment_method);
+                              setShowForm(true);
+                            }}
+                            className="text-violet-600 hover:text-violet-800 transition-colors text-xs font-bold"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => { if(confirm('Delete this expense?')) deleteMutation.mutate(e.id); }}
+                            className="text-red-400 hover:text-red-600 transition-colors text-xs"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1264,9 +1283,23 @@ function PurchasesTab() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button className="w-8 h-8 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-400 group-hover:text-violet-600 group-hover:border-violet-200 transition-all shadow-sm">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={(e) => { e.stopPropagation(); setSelectedPurchaseId(p.id); }} className="w-8 h-8 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-400 hover:text-violet-600 hover:border-violet-200 transition-all shadow-sm">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                      </button>
+                      {p.payment_status === 'pending' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if(confirm('Confirm VOID this purchase? Inventory will be reversed.')) voidMutation.mutate(p.id);
+                          }}
+                          disabled={voidMutation.isPending}
+                          className="w-8 h-8 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-400 hover:text-red-600 hover:border-red-200 transition-all shadow-sm"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.34 9m-4.74 0L9.26 9m9.96-2.14c.88.14 1.53.58 1.53 1.14v0c0 .56-.65 1-1.53 1.14m-16.92 0c-.88-.14-1.53-.58-1.53-1.14v0c0-.56.65-1 1.53-1.14m1.14-2.14A1.875 1.875 0 015.25 4.5h11.5a1.875 1.875 0 011.875 1.875v14.25A1.875 1.875 0 0116.75 22.5H7.25A1.875 1.875 0 015.375 20.625V6.375z" /></svg>
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1739,6 +1772,7 @@ function OutstandingsTab() {
   const [customerNotes, setCustomerNotes] = useState('');
   const [customerLimit, setCustomerLimit] = useState('');
   const [customerOpening, setCustomerOpening] = useState('');
+  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const customerImportRef = useRef<HTMLInputElement>(null);
 
   const { data: out, isLoading, error, isError } = useQuery({
@@ -1772,17 +1806,26 @@ function OutstandingsTab() {
     },
   });
 
-  const createCustomerMutation = useMutation({
-    mutationFn: (d: any) => accountingApi.createCreditCustomer(d),
+   const createCustomerMutation = useMutation({
+    mutationFn: (d: any) => editingCustomerId ? accountingApi.updateCreditCustomer(editingCustomerId, d) : accountingApi.createCreditCustomer(d),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['web-outstandings'] });
       setShowCustomerForm(false);
+      setEditingCustomerId(null);
       setCustomerName('');
       setCustomerPhone('');
       setCustomerAddress('');
       setCustomerNotes('');
       setCustomerLimit('');
       setCustomerOpening('');
+    },
+  });
+
+  const deleteCustomerMutation = useMutation({
+    mutationFn: (id: string) => accountingApi.deleteCreditCustomer(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['web-outstandings'] });
+      alert('Customer deactivated');
     },
   });
 
@@ -1910,10 +1953,10 @@ function OutstandingsTab() {
         </div>
       </div>
 
-      {showCustomerForm && (
+       {showCustomerForm && (
         <div className="bg-white rounded-[2rem] p-8 border border-emerald-100 shadow-xl shadow-emerald-50 animate-in zoom-in-95 duration-200">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-black text-gray-900 tracking-tight">Register New Credit Customer</h3>
+            <h3 className="text-xl font-black text-gray-900 tracking-tight">{editingCustomerId ? 'Edit Credit Customer' : 'Register New Credit Customer'}</h3>
             <button onClick={() => setShowCustomerForm(false)} className="text-gray-400 hover:text-gray-900 transition-colors">✕</button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1954,8 +1997,8 @@ function OutstandingsTab() {
               }}
               disabled={createCustomerMutation.isPending || !customerName.trim()}
               className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-emerald-100 hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all"
-            >
-              {createCustomerMutation.isPending ? 'Saving...' : 'Register Customer'}
+             >
+              {createCustomerMutation.isPending ? 'Saving...' : editingCustomerId ? 'Update Customer' : 'Register Customer'}
             </button>
             <button onClick={() => setShowCustomerForm(false)} className="text-gray-400 text-xs font-black uppercase tracking-widest px-6 py-3 hover:text-gray-900 transition-colors">Discard</button>
           </div>
@@ -1990,8 +2033,39 @@ function OutstandingsTab() {
                         <p className="font-black text-emerald-600">{fmt(c.total_outstanding)}</p>
                         {c.overdue && <span className="text-[9px] font-black text-rose-500 uppercase tracking-tighter">Overdue</span>}
                       </td>
-                      <td className="pr-4 text-gray-300 group-hover:text-violet-400 transition-colors">
-                        <svg className={`w-4 h-4 transition-transform ${expandedId === c.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" /></svg>
+                       <td className="pr-4 text-gray-300 transition-colors">
+                        <div className="flex items-center gap-1">
+                          {!c.id.startsWith('pending-') && (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingCustomerId(c.id);
+                                  setCustomerName(c.name);
+                                  setCustomerPhone(c.phone || '');
+                                  setCustomerAddress(c.address || '');
+                                  setCustomerNotes(c.notes || '');
+                                  setCustomerLimit(String(c.credit_limit || ''));
+                                  setCustomerOpening(String(c.opening_balance || '0'));
+                                  setShowCustomerForm(true);
+                                }}
+                                className="p-1.5 text-gray-400 hover:text-violet-600 transition-colors"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if(confirm(`Deactivate ${c.name}?`)) deleteCustomerMutation.mutate(c.id);
+                                }}
+                                className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                            </>
+                          )}
+                          <svg className={`w-4 h-4 transition-transform ${expandedId === c.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        </div>
                       </td>
                     </tr>
                     {expandedId === c.id && expandedType === 'customer' && customerLedger && (
@@ -2419,6 +2493,17 @@ function SaleReturnTab({ setSelectedReturnId }: any) {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => accountingApi.deleteSaleReturn(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['web-sale-returns'] });
+      qc.invalidateQueries({ queryKey: ['web-inventory'] });
+      qc.invalidateQueries({ queryKey: ['web-pl'] });
+      alert('Sale return deleted and inventory reversed');
+    },
+    onError: (err: any) => alert(err.response?.data?.error?.message || 'Failed to delete return'),
+  });
+
   const updateSrItem = (idx: number, field: keyof SRItem, value: string) => {
     setSrItems((prev) => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it));
     if (field === 'medicine_name') {
@@ -2617,7 +2702,15 @@ function SaleReturnTab({ setSelectedReturnId }: any) {
                   <td className="px-5 py-3 text-gray-500 uppercase text-xs">{r.refund_method}</td>
                   <td className="px-5 py-3 text-right font-semibold text-orange-600">{fmt(r.total_amount)}</td>
                   <td className="px-5 py-3 text-right">
-                    <button onClick={() => setSelectedReturnId(r.id)} className="text-orange-600 hover:text-orange-800 font-bold text-xs uppercase tracking-wider">View Credit Note</button>
+                    <div className="flex items-center justify-end gap-3">
+                      <button onClick={() => setSelectedReturnId(r.id)} className="text-orange-600 hover:text-orange-800 font-bold text-xs uppercase tracking-wider">View</button>
+                      <button
+                        onClick={() => { if(confirm('Delete this sale return and reverse inventory?')) deleteMutation.mutate(r.id); }}
+                        className="text-red-400 hover:text-red-600 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -2705,6 +2798,16 @@ function PurchaseReturnTab({ setSelectedReturnId }: any) {
       setPrItems([{ ...EMPTY_PR_ITEM }]); setPrSuggestions({}); setPrHighlights({});
       setPrSupplierId(''); setSelectedInvoiceId(''); setInvoiceRef(''); setPrReturnDate(TODAY_STR); setPrReason('');
       setShowForm(false);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => accountingApi.deletePurchaseReturn(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['web-purchase-returns'] });
+      qc.invalidateQueries({ queryKey: ['web-inventory'] });
+      qc.invalidateQueries({ queryKey: ['web-pl'] });
+      alert('Return deleted and inventory reversed');
     },
   });
 
@@ -2888,15 +2991,20 @@ function PurchaseReturnTab({ setSelectedReturnId }: any) {
                   <td className="px-5 py-3 text-gray-600">{new Date(r.return_date).toLocaleDateString('en-IN')}</td>
                   <td className="px-5 py-3 text-gray-800 font-medium">{r.supplier?.name ?? '—'}</td>
                   <td className="px-5 py-3 text-gray-500 text-xs">{r.invoice_ref ?? '—'}</td>
-                  <td className="px-5 py-4 text-right">
+                  <td className="px-5 py-3 text-right">
                     <div className="flex items-center justify-end gap-3">
-                      <span className="font-bold text-rose-600">{fmt(r.total_amount)}</span>
+                      <span className="font-bold text-rose-600 mr-2">{fmt(r.total_amount)}</span>
                       <button
                         onClick={() => setSelectedReturnId(r.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-all"
-                        title="View Debit Note"
+                        className="p-1 px-2.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-all text-[10px] font-black uppercase tracking-widest"
                       >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        Note
+                      </button>
+                      <button
+                        onClick={() => { if(confirm('Delete this purchase return and reverse inventory?')) deleteMutation.mutate(r.id); }}
+                        className="p-1.5 text-gray-300 hover:text-red-500 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                     </div>
                   </td>
@@ -2925,6 +3033,7 @@ function ContraTab() {
   const [contraRef, setContraRef] = useState('');
   const [contraFrom, setContraFrom] = useState(FIRST_OF_MONTH);
   const [contraTo, setContraTo] = useState(TODAY_STR);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const { data: listData, isLoading } = useQuery<{ items: any[]; total: number }>({
     queryKey: ['web-contra', contraFrom, contraTo],
@@ -2932,12 +3041,21 @@ function ContraTab() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (payload: object) => accountingApi.createContraEntry(payload),
+    mutationFn: (payload: object) => editingId ? accountingApi.updateContraEntry(editingId, payload) : accountingApi.createContraEntry(payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['web-contra'] });
       setContraAmount(''); setContraDesc(''); setContraRef('');
       setFromAcc('cash'); setToAcc('upi'); setContraDate(TODAY_STR);
+      setEditingId(null);
       setShowForm(false);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => accountingApi.deleteContraEntry(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['web-contra'] });
+      alert('Contra entry deleted');
     },
   });
 
@@ -2953,9 +3071,9 @@ function ContraTab() {
         </button>
       </div>
 
-      {showForm && (
+       {showForm && (
         <div className="bg-white rounded-2xl border border-teal-100 shadow-sm p-6">
-          <h3 className="font-bold text-gray-800 mb-4">New Contra Entry</h3>
+          <h3 className="font-bold text-gray-800 mb-4">{editingId ? 'Edit Contra Entry' : 'New Contra Entry'}</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div>
               <label className="text-xs font-medium text-gray-500 block mb-1">From Account (Credit)</label>
@@ -3033,7 +3151,32 @@ function ContraTab() {
                   <td className="px-5 py-3"><span className="bg-green-50 text-green-700 px-2 py-0.5 rounded-full text-xs uppercase">{c.to_account}</span></td>
                   <td className="px-5 py-3 text-gray-500 text-xs">{c.description ?? '—'}</td>
                   <td className="px-5 py-3 text-gray-500 font-mono text-xs">{c.reference_no ?? '—'}</td>
-                  <td className="px-5 py-3 text-right font-semibold text-teal-700">{fmt(c.amount)}</td>
+                   <td className="px-5 py-3 text-right font-semibold text-teal-700">
+                    <div className="flex items-center justify-end gap-3">
+                      <span>{fmt(c.amount)}</span>
+                      <button
+                        onClick={() => {
+                          setEditingId(c.id);
+                          setFromAcc(c.from_account);
+                          setToAcc(c.to_account);
+                          setContraAmount(String(c.amount));
+                          setContraDate(new Date(c.entry_date).toISOString().split('T')[0]);
+                          setContraDesc(c.description || '');
+                          setContraRef(c.reference_no || '');
+                          setShowForm(true);
+                        }}
+                        className="text-teal-400 hover:text-teal-600 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                      </button>
+                      <button
+                        onClick={() => { if(confirm('Delete this contra entry?')) deleteMutation.mutate(c.id); }}
+                        className="text-gray-300 hover:text-red-500 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

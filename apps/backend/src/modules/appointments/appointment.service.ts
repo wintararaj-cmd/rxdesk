@@ -438,3 +438,57 @@ export async function getAppointmentById(appointmentId: string, userId: string, 
 
   return appointment;
 }
+
+export async function updateAppointment(
+  appointmentId: string,
+  userId: string,
+  userRole: string,
+  data: {
+    appointment_date?: string;
+    slot_start_time?: string;
+    chief_complaint?: string;
+    patient_name?: string;
+    patient_phone?: string;
+  }
+) {
+  const appointment = await prisma.appointment.findUnique({
+    where: { id: appointmentId },
+    include: { chamber: true, patient: true },
+  });
+  if (!appointment) throw new AppError(404, 'NOT_FOUND', 'Appointment not found');
+
+  // Authorization check
+  if (userRole === 'shop_owner') {
+    const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });
+    if (appointment.chamber.shop_id !== shop?.id) throw new AppError(403, 'FORBIDDEN', 'Access denied');
+  } else if (userRole === 'doctor') {
+    const doctor = await prisma.doctor.findUnique({ where: { user_id: userId } });
+    if (appointment.chamber.doctor_id !== doctor?.id) throw new AppError(403, 'FORBIDDEN', 'Access denied');
+  }
+
+  // Update logic
+  let updateData: any = {};
+  if (data.chief_complaint !== undefined) updateData.chief_complaint = data.chief_complaint;
+  if (data.appointment_date) updateData.appointment_date = new Date(data.appointment_date);
+  if (data.slot_start_time) updateData.slot_start_time = data.slot_start_time;
+
+  // If patient info provided, update the linked patient profile
+  if (data.patient_name || data.patient_phone) {
+    await prisma.patient.update({
+      where: { id: appointment.patient_id },
+      data: {
+        ...(data.patient_name && { full_name: data.patient_name }),
+        // Note: phone belongs to User, not Patient here. Simplified.
+      },
+    });
+  }
+
+  return await prisma.appointment.update({
+    where: { id: appointmentId },
+    data: updateData,
+    include: {
+      patient: { select: { full_name: true, user: { select: { phone: true } } } },
+      chamber: { include: { doctor: { select: { full_name: true } } } },
+    },
+  });
+}

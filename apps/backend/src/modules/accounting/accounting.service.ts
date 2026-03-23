@@ -1062,6 +1062,25 @@ export async function recordCreditPayment(userId: string, customerId: string, da
   });
 }
 
+export async function updateCreditCustomer(userId: string, id: string, data: any) {
+  const shop = await getShopOrThrow(userId);
+  const exists = await prisma.creditCustomer.findFirst({ where: { id, shop_id: shop.id } });
+  if (!exists) throw new AppError(404, 'NOT_FOUND', 'Credit customer not found');
+
+  return prisma.creditCustomer.update({
+    where: { id },
+    data: {
+      name: data.name ?? exists.name,
+      phone: data.phone ?? exists.phone,
+      address: data.address ?? exists.address,
+      gst_number: data.gstin ?? data.gst_number ?? exists.gst_number,
+      email: data.email ?? exists.email,
+      notes: data.notes ?? exists.notes,
+    },
+  });
+}
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  Outstandings (Unified)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2661,6 +2680,119 @@ export async function generateGstr2Excel(userId: string, month: number, year: nu
   }
 
   return workbook.xlsx.writeBuffer();
+}
+
+export async function voidPurchase(userId: string, id: string) {
+  const shop = await getShopOrThrow(userId);
+
+  return await prisma.$transaction(async (tx) => {
+    const purchase = await tx.purchaseEntry.findUnique({
+      where: { id, shop_id: shop.id },
+      include: { items: true },
+    });
+
+    if (!purchase) throw new Error('Purchase record not found');
+
+    // 1. Reverse Inventory
+    for (const item of purchase.items) {
+      if (item.batch_number) {
+        // Decrease batch count
+        await tx.shopInventory.updateMany({
+          where: {
+            shop_id: shop.id,
+            medicine_name: item.medicine_name,
+            batch_number: item.batch_number,
+          },
+          data: {
+            quantity: { decrement: item.quantity + (item.free_qty || 0) },
+          },
+        });
+      }
+    }
+
+    // 2. Remove associated payments/income/expense logs if any
+    await tx.supplierPayment.deleteMany({ where: { purchase_id: id } });
+    await tx.expenseEntry.deleteMany({ where: { linked_purchase_id: id } });
+
+    // 3. Delete the purchase entry itself
+    await tx.purchaseItem.deleteMany({ where: { purchase_id: id } });
+    return await tx.purchaseEntry.delete({ where: { id } });
+  });
+}
+
+export async function deleteCreditCustomer(userId: string, id: string) {
+  const shop = await getShopOrThrow(userId);
+  // We don't actually delete if there's history, usually just deactivate
+  return await prisma.creditCustomer.updateMany({
+    where: { id, shop_id: shop.id },
+    data: { is_active: false },
+  });
+}
+
+export async function deleteSaleReturn(userId: string, id: string) {
+  const shop = await getShopOrThrow(userId);
+  return await prisma.$transaction(async (tx) => {
+    const sr = await tx.saleReturn.findUnique({
+      where: { id, shop_id: shop.id },
+      include: { items: true },
+    });
+    if (!sr) throw new Error('Return record not found');
+
+    // Reverse Inventory (decrease what was returned)
+    for (const item of sr.items) {
+      await tx.shopInventory.updateMany({
+        where: { shop_id: shop.id, medicine_name: item.medicine_name },
+        data: { quantity: { decrement: item.quantity } },
+      });
+    }
+
+    await tx.saleReturnItem.deleteMany({ where: { sale_return_id: id } });
+    return await tx.saleReturn.delete({ where: { id } });
+  });
+}
+
+export async function deletePurchaseReturn(userId: string, id: string) {
+  const shop = await getShopOrThrow(userId);
+  return await prisma.$transaction(async (tx) => {
+    const pr = await tx.purchaseReturn.findUnique({
+      where: { id, shop_id: shop.id },
+      include: { items: true },
+    });
+    if (!pr) throw new Error('Return record not found');
+
+    // Reverse Inventory (increase what was taken out)
+    for (const item of pr.items) {
+      await tx.shopInventory.updateMany({
+        where: { shop_id: shop.id, medicine_name: item.medicine_name },
+        data: { quantity: { increment: item.quantity } },
+      });
+    }
+
+    await tx.purchaseReturnItem.deleteMany({ where: { purchase_return_id: id } });
+    return await tx.purchaseReturn.delete({ where: { id } });
+  });
+}
+
+export async function deleteContraEntry(userId: string, id: string) {
+  const shop = await getShopOrThrow(userId);
+  return await prisma.contraEntry.deleteMany({
+    where: { id, shop_id: shop.id },
+  });
+}
+
+export async function updateContraEntry(userId: string, id: string, data: any) {
+  const shop = await getShopOrThrow(userId);
+  return await prisma.contraEntry.updateMany({
+    where: { id, shop_id: shop.id },
+    data: {
+      from_account: data.from_account,
+      to_account: data.to_account,
+      amount: data.amount,
+      entry_date: data.entry_date ? new Date(data.entry_date) : undefined,
+      description: data.description,
+      reference_no: data.reference_no,
+    },
+  });
 }
 
 

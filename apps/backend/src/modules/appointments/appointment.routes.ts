@@ -98,4 +98,12 @@ router.patch('/:id/status', requireRole('patient', 'doctor', 'shop_owner'), asyn
   } catch (err) { next(err); }
 });
 
+// PATCH /appointments/:id  (Update appointment info)
+router.patch('/:id', requireRole('doctor', 'shop_owner'), async (req, res, next) => {
+  try {
+    const appointment = await service.updateAppointment(req.params.id, req.user!.id, req.user!.role, req.body);
+    res.json({ success: true, data: appointment, message: 'Appointment updated' });
+  } catch (err) { next(err); }
+});
+
 export default router;

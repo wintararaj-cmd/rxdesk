@@ -615,14 +615,41 @@ function BillDetailModal({ bill, onClose, onPay }: {
   onClose: () => void;
   onPay: (id: string, method: string) => void;
 }) {
+  const qc = useQueryClient();
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState({
+    customer_name: bill.customer_name ?? '',
+    customer_phone: bill.customer_phone ?? '',
+    customer_gstin: bill.customer_gstin ?? '',
+    billing_address: bill.billing_address ?? '',
+    billing_state: bill.billing_state ?? ''
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (data: any) => billApi.update(bill.id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['bill-history'] });
+      setIsEditing(false);
+      onClose();
+    }
+  });
+
+  const voidMutation = useMutation({
+    mutationFn: (id: string) => billApi.void(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['bill-history'] });
+      onClose();
+    }
+  });
+
   const { data: shopData } = useQuery({ queryKey: ['shop-me'], queryFn: () => shopApi.getMyShop().then(r => r.data.data), staleTime: 5 * 60 * 1000 });
   const shopName = (shopData as any)?.shop_name ?? 'Medical Shop';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={onClose} />
 
       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-auto animate-in">
-        {/* Header with gradient */}
         <div className="sticky top-0 z-10 bg-gradient-to-r from-[#0f0f1a] to-[#1a1a2e] px-6 py-5 rounded-t-3xl">
           <div className="flex items-center justify-between">
             <div>
@@ -638,35 +665,79 @@ function BillDetailModal({ bill, onClose, onPay }: {
           </div>
         </div>
 
-        <div className="px-6 py-6 space-y-5 relative overflow-hidden">
-          {bill.payment_status === 'paid' && (
-            <div className="absolute top-10 right-10 rotate-12 opacity-10 pointer-events-none select-none">
-              <div className="border-8 border-emerald-600 text-emerald-600 font-black text-6xl px-4 py-2 rounded-2xl">PAID</div>
-            </div>
-          )}
-
-          {/* Patient */}
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-500/20">
-              <span className="text-white font-bold text-lg">{(bill.customer_name ?? bill.patient?.full_name ?? 'W').charAt(0).toUpperCase()}</span>
-            </div>
-            <div>
-              <p className="font-bold text-gray-900 text-base">{bill.customer_name ?? bill.patient?.full_name ?? 'Walk-in Customer'}</p>
-              <div className="flex items-center gap-3 mt-0.5">
-                <p className="text-gray-400 text-xs flex items-center gap-1">
-                  <span>{METHOD_LABEL[bill.payment_method]?.icon ?? ''}</span>
-                  <span className="font-medium">{METHOD_LABEL[bill.payment_method]?.label ?? bill.payment_method}</span>
-                </p>
-                {bill.customer_phone && <p className="text-gray-400 text-xs">📞 {bill.customer_phone}</p>}
-              </div>
-            </div>
+        <div className="px-6 py-6 space-y-6">
+          {/* Action Row */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold transition-all ${isEditing ? 'bg-violet-600 text-white shadow-lg shadow-violet-200' : 'bg-violet-50 text-violet-600 border border-violet-100'}`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+              {isEditing ? 'Cancel Edit' : 'Edit Customer'}
+            </button>
+            <button
+              onClick={() => { if(confirm('Confirm Voiding this bill?')) voidMutation.mutate(bill.id); }}
+              disabled={voidMutation.isPending}
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100 transition-all flex items-center gap-2"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.34 9m-4.74 0L9.26 9m9.96-2.14c.88.14 1.53.58 1.53 1.14v0c0 .56-.65 1-1.53 1.14m-16.92 0c-.88-.14-1.53-.58-1.53-1.14v0c0-.56.65-1 1.53-1.14m1.14-2.14A1.875 1.875 0 015.25 4.5h11.5a1.875 1.875 0 011.875 1.875v14.25A1.875 1.875 0 0116.75 22.5H7.25A1.875 1.875 0 015.375 20.625V6.375z" /></svg>
+              Void Bill
+            </button>
           </div>
 
-          {/* Items */}
+          {isEditing ? (
+            <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 space-y-4 animate-in slide-in-from-top-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Customer Name</label>
+                  <input type="text" value={formData.customer_name} onChange={e => setFormData({...formData, customer_name: e.target.value})} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-500" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Phone</label>
+                  <input type="text" value={formData.customer_phone} onChange={e => setFormData({...formData, customer_phone: e.target.value})} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-500" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">GSTIN</label>
+                  <input type="text" value={formData.customer_gstin} onChange={e => setFormData({...formData, customer_gstin: e.target.value})} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-500" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Address</label>
+                  <input type="text" value={formData.billing_address} onChange={e => setFormData({...formData, billing_address: e.target.value})} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-500" />
+                </div>
+              </div>
+              <button 
+                onClick={() => updateMutation.mutate(formData)}
+                disabled={updateMutation.isPending}
+                className="w-full bg-violet-600 text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 active:scale-95 transition-all"
+              >
+                {updateMutation.isPending ? 'Updating...' : 'Save Changes'}
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Patient Profile View */}
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-500/20">
+                  <span className="text-white font-bold text-lg">{(bill.customer_name ?? bill.patient?.full_name ?? 'W').charAt(0).toUpperCase()}</span>
+                </div>
+                <div>
+                  <p className="font-bold text-gray-900 text-base">{bill.customer_name ?? bill.patient?.full_name ?? 'Walk-in Customer'}</p>
+                  <div className="flex items-center gap-3 mt-0.5">
+                    <p className="text-gray-400 text-xs flex items-center gap-1">
+                      <span>{METHOD_LABEL[bill.payment_method]?.icon ?? ''}</span>
+                      <span className="font-medium">{METHOD_LABEL[bill.payment_method]?.label ?? bill.payment_method}</span>
+                    </p>
+                    {(bill.customer_phone || bill.patient?.phone) && <p className="text-gray-400 text-xs text-nowrap truncate">📞 {bill.customer_phone || bill.patient?.phone}</p>}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Items Section */}
           <div>
             <div className="flex items-center justify-between mb-3 px-1">
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Items ({bill.items.length})</p>
-              <span className="text-[10px] text-gray-300">Detailed View</span>
             </div>
             <div className="bg-gray-50/80 rounded-2xl p-4 border border-gray-100">
               {bill.items.map((item, i) => (
@@ -787,13 +858,14 @@ function BillHistoryTab() {
     queryFn: () => billApi.stats({ ...(fromDate && { from_date: fromDate }), ...(toDate && { to_date: toDate }) }).then(r => r.data.data),
   });
 
-  const payMutation = useMutation({
-    mutationFn: ({ id, method }: { id: string; method: string }) => billApi.markPaid(id, method),
+  const voidMutation = useMutation({
+    mutationFn: (id: string) => billApi.void(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['bill-history'] });
       qc.invalidateQueries({ queryKey: ['bill-stats'] });
-      setSelectedBill(null);
+      alert('Bill voided successfully');
     },
+    onError: (err: any) => alert(err.response?.data?.error?.message || 'Failed to void bill')
   });
 
   const bills: BillData[] = data?.bills ?? [];
@@ -897,7 +969,7 @@ function BillHistoryTab() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50/80 border-b border-gray-100">
-              {['Bill No.', 'Patient', 'Date', 'Items', 'Amount', 'Status', 'Method'].map(h => (
+              {['Bill No.', 'Patient', 'Date', 'Items', 'Amount', 'Status', 'Method', 'Actions'].map(h => (
                 <th key={h} className="px-5 py-3.5 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
               ))}
             </tr>
@@ -949,6 +1021,24 @@ function BillHistoryTab() {
                   <span className={`text-xs font-medium ${METHOD_LABEL[bill.payment_method]?.color ?? 'text-gray-500'}`}>
                     {METHOD_LABEL[bill.payment_method]?.icon ?? ''} {METHOD_LABEL[bill.payment_method]?.label ?? bill.payment_method}
                   </span>
+                </td>
+                <td className="px-5 py-4">
+                  <div className="flex items-center gap-2">
+                    <button onClick={(e) => { e.stopPropagation(); setSelectedBill(bill); }} className="p-1.5 hover:bg-violet-100 rounded-lg text-violet-600 transition-colors tooltip" title="Edit/View">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm('Are you sure you want to VOID this bill? This cannot be undone.')) {
+                          voidMutation.mutate(bill.id);
+                        }
+                      }}
+                      className="p-1.5 hover:bg-red-100 rounded-lg text-red-600 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.34 9m-4.74 0L9.26 9m9.96-2.14c.88.14 1.53.58 1.53 1.14v0c0 .56-.65 1-1.53 1.14m-16.92 0c-.88-.14-1.53-.58-1.53-1.14v0c0-.56.65-1 1.53-1.14m1.14-2.14A1.875 1.875 0 015.25 4.5h11.5a1.875 1.875 0 011.875 1.875v14.25A1.875 1.875 0 0116.75 22.5H7.25A1.875 1.875 0 015.375 20.625V6.375z" /></svg>
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

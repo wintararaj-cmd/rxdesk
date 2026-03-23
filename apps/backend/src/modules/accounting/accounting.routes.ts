@@ -202,6 +202,13 @@ router.post('/credit-customers/:id/payment', shopAuth, async (req, res, next) =>
   } catch (err) { next(err); }
 });
 
+router.put('/credit-customers/:id', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.updateCreditCustomer(req.user!.id, req.params.id, req.body);
+    res.json({ success: true, data, message: 'Credit customer updated' });
+  } catch (err) { next(err); }
+});
+
 router.get('/outstandings', shopAuth, async (req, res, next) => {
   try {
     const data = await service.listOutstandings(req.user!.id);
@@ -477,6 +484,48 @@ router.get('/reports/gstr2-excel', shopAuth, async (req, res, next) => {
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=GSTR2_${month}_${year}.xlsx`);
     res.send(buffer);
+  } catch (err) { next(err); }
+});
+
+router.delete('/purchases/:id', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.voidPurchase(req.user!.id, req.params.id);
+    res.json({ success: true, data, message: 'Purchase voided and items reversed' });
+  } catch (err) { next(err); }
+});
+
+router.delete('/credit-customers/:id', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.deleteCreditCustomer(req.user!.id, req.params.id);
+    res.json({ success: true, data, message: 'Credit customer deactivated' });
+  } catch (err) { next(err); }
+});
+
+router.delete('/sale-returns/:id', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.deleteSaleReturn(req.user!.id, req.params.id);
+    res.json({ success: true, data, message: 'Sale return deleted and items reversed' });
+  } catch (err) { next(err); }
+});
+
+router.delete('/purchase-returns/:id', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.deletePurchaseReturn(req.user!.id, req.params.id);
+    res.json({ success: true, data, message: 'Purchase return deleted and items reversed' });
+  } catch (err) { next(err); }
+});
+
+router.delete('/contra-entries/:id', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.deleteContraEntry(req.user!.id, req.params.id);
+    res.json({ success: true, data, message: 'Contra entry deleted' });
+  } catch (err) { next(err); }
+});
+
+router.put('/contra-entries/:id', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.updateContraEntry(req.user!.id, req.params.id, req.body);
+    res.json({ success: true, data, message: 'Contra entry updated' });
   } catch (err) { next(err); }
 });
 

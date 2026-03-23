@@ -88,6 +88,14 @@ router.patch('/:id/payment', requireRole('shop_owner'), async (req, res, next) =
   } catch (err) { next(err); }
 });
 
+// PATCH /bills/:id  (Update bill info)
+router.patch('/:id', requireRole('shop_owner'), async (req, res, next) => {
+  try {
+    const bill = await service.updateBill(req.params.id, req.user!.id, req.body);
+    res.json({ success: true, data: bill, message: 'Bill updated' });
+  } catch (err) { next(err); }
+});
+
 // DELETE /bills/:id  (Void bill)
 router.delete('/:id', requireRole('shop_owner'), async (req, res, next) => {
   try {
