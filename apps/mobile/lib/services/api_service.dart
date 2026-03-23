@@ -165,6 +165,12 @@ class ApiService {
     return _decode(r);
   }
 
+  static Future<Map<String, dynamic>> updateDoctorProfile(Map<String, dynamic> data) async {
+    final r = await http.put(Uri.parse('$_base/doctors/me'),
+        headers: await _headers(), body: jsonEncode(data));
+    return _decode(r);
+  }
+
   static Future<List<dynamic>> getDoctorAppointments() async {
     final r = await http.get(Uri.parse('$_base/appointments/today'), headers: await _headers());
     return (_decode(r)['data'] as List?) ?? [];
@@ -208,11 +214,28 @@ class ApiService {
     return (_decode(r)['data'] as List?) ?? [];
   }
 
+  static Future<Map<String, dynamic>> updatePatientProfile(Map<String, dynamic> data) async {
+    final r = await http.put(Uri.parse('$_base/patients/me'),
+        headers: await _headers(), body: jsonEncode(data));
+    return _decode(r);
+  }
+
+  static Future<Map<String, dynamic>> cancelAppointment(String id, {String? reason}) async {
+    final r = await http.patch(Uri.parse('$_base/appointments/$id/status'),
+        headers: await _headers(),
+        body: jsonEncode({'status': 'cancelled', if (reason != null) 'cancel_reason': reason}));
+    return _decode(r);
+  }
+
   // ── PRESCRIPTIONS ───────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> createPrescription(Map<String, dynamic> payload) async {
     final r = await http.post(Uri.parse('$_base/prescriptions'),
         headers: await _headers(), body: jsonEncode(payload));
     return _decode(r);
+  }
+  
+  static Future<void> deletePrescription(String id) async {
+    await http.delete(Uri.parse('$_base/prescriptions/$id'), headers: await _headers());
   }
 
   static Future<List<dynamic>> searchPatients(String q) async {

@@ -1,21 +1,22 @@
+// lib/screens/patient/patient_profile_details.dart
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 
-class DoctorProfileDetails extends StatefulWidget {
-  const DoctorProfileDetails({super.key});
+class PatientProfileDetails extends StatefulWidget {
+  const PatientProfileDetails({super.key});
   @override
-  State<DoctorProfileDetails> createState() => _DoctorProfileDetailsState();
+  State<PatientProfileDetails> createState() => _PatientProfileDetailsState();
 }
 
-class _DoctorProfileDetailsState extends State<DoctorProfileDetails> {
+class _PatientProfileDetailsState extends State<PatientProfileDetails> {
   Map<String, dynamic>? _profile;
   bool _isLoading = true;
   bool _isEditing = false;
   
   final _nameCtrl = TextEditingController();
-  final _specCtrl = TextEditingController();
-  final _expCtrl = TextEditingController();
-  final _mciCtrl = TextEditingController();
+  final _ageCtrl = TextEditingController();
+  final _genderCtrl = TextEditingController();
+  final _bloodCtrl = TextEditingController();
 
   @override
   void initState() { super.initState(); _fetch(); }
@@ -23,14 +24,14 @@ class _DoctorProfileDetailsState extends State<DoctorProfileDetails> {
   Future<void> _fetch() async {
     setState(() => _isLoading = true);
     try {
-      final res = await ApiService.getDoctorProfile();
+      final res = await ApiService.getPatientProfile();
       final data = res['data'] as Map<String, dynamic>;
       if (mounted) setState(() {
         _profile = data;
         _nameCtrl.text = data['full_name'] ?? '';
-        _specCtrl.text = data['specialization'] ?? '';
-        _expCtrl.text = (data['experience_years'] ?? '').toString();
-        _mciCtrl.text = data['mci_number'] ?? '';
+        _ageCtrl.text = (data['age'] ?? '').toString();
+        _genderCtrl.text = data['gender'] ?? '';
+        _bloodCtrl.text = data['blood_group'] ?? '';
         _isLoading = false;
       });
     } catch (_) { if (mounted) setState(() => _isLoading = false); }
@@ -39,10 +40,11 @@ class _DoctorProfileDetailsState extends State<DoctorProfileDetails> {
   Future<void> _save() async {
     setState(() => _isLoading = true);
     try {
-      await ApiService.updateDoctorProfile({
+      await ApiService.updatePatientProfile({
         'full_name': _nameCtrl.text.trim(),
-        'specialization': _specCtrl.text.trim(),
-        'experience_years': int.tryParse(_expCtrl.text) ?? 0,
+        'age': int.tryParse(_ageCtrl.text) ?? 0,
+        'gender': _genderCtrl.text.trim(),
+        'blood_group': _bloodCtrl.text.trim(),
       });
       _isEditing = false;
       _fetch();
@@ -58,7 +60,7 @@ class _DoctorProfileDetailsState extends State<DoctorProfileDetails> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile Details'),
+        title: const Text('My Profile'),
         actions: [
           if (!_isLoading)
             IconButton(
@@ -76,21 +78,9 @@ class _DoctorProfileDetailsState extends State<DoctorProfileDetails> {
               padding: const EdgeInsets.all(20),
               children: [
                 _buildField('Full Name', _nameCtrl, editable: true),
-                _buildField('Specialization', _specCtrl, editable: true),
-                _buildField('Experience (Years)', _expCtrl, editable: true, isNumber: true),
-                _buildField('MCI Number', _mciCtrl, editable: false),
-                const SizedBox(height: 10),
-                const Text(
-                  'Verification Status: ',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-                Text(
-                  (_profile?['verification_status'] ?? 'pending').toString().toUpperCase(),
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: _profile?['verification_status'] == 'approved' ? Colors.green : Colors.orange,
-                  ),
-                ),
+                _buildField('Age', _ageCtrl, editable: true, isNumber: true),
+                _buildField('Gender', _genderCtrl, editable: true),
+                _buildField('Blood Group', _bloodCtrl, editable: true),
               ],
             ),
     );

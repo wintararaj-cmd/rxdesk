@@ -125,4 +125,12 @@ router.get('/:id/pdf', pdfRateLimiter, requireRole('patient', 'doctor', 'shop_ow
   } catch (err) { next(err); }
 });
 
+// DELETE /prescriptions/:id  — doctor deletes prescription
+router.delete('/:id', requireRole('doctor'), async (req, res, next) => {
+  try {
+    await service.deletePrescription(req.params.id, req.user!.id);
+    res.json({ success: true, message: 'Prescription deleted' });
+  } catch (err) { next(err); }
+});
+
 export default router;

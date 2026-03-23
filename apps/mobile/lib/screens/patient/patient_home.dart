@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../login_screen.dart';
+import 'patient_profile_details.dart';
 
 class PatientHome extends StatefulWidget {
   const PatientHome({super.key});
@@ -128,13 +129,13 @@ class _PatientDashboardTabState extends State<PatientDashboardTab> {
               if (upcoming.isNotEmpty) ...[
                 const Text('Upcoming', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 12),
-                ...upcoming.map((a) => _PatientApptCard(a)),
+                ...upcoming.map((a) => _PatientApptCard(a, onCancel: _load)),
                 const SizedBox(height: 20),
               ],
               if (past.isNotEmpty) ...[
                 const Text('Past Visits', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF6B7280))),
                 const SizedBox(height: 12),
-                ...past.map((a) => _PatientApptCard(a)),
+                ...past.map((a) => _PatientApptCard(a, onCancel: _load)),
               ],
               if (_appts.isEmpty)
                 const Center(child: Padding(padding: EdgeInsets.all(40), child: Text('No appointments yet'))),
@@ -605,7 +606,6 @@ class _MedicineInfoChip extends StatelessWidget {
   }
 }
 
-// ── Tab 4: Profile ───────────────────────────────────────────────────────────
 class PatientProfileTab extends StatelessWidget {
   const PatientProfileTab({super.key});
   @override
@@ -615,23 +615,33 @@ class PatientProfileTab extends StatelessWidget {
       const SizedBox(height: 20),
       const Text('Account Settings', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
       const SizedBox(height: 12),
-      ListTile(leading: const Icon(Icons.person_outline), title: const Text('Personal Info'), trailing: const Icon(Icons.chevron_right), onTap: () {}),
-      ListTile(leading: const Icon(Icons.history), title: const Text('Medical History'), trailing: const Icon(Icons.chevron_right), onTap: () {}),
-      ListTile(leading: const Icon(Icons.security), title: const Text('Change Password'), trailing: const Icon(Icons.chevron_right), onTap: () {}),
+      ListTile(leading: const Icon(Icons.person_outline), title: const Text('Personal Info'), trailing: const Icon(Icons.chevron_right), onTap: () {
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PatientProfileDetails()));
+      }),
+      ListTile(leading: const Icon(Icons.history), title: const Text('Medical History'), trailing: const Icon(Icons.chevron_right), onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Medical History coming soon')));
+      }),
+      ListTile(leading: const Icon(Icons.security), title: const Text('Change Password'), trailing: const Icon(Icons.chevron_right), onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password change coming soon')));
+      }),
       const Divider(),
-      ListTile(leading: const Icon(Icons.help_outline), title: const Text('Support'), trailing: const Icon(Icons.chevron_right), onTap: () {}),
+      ListTile(leading: const Icon(Icons.help_outline), title: const Text('Support'), trailing: const Icon(Icons.chevron_right), onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Contact support at support@rxdesk.in')));
+      }),
     ]);
   }
 }
-
-// ── Utilities ───────────────────────────────────────────────────────────────
 class _PatientApptCard extends StatelessWidget {
   final dynamic appt;
-  const _PatientApptCard(this.appt);
+  final VoidCallback? onCancel;
+  const _PatientApptCard(this.appt, {this.onCancel});
+
   @override
   Widget build(BuildContext context) {
     final status = appt['status'] ?? '';
     final doctor = ((appt['chamber'] ?? {})['doctor'] ?? {});
+    final isUpcoming = ['booked','confirmed','arrived'].contains(status);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -640,7 +650,51 @@ class _PatientApptCard extends StatelessWidget {
            child: const Icon(Icons.calendar_today, color: Colors.deepPurple, size: 18)),
          title: Text('Dr. ${doctor['full_name'] ?? 'Doctor'}', style: const TextStyle(fontWeight: FontWeight.bold)),
          subtitle: Text('${appt['appointment_date']?.toString().substring(0, 10)} at ${appt['slot_start_time'] ?? ''}'),
-         trailing: Text(status.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+         trailing: Row(
+           mainAxisSize: MainAxisSize.min,
+           children: [
+             Text(status.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+             if (isUpcoming) ...[
+               const SizedBox(width: 8),
+               PopupMenuButton(
+                 icon: const Icon(Icons.more_vert, size: 18),
+                 itemBuilder: (ctx) => [
+                   const PopupMenuItem(value: 'cancel', child: Text('Cancel Appointment', style: TextStyle(color: Colors.red))),
+                 ],
+                 onSelected: (val) {
+                   if (val == 'cancel') _confirmCancel(context);
+                 },
+               )
+             ]
+           ],
+         ),
+      ),
+    );
+  }
+
+  void _confirmCancel(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel Appointment?'),
+        content: const Text('Are you sure you want to cancel this appointment?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('No')),
+          TextButton(
+            onPressed: () async {
+              try {
+                await ApiService.cancelAppointment(appt['id']);
+                if (context.mounted) {
+                   Navigator.pop(ctx);
+                   onCancel?.call();
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            },
+            child: const Text('Yes, Cancel', style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
   }

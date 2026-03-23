@@ -6,6 +6,7 @@ import '../../services/auth_service.dart';
 import '../login_screen.dart';
 import 'doctor_prescribe_screen.dart';
 import 'doctor_profile_details.dart';
+import 'doctor_prescription_detail.dart';
 
 class DoctorHome extends StatefulWidget {
   const DoctorHome({super.key});
@@ -165,7 +166,12 @@ class _DoctorHistoryTabState extends State<DoctorHistoryTab> {
                     title: Text(patient['full_name'] ?? 'Patient', style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text('Diagnosis: ${r['diagnosis'] ?? 'Visit Result'}'),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () {},
+                    onTap: () async {
+                      final refresh = await Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => DoctorPrescriptionDetail(prescription: r)),
+                      );
+                      if (refresh == true) _load();
+                    },
                   ),
                 );
               },

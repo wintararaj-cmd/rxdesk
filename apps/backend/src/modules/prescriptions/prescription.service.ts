@@ -334,3 +334,33 @@ export async function generatePrescriptionPdf(
     throw err;
   }
 }
+export async function deletePrescription(prescriptionId: string, userId: string) {
+  const doctor = await prisma.doctor.findUnique({ where: { user_id: userId } });
+  if (!doctor) throw new AppError(403, 'FORBIDDEN', 'Only doctors can delete prescriptions');
+
+  const prescription = await prisma.prescription.findUnique({
+    where: { id: prescriptionId },
+    select: { id: true, doctor_id: true, dispensed: true, appointment_id: true },
+  });
+
+  if (!prescription) throw new AppError(404, 'NOT_FOUND', 'Prescription not found');
+  if (prescription.doctor_id !== doctor.id) throw new AppError(403, 'FORBIDDEN', 'You did not issue this prescription');
+  if (prescription.dispensed) throw new AppError(409, 'ALREADY_DISPENSED', 'Cannot delete a prescription that has already been billed');
+
+  return await prisma.$transaction(async (tx) => {
+    // Revert appointment status to 'arrived' so it can be re-processed if needed
+    if (prescription.appointment_id) {
+       await tx.appointment.update({
+         where: { id: prescription.appointment_id },
+         data: { status: 'arrived' },
+       });
+    }
+
+    // Related items will be deleted via cascade if set in schema, 
+    // but let's be safe if it's not.
+    await tx.prescriptionItem.deleteMany({ where: { prescription_id: prescriptionId } });
+    await tx.prescription.delete({ where: { id: prescriptionId } });
+
+    return { success: true };
+  });
+}
