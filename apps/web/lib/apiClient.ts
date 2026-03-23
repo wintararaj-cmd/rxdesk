@@ -210,6 +210,7 @@ export const accountingApi = {
 
   // Purchases
   voidPurchase: (id: string) => apiClient.delete(`/accounting/purchases/${id}`),
+  updatePurchase: (id: string, data: object) => apiClient.put(`/accounting/purchases/${id}`, data),
 
   // Sale Returns
   listSaleReturns: (params?: object) => apiClient.get('/accounting/sale-returns', { params }),

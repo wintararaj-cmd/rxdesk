@@ -397,6 +397,127 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
   return purchase;
 }
 
+export async function updatePurchaseEntry(userId: string, id: string, input: CreatePurchaseInput) {
+  const shop = await getShopOrThrow(userId);
+
+  return await prisma.$transaction(async (tx) => {
+    const oldPurchase = await tx.purchaseEntry.findUnique({
+      where: { id, shop_id: shop.id },
+      include: { items: true },
+    });
+
+    if (!oldPurchase) throw new AppError(404, 'NOT_FOUND', 'Purchase record not found');
+
+    // 1. Reverse Old Inventory
+    for (const item of oldPurchase.items) {
+      await tx.shopInventory.updateMany({
+        where: {
+          shop_id: shop.id,
+          medicine_name: item.medicine_name,
+          batch_number: item.batch_number,
+        },
+        data: {
+          stock_qty: { decrement: item.quantity + (item.free_qty || 0) },
+        },
+      });
+    }
+
+    // 2. Clear old items
+    await tx.purchaseItem.deleteMany({ where: { purchase_id: id } });
+
+    // 3. New Totals
+    const itemsWithTotals = input.items.map((item) => {
+      const discountPct = item.discount_pct ?? 0;
+      const gstRate = item.gst_rate ?? 12;
+      const baseTotal = item.purchase_price * item.quantity;
+      const discountAmt = baseTotal * (discountPct / 100);
+      const taxableVal = baseTotal - discountAmt;
+      const gstAmt = taxableVal * (gstRate / 100);
+      const lineTotal = taxableVal + gstAmt;
+      return { ...item, discount_pct: discountPct, gst_rate: gstRate, line_total: lineTotal, gst_amount: gstAmt };
+    });
+
+    const subtotal = itemsWithTotals.reduce((s, i) => s + i.purchase_price * i.quantity, 0);
+    const totalGst = itemsWithTotals.reduce((s, i) => s + i.gst_amount, 0);
+    const totalAmount = itemsWithTotals.reduce((s, i) => s + i.line_total, 0);
+
+    // 4. Update the entry
+    const updatedPe = await tx.purchaseEntry.update({
+      where: { id },
+      data: {
+        supplier_id: input.supplier_id ?? null,
+        invoice_number: input.invoice_number,
+        invoice_date: new Date(input.invoice_date),
+        received_date: new Date(input.received_date ?? input.invoice_date),
+        subtotal,
+        gst_amount: totalGst,
+        total_amount: totalAmount,
+        items: {
+          create: itemsWithTotals.map((item) => ({
+            medicine_id: item.medicine_id ?? null,
+            medicine_name: item.medicine_name,
+            batch_number: item.batch_number,
+            expiry_date: new Date(item.expiry_date),
+            quantity: item.quantity,
+            free_qty: item.free_qty ?? 0,
+            purchase_price: item.purchase_price,
+            mrp: item.mrp,
+            discount_pct: item.discount_pct,
+            gst_rate: item.gst_rate,
+            line_total: item.line_total,
+          })),
+        },
+      },
+      include: { items: true },
+    });
+
+    // 5. Update inventory for each NEW item
+    for (const item of itemsWithTotals) {
+      const totalQty = item.quantity + (item.free_qty ?? 0);
+      const existing = await tx.shopInventory.findFirst({
+        where: {
+          shop_id: shop.id,
+          medicine_name: item.medicine_name,
+          batch_number: item.batch_number,
+        },
+      });
+      if (existing) {
+        await tx.shopInventory.update({
+          where: { id: existing.id },
+          data: { stock_qty: { increment: totalQty }, mrp: item.mrp, purchase_price: item.purchase_price, unit: item.unit ?? existing.unit },
+        });
+      } else {
+        await tx.shopInventory.create({
+          data: {
+            shop_id: shop.id,
+            medicine_id: item.medicine_id ?? null,
+            medicine_name: item.medicine_name,
+            batch_number: item.batch_number,
+            expiry_date: new Date(item.expiry_date),
+            mrp: item.mrp,
+            purchase_price: item.purchase_price,
+            stock_qty: totalQty,
+            gst_rate: item.gst_rate,
+            unit: item.unit ?? 'strip',
+          },
+        });
+      }
+    }
+
+    // 6. Update linked expense
+    await tx.expenseEntry.updateMany({
+      where: { linked_purchase_id: id },
+      data: {
+        amount: totalAmount,
+        description: `Purchase from ${input.supplier_id ? 'supplier' : 'unregistered'} — ${input.invoice_number ?? id} (EDITED)`,
+        entry_date: new Date(input.received_date ?? input.invoice_date),
+      },
+    });
+
+    return updatedPe;
+  });
+}
+
 export async function listPurchaseEntries(userId: string, opts: { page?: number; limit?: number; supplier_id?: string; from?: string; to?: string }) {
   const shop = await getShopOrThrow(userId);
   const page = opts.page ?? 1;

@@ -83,10 +83,14 @@ interface Purchase {
   id: string;
   invoice_number: string | null;
   invoice_date: string;
+  received_date?: string | null;
   total_amount: number;
   amount_paid: number;
   payment_status: string;
-  supplier: { name: string } | null;
+  supplier: { id?: string; name: string } | null;
+  supplier_id?: string | null;
+  notes?: string | null;
+  items?: any[];
 }
 
 interface CreditCustomer {
@@ -820,6 +824,8 @@ function PurchasesTab() {
   const [triedToSubmit, setTriedToSubmit] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  const [editingId, setEditingId] = useState<string | null>(null);
+
   const { data: suppliersData } = useQuery<{ id: string; name: string }[]>({
     queryKey: ['web-suppliers'],
     queryFn: () => accountingApi.listSuppliers().then((r) => r.data.data),
@@ -837,15 +843,53 @@ function PurchasesTab() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (payload: object) => accountingApi.createPurchase(payload),
+    mutationFn: (payload: object) => editingId ? accountingApi.updatePurchase(editingId, payload) : accountingApi.createPurchase(payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['web-purchases'] });
       resetForm();
       setShowForm(false);
       setTriedToSubmit(false);
       setFormError(null);
+      alert(editingId ? 'Purchase updated successfully' : 'Purchase entry created');
     },
+    onError: (err: any) => alert(err.response?.data?.error?.message || 'Failed to save purchase'),
   });
+
+  const loadPurchaseForEdit = (p: Purchase) => {
+    setEditingId(p.id);
+    setSupplierId(p.supplier_id || '');
+    setInvoiceNumber(p.invoice_number || '');
+    setInvoiceDate(p.invoice_date.split('T')[0]);
+    setReceivedDate(p.received_date ? p.received_date.split('T')[0] : p.invoice_date.split('T')[0]);
+    setNotes(p.notes || '');
+    if (p.items && p.items.length > 0) {
+      setPiItems(p.items.map((it: any) => ({
+        medicine_name: it.medicine_name,
+        batch_number: it.batch_number,
+        expiry_date: it.expiry_date.split('T')[0],
+        quantity: String(it.quantity),
+        free_qty: String(it.free_qty || 0),
+        purchase_price: String(it.purchase_price),
+        mrp: String(it.mrp),
+        discount_pct: String(it.discount_pct || 0),
+        gst_rate: String(it.gst_rate || 12),
+        unit: it.unit || 'strip',
+        line_total: it.line_total
+      })));
+    } else {
+      setPiItems([{ ...EMPTY_PI_ITEM }]);
+    }
+    setShowForm(true);
+  };
+
+  const handleEditClick = async (id: string) => {
+    try {
+      const res = await accountingApi.getPurchaseById(id);
+      loadPurchaseForEdit(res.data.data);
+    } catch {
+      alert('Failed to load purchase details');
+    }
+  };
 
   const voidMutation = useMutation({
     mutationFn: (id: string) => accountingApi.voidPurchase(id),
@@ -861,7 +905,7 @@ function PurchasesTab() {
 
   const resetForm = () => {
     setSupplierId(''); setInvoiceNumber(''); setInvoiceDate(TODAY_STR);
-    setReceivedDate(TODAY_STR); setNotes('');
+    setReceivedDate(TODAY_STR); setNotes(''); setEditingId(null);
     setPiItems([{ ...EMPTY_PI_ITEM }]); setSuggestions({}); setSuggHighlights({});
   };
 
@@ -1024,7 +1068,7 @@ function PurchasesTab() {
       {/* ── New Invoice Form ── */}
       {showForm && (
         <div className="bg-white rounded-2xl border border-violet-100 shadow-sm p-6 space-y-5">
-          <h3 className="font-bold text-gray-800 text-base">New Purchase Invoice</h3>
+          <h3 className="font-bold text-gray-800 text-base">{editingId ? 'Edit Purchase Invoice' : 'New Purchase Invoice'}</h3>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
             <div>
@@ -1231,7 +1275,7 @@ function PurchasesTab() {
                 disabled={createMutation.isPending || !piItems.some((it) => it.medicine_name && it.batch_number && it.expiry_date && Number(it.purchase_price) > 0)}
                 className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-10 py-3 rounded-2xl text-sm font-black shadow-xl shadow-violet-200 hover:scale-105 active:scale-95 disabled:opacity-50 transition-all"
               >
-                {createMutation.isPending ? 'Processing…' : 'Finalize & Save Invoice'}
+                {createMutation.isPending ? 'Processing…' : editingId ? 'Update Invoice' : 'Finalize & Save Invoice'}
               </button>
             </div>
           </div>
@@ -1296,8 +1340,11 @@ function PurchasesTab() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button onClick={(e) => { e.stopPropagation(); setSelectedPurchaseId(p.id); }} className="w-8 h-8 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-400 hover:text-violet-600 hover:border-violet-200 transition-all shadow-sm">
+                      <button onClick={(e) => { e.stopPropagation(); setSelectedPurchaseId(p.id); }} title="View Details" className="w-8 h-8 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-400 hover:text-violet-600 hover:border-violet-200 transition-all shadow-sm">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); handleEditClick(p.id); }} title="Edit Invoice" className="w-8 h-8 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-400 hover:text-amber-600 hover:border-amber-200 transition-all shadow-sm">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
                       </button>
                       {p.payment_status === 'pending' && (
                         <button
@@ -1330,13 +1377,13 @@ function PurchasesTab() {
       )}
 
       {selectedPurchaseId && (
-        <PurchaseDetailModal id={selectedPurchaseId} onClose={() => setSelectedPurchaseId(null)} />
+        <PurchaseDetailModal id={selectedPurchaseId} onClose={() => setSelectedPurchaseId(null)} onEdit={(p) => { setSelectedPurchaseId(null); loadPurchaseForEdit(p); }} />
       )}
     </div>
   );
 }
 
-function PurchaseDetailModal({ id, onClose }: { id: string; onClose: () => void }) {
+function PurchaseDetailModal({ id, onClose, onEdit }: { id: string; onClose: () => void; onEdit: (p: Purchase) => void }) {
   const qc = useQueryClient();
   const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState('cash');
@@ -1401,6 +1448,13 @@ function PurchaseDetailModal({ id, onClose }: { id: string; onClose: () => void 
             </div>
           </div>
           <div className="flex gap-2">
+            <button
+              onClick={() => onEdit(p)}
+              className="w-10 h-10 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-300 hover:text-amber-500 hover:border-amber-200 transition-all shadow-sm"
+              title="Edit Invoice"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+            </button>
             {p?.payment_status === 'pending' && (
               <button
                 onClick={() => { if(confirm('Confirm VOID this purchase? Inventory will be reversed.')) voidMutation.mutate(p.id); }}

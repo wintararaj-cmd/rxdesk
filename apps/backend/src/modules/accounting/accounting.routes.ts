@@ -84,6 +84,13 @@ router.get('/purchases/:id', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.put('/purchases/:id', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.updatePurchaseEntry(req.user!.id, req.params.id, req.body);
+    res.json({ success: true, data, message: 'Purchase updated' });
+  } catch (err) { next(err); }
+});
+
 // ─── Supplier Payments ────────────────────────────────────────────────────────
 
 router.get('/supplier-payments', shopAuth, async (req, res, next) => {
