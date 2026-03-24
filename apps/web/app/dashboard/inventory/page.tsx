@@ -42,21 +42,34 @@ interface CatalogMedicine {
   is_schedule_h?: boolean;
 }
 
-interface InventoryItem {
+interface MasterInventoryItem {
   id: string;
-  medicine?: { generic_name?: string; form?: string; strength?: string };
+  medicine_id?: string;
   medicine_name: string;
-  hsn_code?: string;
   unit?: string;
-  stock_qty: number;
+  rack_location?: string;
   reorder_level: number;
-  mrp: number;
-  gst_rate: number;
-  purchase_price?: number;
-  expiry_date?: string;
+  total_stock: number;
+  nearest_expiry?: string;
+  max_mrp: number;
+  min_mrp: number;
+}
+
+interface BatchItem {
+  id: string;
   batch_number?: string;
-  discount_type: 'percentage' | 'amount';
-  discount_value: number;
+  expiry_date?: string;
+  stock_qty: number;
+  mrp: number;
+  purchase_price: number;
+  hsn_code?: string;
+}
+
+interface InventoryItem extends BatchItem {
+  medicine_name: string;
+  medicine?: { generic_name?: string; form?: string; strength?: string };
+  gst_rate: number;
+  reorder_level: number;
 }
 
 interface Pagination {
