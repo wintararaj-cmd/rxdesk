@@ -62,15 +62,23 @@ router.get('/', requireRole('shop_owner'), async (req, res, next) => {
     const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
 
     if (lowStock) {
-      const items = await prisma.$queryRaw<unknown[]>`
-        SELECT i.*, m.generic_name, m.form, m.strength
-        FROM shop_inventory i
-        LEFT JOIN medicines m ON m.id = i.medicine_id
-        WHERE i.shop_id = ${shop.id}::uuid
-          AND i.stock_qty <= i.reorder_level
-        ORDER BY i.medicine_name ASC
+      const items = await prisma.$queryRaw<any[]>`
+        SELECT 
+          sm.id,
+          sm.medicine_name,
+          COALESCE(SUM(si.stock_qty), 0) as stock_qty,
+          sm.reorder_level,
+          sm.rack_location
+        FROM shop_medicines sm
+        LEFT JOIN shop_inventory si ON si.shop_medicine_id = sm.id
+        WHERE sm.shop_id = ${shop.id}
+        GROUP BY sm.id, sm.medicine_name, sm.reorder_level, sm.rack_location
+        HAVING COALESCE(SUM(si.stock_qty), 0) <= sm.reorder_level
+        ORDER BY sm.medicine_name ASC
       `;
-      res.json({ success: true, data: items }); return;
+      // Convert BigInt
+      const formatted = items.map(it => ({ ...it, stock_qty: Number(it.stock_qty) }));
+      res.json({ success: true, data: formatted }); return;
     }
 
     const PAGE_SIZE = 50;
@@ -85,7 +93,10 @@ router.get('/', requireRole('shop_owner'), async (req, res, next) => {
     const [inventory, total] = await Promise.all([
       prisma.shopInventory.findMany({
         where,
-        include: { medicine: { select: { generic_name: true, form: true, strength: true, gst_rate: true } } },
+        include: { 
+          medicine: { select: { generic_name: true, form: true, strength: true, gst_rate: true } },
+          shop_medicine: { select: { rack_location: true, reorder_level: true } }
+        },
         orderBy: { medicine_name: 'asc' },
         skip,
         take: PAGE_SIZE,
@@ -137,14 +148,22 @@ router.get('/master/:id/batches', requireRole('shop_owner'), async (req, res, ne
 router.get('/low-stock', requireRole('shop_owner'), async (req, res, next) => {
   try {
     const shop = await getShopByUser(req.user!.id);
-    const items = await prisma.$queryRaw<{ id: string; medicine_name: string; stock_qty: number; reorder_level: number }[]>`
-      SELECT id, medicine_name, stock_qty, reorder_level
-      FROM shop_inventory
-      WHERE shop_id = ${shop.id}::uuid
-        AND stock_qty <= reorder_level
+    const items = await prisma.$queryRaw<any[]>`
+      SELECT 
+        sm.id,
+        sm.medicine_name,
+        COALESCE(SUM(si.stock_qty), 0) as stock_qty,
+        sm.reorder_level
+      FROM shop_medicines sm
+      LEFT JOIN shop_inventory si ON si.shop_medicine_id = sm.id
+      WHERE sm.shop_id = ${shop.id}
+      GROUP BY sm.id, sm.medicine_name, sm.reorder_level
+      HAVING COALESCE(SUM(si.stock_qty), 0) <= sm.reorder_level
       ORDER BY stock_qty ASC
     `;
-    res.json({ success: true, data: items });
+    // Format BigInt from SUM
+    const formatted = items.map(it => ({ ...it, stock_qty: Number(it.stock_qty) }));
+    res.json({ success: true, data: formatted });
   } catch (err) { next(err); }
 });
 
@@ -248,24 +267,80 @@ async function handleInventoryUpdate(req: any, res: any, next: any) {
     if (!existing) throw new AppError(404, 'NOT_FOUND', 'Inventory item not found');
 
     const data = updateInventorySchema.parse(req.body);
+    
+    let shopMedId = (existing as any).shop_medicine_id;
+
+    // If medicine name or unit changed, ensure matching ShopMedicine exists
+    if ((data.medicine_name && data.medicine_name.trim().toLowerCase() !== existing.medicine_name.toLowerCase()) || 
+        (data.unit && data.unit.toLowerCase() !== existing.unit?.toLowerCase())) {
+      
+      const mName = (data.medicine_name || existing.medicine_name).trim();
+      const unit = (data.unit || existing.unit || 'strip').trim();
+
+      const shopMed = await prisma.shopMedicine.upsert({
+        where: {
+          shop_id_medicine_name_unit: {
+            shop_id: shop.id,
+            medicine_name: mName,
+            unit: unit,
+          }
+        },
+        update: {
+          rack_location: data.rack_location || undefined,
+        },
+        create: {
+          shop_id: shop.id,
+          medicine_name: mName,
+          unit: unit,
+          reorder_level: data.reorder_level || existing.reorder_level || 10,
+          rack_location: data.rack_location || undefined,
+        }
+      });
+      shopMedId = shopMed.id;
+    } else if (data.rack_location !== undefined || data.reorder_level !== undefined) {
+      // Update rack/reorder on existing master
+      if (shopMedId) {
+        await prisma.shopMedicine.update({
+          where: { id: shopMedId },
+          data: {
+            rack_location: data.rack_location || undefined,
+            reorder_level: data.reorder_level || undefined,
+          }
+        });
+      }
+    }
+
     const item = await prisma.shopInventory.update({
       where: { id: req.params.id },
-      data: { ...data, expiry_date: data.expiry_date ? new Date(data.expiry_date) : undefined },
+      data: { 
+        ...data, 
+        shop_medicine_id: shopMedId || undefined,
+        expiry_date: data.expiry_date ? new Date(data.expiry_date) : undefined 
+      },
     });
 
-    // ── Low-stock notification ───────────────────────────────────────────────
-    if (item.stock_qty <= item.reorder_level) {
-      prisma.notification.create({
-        data: {
-          user_id: req.user!.id,
-          title: 'Low Stock Alert',
-          body: `${item.medicine_name} is running low — only ${item.stock_qty} unit(s) left (reorder level: ${item.reorder_level}). Please restock soon.`,
-          type: 'push',
-          category: 'stock_alert',
-          reference_id: item.id,
-          reference_type: 'inventory',
-        },
-      }).catch((e: Error) => logger.warn(`Stock alert notification failed: ${e?.message}`));
+    // ── Low-stock notification (Based on Total Stock) ────────────────────────
+    if (shopMedId) {
+      const summary = await prisma.shopInventory.aggregate({
+        where: { shop_medicine_id: shopMedId },
+        _sum: { stock_qty: true }
+      });
+      const totalStock = Number(summary._sum.stock_qty || 0);
+      const reorderLevel = data.reorder_level || existing.reorder_level || 10;
+
+      if (totalStock <= reorderLevel) {
+        prisma.notification.create({
+          data: {
+            user_id: req.user!.id,
+            title: 'Low Stock Alert',
+            body: `${item.medicine_name} is running low — only ${totalStock} unit(s) left in total across all batches (reorder level: ${reorderLevel}). Please restock soon.`,
+            type: 'push',
+            category: 'stock_alert',
+            reference_id: shopMedId,
+            reference_type: 'inventory',
+          },
+        }).catch((e: Error) => logger.warn(`Stock alert notification failed: ${e?.message}`));
+      }
     }
 
     res.json({ success: true, data: item });

@@ -1934,6 +1934,11 @@ function WalkInSaleTab() {
                               <span className={`font-semibold ${si === (suggHighlights[idx] ?? -1) ? 'text-white' : 'text-gray-900'}`}>{s.medicine_name}</span>
                               <div className="flex items-center gap-2">
                                 <span className={`text-[10px] px-1 rounded ${si === (suggHighlights[idx] ?? -1) ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'}`}>B: {s.batch_number || 'N/A'}</span>
+                                {s.shop_medicine?.rack_location && (
+                                  <span className={`text-[10px] px-1 rounded ${si === (suggHighlights[idx] ?? -1) ? 'bg-indigo-400 text-white' : 'bg-indigo-50 text-indigo-500 font-bold'}`}>
+                                    📍 {s.shop_medicine.rack_location}
+                                  </span>
+                                )}
                                 {s.expiry_date && <span className={`text-[10px] ${si === (suggHighlights[idx] ?? -1) ? 'text-violet-100' : 'text-orange-600'}`}>E: {fmtDate(s.expiry_date)}</span>}
                               </div>
                             </div>

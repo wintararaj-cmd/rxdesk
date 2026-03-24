@@ -131,18 +131,28 @@ export async function generateBillFromPrescription(
         data: { stock_qty: { decrement: item.quantity } },
       });
       // Fire low-stock notification if stock hits/falls below reorder level
-      if (updatedInv.stock_qty <= updatedInv.reorder_level) {
-        prisma.notification.create({
-          data: {
-            user_id: userId,
-            title: 'Low Stock Alert',
-            body: `${updatedInv.medicine_name} is running low — only ${updatedInv.stock_qty} unit(s) left (reorder level: ${updatedInv.reorder_level}).`,
-            type: 'push',
-            category: 'stock_alert',
-            reference_id: updatedInv.id,
-            reference_type: 'inventory',
-          },
-        }).catch((e) => logger.warn(`Stock alert (bill) failed: ${e?.message}`));
+      if (inv.shop_medicine_id) {
+        const summary = await prisma.shopInventory.aggregate({
+          where: { shop_medicine_id: inv.shop_medicine_id },
+          _sum: { stock_qty: true }
+        });
+        const totalStock = Number(summary._sum.stock_qty || 0);
+        const master = await prisma.shopMedicine.findUnique({ where: { id: inv.shop_medicine_id } });
+        const reorderLevel = master?.reorder_level || 10;
+
+        if (totalStock <= reorderLevel) {
+          prisma.notification.create({
+            data: {
+              user_id: userId,
+              title: 'Low Stock Alert',
+              body: `${updatedInv.medicine_name} is running low — only ${totalStock} unit(s) left in total across all batches (reorder level: ${reorderLevel}).`,
+              type: 'push',
+              category: 'stock_alert',
+              reference_id: inv.shop_medicine_id,
+              reference_type: 'inventory',
+            },
+          }).catch((e) => logger.warn(`Stock alert (bill) failed: ${e?.message}`));
+        }
       }
     }
   }
@@ -264,7 +274,9 @@ export async function createManualBill(
 
     // 1. Try to fulfill from the specifically selected batch first
     if (item.inventory_id) {
-      const inv = await prisma.shopInventory.findUnique({ where: { id: item.inventory_id } });
+      const inv = await prisma.shopInventory.findFirst({ 
+        where: { id: item.inventory_id, shop_id: shop.id } 
+      });
       if (inv) {
         const take = Math.min(inv.stock_qty, remainingQty);
         const discAmt = (itemDiscountType === 'percentage')
@@ -353,18 +365,28 @@ export async function createManualBill(
           data: { stock_qty: { decrement: ib.quantity } },
         });
 
-        if (updatedInv.stock_qty <= updatedInv.reorder_level) {
-          prisma.notification.create({
-            data: {
-              user_id: userId,
-              title: 'Low Stock Alert',
-              body: `${updatedInv.medicine_name} is running low — only ${updatedInv.stock_qty} unit(s) left.`,
-              type: 'push',
-              category: 'stock_alert',
-              reference_id: updatedInv.id,
-              reference_type: 'inventory',
-            },
-          }).catch((e) => logger.warn(`Low-stock alert failed: ${e?.message}`));
+        if (updatedInv.shop_medicine_id) {
+          const summary = await prisma.shopInventory.aggregate({
+            where: { shop_medicine_id: updatedInv.shop_medicine_id },
+            _sum: { stock_qty: true }
+          });
+          const totalStock = Number(summary._sum.stock_qty || 0);
+          const master = await prisma.shopMedicine.findUnique({ where: { id: updatedInv.shop_medicine_id } });
+          const reorderLevel = master?.reorder_level || 10;
+
+          if (totalStock <= reorderLevel) {
+            prisma.notification.create({
+              data: {
+                user_id: userId,
+                title: 'Low Stock Alert',
+                body: `${updatedInv.medicine_name} is running low — only ${totalStock} unit(s) left in total across all batches (reorder level: ${reorderLevel}).`,
+                type: 'push',
+                category: 'stock_alert',
+                reference_id: updatedInv.shop_medicine_id,
+                reference_type: 'inventory',
+              },
+            }).catch((e) => logger.warn(`Low-stock alert failed: ${e?.message}`));
+          }
         }
       }
     }
@@ -970,10 +992,34 @@ export async function updateBill(billId: string, userId: string, data: any) {
     if (data.items) {
       for (const it of normalizedItems) {
         if (it.inventory_id) {
-          await tx.shopInventory.update({
+          const updatedInv = await tx.shopInventory.update({
             where: { id: it.inventory_id },
             data: { stock_qty: { decrement: it.quantity } },
           });
+
+          if (updatedInv.shop_medicine_id) {
+            const summary = await tx.shopInventory.aggregate({
+              where: { shop_medicine_id: updatedInv.shop_medicine_id },
+              _sum: { stock_qty: true }
+            });
+            const totalStock = Number(summary._sum.stock_qty || 0);
+            const master = await tx.shopMedicine.findUnique({ where: { id: updatedInv.shop_medicine_id } });
+            const reorderLevel = master?.reorder_level || 10;
+
+            if (totalStock <= reorderLevel) {
+              tx.notification.create({
+                data: {
+                  user_id: userId,
+                  title: 'Low Stock Alert (Edit)',
+                  body: `${updatedInv.medicine_name} is running low — only ${totalStock} unit(s) left in total across all batches (reorder level: ${reorderLevel}).`,
+                  type: 'push',
+                  category: 'stock_alert',
+                  reference_id: updatedInv.shop_medicine_id,
+                  reference_type: 'inventory',
+                },
+              }).catch((e) => logger.warn(`Low-stock alert edit fail: ${e?.message}`));
+            }
+          }
         }
       }
     }

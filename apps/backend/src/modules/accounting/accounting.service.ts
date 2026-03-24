@@ -2934,16 +2934,44 @@ export async function voidPurchase(userId: string, id: string) {
 
     // 1. Reverse Inventory
     for (const item of purchase.items) {
-      await tx.shopInventory.updateMany({
+      const matched = await tx.shopInventory.findFirst({
         where: {
           shop_id: shop.id,
           medicine_name: { equals: item.medicine_name.trim(), mode: 'insensitive' },
           batch_number: { equals: (item.batch_number || '').trim(), mode: 'insensitive' },
-        },
-        data: {
-          stock_qty: { decrement: item.quantity + (item.free_qty || 0) },
-        },
+        }
       });
+
+      if (matched) {
+        const updatedInv = await tx.shopInventory.update({
+          where: { id: matched.id },
+          data: { stock_qty: { decrement: item.quantity + (item.free_qty || 0) } },
+        });
+
+        if (updatedInv.shop_medicine_id) {
+          const summary = await tx.shopInventory.aggregate({
+            where: { shop_medicine_id: updatedInv.shop_medicine_id },
+            _sum: { stock_qty: true }
+          });
+          const totalStock = Number(summary._sum.stock_qty || 0);
+          const master = await tx.shopMedicine.findUnique({ where: { id: updatedInv.shop_medicine_id } });
+          const reorderLevel = master?.reorder_level || 10;
+
+          if (totalStock <= reorderLevel) {
+            tx.notification.create({
+              data: {
+                user_id: userId,
+                title: 'Low Stock Alert (Void Purchase)',
+                body: `${updatedInv.medicine_name} is running low — only ${totalStock} unit(s) left in total after voiding purchase (reorder level: ${reorderLevel}).`,
+                type: 'push',
+                category: 'stock_alert',
+                reference_id: updatedInv.shop_medicine_id,
+                reference_type: 'inventory',
+              },
+            }).catch((e) => logger.warn(`Low-stock alert void fail: ${e?.message}`));
+          }
+        }
+      }
     }
 
     // 2. Remove associated payments/income/expense logs if any
@@ -2976,10 +3004,39 @@ export async function deleteSaleReturn(userId: string, id: string) {
 
     // Reverse Inventory (decrease what was returned)
     for (const item of sr.items) {
-      await tx.shopInventory.updateMany({
-        where: { shop_id: shop.id, medicine_name: item.medicine_name },
-        data: { stock_qty: { decrement: item.quantity } },
+      const matched = await tx.shopInventory.findFirst({
+        where: { shop_id: shop.id, medicine_name: item.medicine_name, batch_number: item.batch_number }
       });
+      if (matched) {
+        const updatedInv = await tx.shopInventory.update({
+          where: { id: matched.id },
+          data: { stock_qty: { decrement: item.quantity } },
+        });
+
+        if (updatedInv.shop_medicine_id) {
+          const summary = await tx.shopInventory.aggregate({
+            where: { shop_medicine_id: updatedInv.shop_medicine_id },
+            _sum: { stock_qty: true }
+          });
+          const totalStock = Number(summary._sum.stock_qty || 0);
+          const master = await tx.shopMedicine.findUnique({ where: { id: updatedInv.shop_medicine_id } });
+          const reorderLevel = master?.reorder_level || 10;
+
+          if (totalStock <= reorderLevel) {
+            tx.notification.create({
+              data: {
+                user_id: userId,
+                title: 'Low Stock Alert (Delete Return)',
+                body: `${updatedInv.medicine_name} is running low — only ${totalStock} unit(s) left in total (reorder level: ${reorderLevel}).`,
+                type: 'push',
+                category: 'stock_alert',
+                reference_id: updatedInv.shop_medicine_id,
+                reference_type: 'inventory',
+              },
+            }).catch((e) => logger.warn(`Low-stock alert delete return fail: ${e?.message}`));
+          }
+        }
+      }
     }
 
     await tx.saleReturnItem.deleteMany({ where: { return_id: id } });
