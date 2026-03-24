@@ -130,9 +130,9 @@ export const billApi = {
   getById: (id: string) => apiClient.get(`/bills/${id}`),
   markPaid: (id: string, method: string) =>
     apiClient.patch(`/bills/${id}/pay`, { payment_method: method }),
-  searchCustomers: (phone: string) =>
-    apiClient.get<{ success: boolean; data: { customer_name: string | null; customer_phone: string }[] }>(
-      '/bills/customers/search', { params: { phone } }
+  searchCustomers: (q: string) =>
+    apiClient.get<{ success: boolean; data: any[] }>(
+      '/bills/customers/search', { params: { q } }
     ),
   void: (id: string) => apiClient.delete(`/bills/${id}`),
   update: (id: string, data: object) => apiClient.patch(`/bills/${id}`, data),

@@ -644,7 +644,9 @@ function BillDetailModal({ bill, onClose, onPay }: {
   });
 
   const [suggestions, setSuggestions] = useState<Record<number, any[]>>({});
+  const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
   const searchTimers = useRef<Record<number, any>>({});
+  const customerSearchTimer = useRef<any>(null);
 
   const updateMutation = useMutation({
     mutationFn: (data: any) => billApi.update(bill.id, data),
@@ -671,6 +673,36 @@ function BillDetailModal({ bill, onClose, onPay }: {
   const { data: shopData } = useQuery({ queryKey: ['shop-me'], queryFn: () => shopApi.getMyShop().then(r => r.data.data), staleTime: 5 * 60 * 1000 });
   const shopName = (shopData as any)?.shop_name ?? 'Medical Shop';
   const isTaxInvoice = (shopData as any)?.gst_type === 'regular';
+
+  const onCustomerChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+
+    if (field === 'customer_name' || field === 'customer_phone') {
+      if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current);
+      if (value.length < 2) {
+        setCustomerSuggestions([]);
+        return;
+      }
+      customerSearchTimer.current = setTimeout(async () => {
+        try {
+          const res = await billApi.searchCustomers(value);
+          setCustomerSuggestions(res.data.data || []);
+        } catch { /* ignore */ }
+      }, 300);
+    }
+  };
+
+  const selectCustomer = (c: any) => {
+    setFormData(prev => ({
+      ...prev,
+      customer_name: c.customer_name || prev.customer_name,
+      customer_phone: c.customer_phone || prev.customer_phone,
+      customer_gstin: c.customer_gstin || prev.customer_gstin,
+      billing_address: c.billing_address || prev.billing_address,
+      billing_state: c.billing_state || prev.billing_state
+    }));
+    setCustomerSuggestions([]);
+  };
 
   const addItem = () => {
     setFormData(prev => ({
@@ -778,13 +810,23 @@ function BillDetailModal({ bill, onClose, onPay }: {
           {isEditing ? (
             <div className="space-y-6 animate-in fade-in duration-300">
               <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 grid grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="col-span-2 lg:col-span-1">
+                <div className="col-span-2 lg:col-span-1 relative">
                   <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Customer Name</label>
-                  <input type="text" value={formData.customer_name} onChange={e => setFormData({...formData, customer_name: e.target.value})} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-500" />
+                  <input type="text" value={formData.customer_name} onChange={e => onCustomerChange('customer_name', e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-500" />
+                  {customerSuggestions.length > 0 && (
+                    <div className="absolute z-30 top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden mt-1 max-h-48 overflow-y-auto">
+                      {customerSuggestions.map((c, ci) => (
+                        <button key={ci} onMouseDown={() => selectCustomer(c)} className="w-full text-left px-3 py-2 text-xs hover:bg-violet-50 border-b border-gray-50 last:border-0">
+                          <p className="font-bold text-gray-900">{c.customer_name}</p>
+                          <p className="text-[10px] text-gray-500">{c.customer_phone}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Phone</label>
-                  <input type="text" value={formData.customer_phone} onChange={e => setFormData({...formData, customer_phone: e.target.value})} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-500" />
+                  <input type="text" value={formData.customer_phone} onChange={e => onCustomerChange('customer_phone', e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-500" />
                 </div>
                 <div>
                   <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">GSTIN</label>

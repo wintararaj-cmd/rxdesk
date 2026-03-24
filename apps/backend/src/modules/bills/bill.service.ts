@@ -736,18 +736,21 @@ export async function getBillStats(userId: string, fromDate?: string, toDate?: s
   };
 }
 
-export async function searchCustomersByPhone(userId: string, phone: string) {
+export async function searchCustomers(userId: string, query: string) {
   const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId }, select: { id: true } });
-  if (!shop) return [];
+  if (!shop || !query) return [];
 
   // 1. Search in CreditCustomer Master (Primary)
   const master = await prisma.creditCustomer.findMany({
     where: {
       shop_id: shop.id,
-      phone: { startsWith: phone },
+      OR: [
+        { phone: { contains: query, mode: 'insensitive' } },
+        { name: { contains: query, mode: 'insensitive' } },
+      ],
     },
-    select: { name: true, phone: true, address: true },
-    take: 5,
+    select: { name: true, phone: true, address: true, state: true },
+    take: 10,
   });
 
   const masterResults = master.map(c => ({
@@ -755,22 +758,24 @@ export async function searchCustomersByPhone(userId: string, phone: string) {
     customer_phone: c.phone || '',
     customer_gstin: null,
     billing_address: c.address,
-    billing_state: null,
+    billing_state: c.state,
     source: 'master'
   }));
 
-  // 2. Search in Bill History (Fallback for walk-ins not in master)
+  // 2. Search in Bill History (Fallback)
   const masterPhones = master.map(m => m.phone).filter(Boolean) as string[];
   const bills = await prisma.bill.findMany({
     where: {
       shop_id: shop.id,
-      customer_phone: { startsWith: phone },
+      OR: [
+        { customer_phone: { contains: query, mode: 'insensitive' } },
+        { customer_name: { contains: query, mode: 'insensitive' } },
+      ],
       ...(masterPhones.length > 0 ? { NOT: { customer_phone: { in: masterPhones } } } : {})
     },
     select: { customer_name: true, customer_phone: true, customer_gstin: true, billing_address: true, billing_state: true },
     distinct: ['customer_phone'],
-    orderBy: { customer_phone: 'asc' },
-    take: 5,
+    take: 10,
   });
 
   const billResults = bills.map(b => ({
@@ -782,7 +787,7 @@ export async function searchCustomersByPhone(userId: string, phone: string) {
     source: 'history'
   }));
 
-  return [...masterResults, ...billResults];
+  return [...masterResults, ...billResults].slice(0, 15);
 }
 export async function voidBill(billId: string, userId: string) {
   const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });

@@ -52,12 +52,12 @@ router.post('/from-prescription/:prescriptionId', requireRole('shop_owner'), asy
   } catch (err) { next(err); }
 });
 
-// GET /bills/customers/search?phone=...  (typeahead for known customers)
+// GET /bills/customers/search?q=... OR phone=... (typeahead for known customers)
 router.get('/customers/search', requireRole('shop_owner'), async (req, res, next) => {
   try {
-    const phone = ((req.query.phone as string) ?? '').trim();
-    if (phone.length < 3) return res.json({ success: true, data: [] });
-    const data = await service.searchCustomersByPhone(req.user!.id, phone);
+    const query = ((req.query.q || req.query.phone) as string ?? '').trim();
+    if (query.length < 2) return res.json({ success: true, data: [] });
+    const data = await service.searchCustomers(req.user!.id, query);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
