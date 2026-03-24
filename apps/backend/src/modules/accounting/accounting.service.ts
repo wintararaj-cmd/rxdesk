@@ -330,7 +330,7 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
           create: itemsWithTotals.map((item) => ({
             medicine_id: item.medicine_id ?? null,
             medicine_name: item.medicine_name,
-            batch_number: item.batch_number,
+            batch_number: (item.batch_number || '').trim(),
             expiry_date: new Date(item.expiry_date),
             quantity: item.quantity,
             free_qty: item.free_qty ?? 0,
@@ -354,8 +354,17 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
       const existing = await tx.shopInventory.findFirst({
         where: {
           shop_id: shop.id,
-          medicine_name: { equals: mName, mode: 'insensitive' },
-          batch_number: { equals: bNumber, mode: 'insensitive' },
+          AND: [
+            {
+              OR: [
+                ...(item.medicine_id ? [{ medicine_id: item.medicine_id }] : []),
+                { medicine_name: { equals: mName, mode: 'insensitive' } }
+              ]
+            },
+            bNumber === ''
+              ? { OR: [{ batch_number: '' }, { batch_number: null }] }
+              : { batch_number: { equals: bNumber, mode: 'insensitive' } }
+          ]
         },
       });
 
@@ -369,6 +378,7 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
             unit: item.unit ?? existing.unit,
             expiry_date: new Date(item.expiry_date),
             hsn_code: item.hsn_code ?? existing.hsn_code,
+            ...(item.medicine_id ? { medicine_id: item.medicine_id } : {}),
           },
         });
       } else {
@@ -423,16 +433,31 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
 
     // 1. Reverse Old Inventory
     for (const item of oldPurchase.items) {
-      await tx.shopInventory.updateMany({
+      const bNo = (item.batch_number || '').trim();
+      const existing = await tx.shopInventory.findFirst({
         where: {
           shop_id: shop.id,
-          medicine_name: { equals: item.medicine_name.trim(), mode: 'insensitive' },
-          batch_number: { equals: (item.batch_number || '').trim(), mode: 'insensitive' },
-        },
-        data: {
-          stock_qty: { decrement: item.quantity + (item.free_qty || 0) },
+          AND: [
+            {
+              OR: [
+                ...(item.medicine_id ? [{ medicine_id: item.medicine_id }] : []),
+                { medicine_name: { equals: item.medicine_name.trim(), mode: 'insensitive' } }
+              ]
+            },
+            bNo === ''
+              ? { OR: [{ batch_number: '' }, { batch_number: null }] }
+              : { batch_number: { equals: bNo, mode: 'insensitive' } }
+          ]
         },
       });
+      if (existing) {
+        await tx.shopInventory.update({
+          where: { id: existing.id },
+          data: {
+            stock_qty: { decrement: item.quantity + (item.free_qty || 0) },
+          },
+        });
+      }
     }
 
     // 2. Clear old items
@@ -469,7 +494,7 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
           create: itemsWithTotals.map((item) => ({
             medicine_id: item.medicine_id ?? null,
             medicine_name: item.medicine_name,
-            batch_number: item.batch_number,
+            batch_number: (item.batch_number || '').trim(),
             expiry_date: new Date(item.expiry_date),
             quantity: item.quantity,
             free_qty: item.free_qty ?? 0,
@@ -493,8 +518,17 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
       const existing = await tx.shopInventory.findFirst({
         where: {
           shop_id: shop.id,
-          medicine_name: { equals: mName, mode: 'insensitive' },
-          batch_number: { equals: bNumber, mode: 'insensitive' },
+          AND: [
+            {
+              OR: [
+                ...(item.medicine_id ? [{ medicine_id: item.medicine_id }] : []),
+                { medicine_name: { equals: mName, mode: 'insensitive' } }
+              ]
+            },
+            bNumber === ''
+              ? { OR: [{ batch_number: '' }, { batch_number: null }] }
+              : { batch_number: { equals: bNumber, mode: 'insensitive' } }
+          ]
         },
       });
 
@@ -508,6 +542,7 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
             unit: item.unit ?? existing.unit,
             expiry_date: new Date(item.expiry_date),
             hsn_code: item.hsn_code ?? existing.hsn_code,
+            ...(item.medicine_id ? { medicine_id: item.medicine_id } : {}),
           },
         });
       } else {

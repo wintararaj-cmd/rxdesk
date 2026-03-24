@@ -788,7 +788,7 @@ function SuppliersTab({ shopGstType }: { shopGstType?: string }) {
 
 const GST_RATES = ['0', '5', '12', '18', '28'];
 const PI_UNITS = ['strip', 'tablet', 'capsule', 'bottle', 'syrup', 'injection', 'vial', 'tube', 'cream', 'ointment', 'sachet', 'packet', 'piece', 'box'];
-const EMPTY_PI_ITEM = { medicine_name: '', unit: 'strip', batch_number: '', expiry_date: '', quantity: '1', free_qty: '', purchase_price: '', mrp: '', discount_pct: '', gst_rate: '12' };
+const EMPTY_PI_ITEM = { medicine_id: '', medicine_name: '', unit: 'strip', hsn_code: '', batch_number: '', expiry_date: '', quantity: '1', free_qty: '', purchase_price: '', mrp: '', discount_pct: '', gst_rate: '12' };
 type PIItem = typeof EMPTY_PI_ITEM;
 
 function PurchasesTab() {
@@ -803,7 +803,7 @@ function PurchasesTab() {
   const [receivedDate, setReceivedDate] = useState(TODAY_STR);
   const [notes, setNotes] = useState('');
   const [piItems, setPiItems] = useState<PIItem[]>([{ ...EMPTY_PI_ITEM }]);
-  const [suggestions, setSuggestions] = useState<Record<number, { id: string; medicine_name: string; mrp: number; gst_rate: number }[]>>({});
+  const [suggestions, setSuggestions] = useState<Record<number, { id: string; medicine_name: string; mrp: number; gst_rate: number; hsn_code?: string; medicine_id?: string }[]>>({});
   const [suggHighlights, setSuggHighlights] = useState<Record<number, number>>({});
   const searchTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
   const piMedRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -865,6 +865,7 @@ function PurchasesTab() {
     setNotes(p.notes || '');
     if (p.items && p.items.length > 0) {
       setPiItems(p.items.map((it: any) => ({
+        medicine_id: it.medicine_id || '',
         medicine_name: it.medicine_name,
         batch_number: it.batch_number,
         expiry_date: it.expiry_date.split('T')[0],
@@ -875,6 +876,7 @@ function PurchasesTab() {
         discount_pct: String(it.discount_pct || 0),
         gst_rate: String(it.gst_rate || 12),
         unit: it.unit || 'strip',
+        hsn_code: it.hsn_code || '',
         line_total: it.line_total
       })));
     } else {
@@ -939,9 +941,17 @@ function PurchasesTab() {
     }
   };
 
-  const selectSuggestion = (idx: number, inv: { medicine_name: string; mrp: number; gst_rate: number; unit?: string }) => {
+  const selectSuggestion = (inv: any, idx: number) => {
     setPiItems((prev) => prev.map((it, i) =>
-      i === idx ? { ...it, medicine_name: inv.medicine_name, mrp: String(inv.mrp || ''), gst_rate: String(inv.gst_rate ?? 12), unit: inv.unit ?? it.unit } : it
+      i === idx ? {
+        ...it,
+        medicine_id: inv.medicine_id || inv.id || '',
+        medicine_name: inv.medicine_name || inv.name || '',
+        mrp: String(inv.mrp || ''),
+        gst_rate: String(inv.gst_rate ?? 12),
+        unit: inv.unit ?? it.unit,
+        hsn_code: inv.hsn_code || it.hsn_code
+      } : it
     ));
     setSuggestions((p) => ({ ...p, [idx]: [] }));
     setSuggHighlights((p) => ({ ...p, [idx]: -1 }));
@@ -998,6 +1008,7 @@ function PurchasesTab() {
       received_date: receivedDate || invoiceDate,
       notes: notes || undefined,
       items: validItems.map((it) => ({
+        medicine_id: it.medicine_id || undefined,
         medicine_name: it.medicine_name.trim(),
         unit: it.unit || 'strip',
         batch_number: it.batch_number.trim(),
@@ -1008,6 +1019,7 @@ function PurchasesTab() {
         mrp: Number(it.mrp) || Number(it.purchase_price),
         discount_pct: Number(it.discount_pct) || 0,
         gst_rate: Number(it.gst_rate) || 12,
+        hsn_code: it.hsn_code || undefined,
       })),
     });
   };
@@ -1135,7 +1147,7 @@ function PurchasesTab() {
                           const h = suggHighlights[idx] ?? -1;
                           if (e.key === 'ArrowDown') { e.preventDefault(); setSuggHighlights((p) => ({ ...p, [idx]: Math.min(h + 1, suggs.length - 1) })); }
                           else if (e.key === 'ArrowUp') { e.preventDefault(); setSuggHighlights((p) => ({ ...p, [idx]: Math.max(h - 1, 0) })); }
-                          else if (e.key === 'Enter' && h >= 0 && suggs[h]) { e.preventDefault(); selectSuggestion(idx, suggs[h]); }
+                          else if (e.key === 'Enter' && h >= 0 && suggs[h]) { e.preventDefault(); selectSuggestion(suggs[h], idx); }
                           else if (e.key === 'Enter' && (h < 0 || suggs.length === 0)) { e.preventDefault(); setSuggestions((p) => ({ ...p, [idx]: [] })); piUnitRefs.current[idx]?.focus(); }
                           else if (e.key === 'Escape') {
                             setSuggestions((p) => ({ ...p, [idx]: [] }));
@@ -1153,7 +1165,7 @@ function PurchasesTab() {
                       {suggestions[idx]?.length > 0 && (
                         <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto ring-1 ring-black/5 animate-in fade-in slide-in-from-top-1">
                           {suggestions[idx].map((s, si) => (
-                            <button key={s.id} type="button" onMouseDown={() => selectSuggestion(idx, s)}
+                            <button key={s.id} type="button" onMouseDown={() => selectSuggestion(s, idx)}
                               className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors border-b border-gray-50 last:border-0 ${si === (suggHighlights[idx] ?? -1) ? 'bg-violet-600 text-white shadow-inner' : 'hover:bg-violet-50'}`}>
                               <span className="font-semibold">{s.medicine_name}</span>
                               {s.mrp > 0 && <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${si === (suggHighlights[idx] ?? -1) ? 'bg-white/20' : 'bg-violet-50 text-violet-600'}`}>₹{s.mrp}</span>}
