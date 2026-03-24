@@ -63,6 +63,9 @@ interface BatchItem {
   mrp: number;
   purchase_price: number;
   hsn_code?: string;
+  unit?: string;
+  discount_type?: 'percentage' | 'amount';
+  discount_value?: number;
 }
 
 interface InventoryItem extends BatchItem {
