@@ -273,7 +273,7 @@ export default function InventoryPage() {
     enabled: tab === 'stock',
   });
   const items = queryResult?.data ?? [];
-  const pagination = null; // No pagination for master list for now
+  const pagination: Pagination | null = null; // No pagination for master list for now
 
   const addMutation = useMutation({
     mutationFn: (data: object) => inventoryApi.add(data),
@@ -463,7 +463,7 @@ export default function InventoryPage() {
           <h1 className="text-2xl font-bold text-gray-900">Inventory</h1>
           <p className="text-gray-500 text-sm mt-1">
             {tab === 'stock'
-              ? (pagination ? `${pagination.total.toLocaleString()} items in stock` : '…')
+              ? (items.length > 0 ? `${items.length.toLocaleString()} items in stock` : '…')
               : tab === 'catalog'
               ? (catalogPagination ? `${catalogPagination.total.toLocaleString()} medicines in catalog` : '…')
               : 'Find alternatives by composition'}
