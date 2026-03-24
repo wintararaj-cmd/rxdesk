@@ -835,29 +835,191 @@ export async function voidBill(billId: string, userId: string) {
 /**
  * Update basic bill details (customer info, payment meta)
  */
+/**
+ * Update bill details including items, inventory, and accounting
+ */
 export async function updateBill(billId: string, userId: string, data: any) {
   const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });
   if (!shop) throw new AppError(403, 'FORBIDDEN', 'Access denied');
 
-  const bill = await prisma.bill.findUnique({ where: { id: billId } });
-  if (!bill) throw new AppError(404, 'NOT_FOUND', 'Bill not found');
-  if (bill.shop_id !== shop.id) throw new AppError(403, 'FORBIDDEN', 'Access denied');
+  return await prisma.$transaction(async (tx) => {
+    const oldBill = await tx.bill.findUnique({
+      where: { id: billId, shop_id: shop.id },
+      include: { items: true, income_entry: true, credit_transactions: true },
+    });
 
-  return await prisma.bill.update({
-    where: { id: billId },
-    data: {
-      customer_name: data.customer_name ?? bill.customer_name,
-      customer_phone: data.customer_phone ?? bill.customer_phone,
-      customer_gstin: data.customer_gstin ?? bill.customer_gstin,
-      billing_address: data.billing_address ?? bill.billing_address,
-      billing_state: data.billing_state ?? bill.billing_state,
-      payment_method: data.payment_method ?? bill.payment_method,
-      payment_status: data.payment_status ?? bill.payment_status,
-    },
-    include: {
-      items: true,
-      patient: { select: { full_name: true, user_id: true } }
+    if (!oldBill) throw new AppError(404, 'NOT_FOUND', 'Bill not found');
+
+    // 1. Reverse Old Inventory if items are being updated
+    if (data.items) {
+      for (const item of oldBill.items) {
+        if (item.inventory_id) {
+          await tx.shopInventory.update({
+            where: { id: item.inventory_id },
+            data: { stock_qty: { increment: item.quantity } },
+          });
+        }
+      }
+
+      // 2. Clear old items
+      await tx.billItem.deleteMany({ where: { bill_id: billId } });
     }
+
+    // 3. Recalculate Totals if items provided
+    let subtotal = Number(oldBill.subtotal);
+    let totalGst = Number(oldBill.gst_amount);
+    let discountAmount = Number(oldBill.discount_amount);
+    let totalAmount = Number(oldBill.total_amount);
+
+    interface NormalizedItem {
+      medicine_name: string;
+      inventory_id?: string;
+      batch_number?: string;
+      expiry_date?: string | null;
+      unit: string;
+      mrp: number;
+      quantity: number;
+      discount_type: 'percentage' | 'amount';
+      discount_value: number;
+      gst_rate: number;
+      line_total: number;
+    }
+
+    let normalizedItems: NormalizedItem[] = [];
+
+    if (data.items && Array.isArray(data.items)) {
+      subtotal = 0;
+      totalGst = 0;
+      discountAmount = Number(data.discount_amount ?? 0);
+
+      normalizedItems = data.items.map((it: any) => {
+        const qty = Number(it.quantity) || 0;
+        const mrp = Number(it.mrp) || 0;
+        const gstRate = Number(it.gst_rate) || 0;
+        const dv = Number(it.discount_value) || 0;
+
+        const itemSub = qty * mrp;
+        const itemDisc = it.discount_type === 'percentage' ? (itemSub * dv) / 100 : (qty * dv);
+        const taxable = itemSub - itemDisc;
+        const itemGst = (taxable * gstRate) / 100;
+        const lineTotal = taxable + itemGst;
+
+        subtotal += itemSub;
+        totalGst += itemGst;
+
+        return {
+          medicine_name: it.medicine_name,
+          inventory_id: it.inventory_id,
+          batch_number: it.batch_number,
+          expiry_date: it.expiry_date ? new Date(it.expiry_date) : null,
+          unit: it.unit || 'piece',
+          mrp,
+          quantity: qty,
+          discount_type: it.discount_type || 'percentage',
+          discount_value: dv,
+          gst_rate: gstRate,
+          line_total: lineTotal,
+        };
+      });
+
+      totalAmount = subtotal - discountAmount + totalGst;
+    }
+
+    // 4. Update the Bill
+    const updatedBill = await tx.bill.update({
+      where: { id: billId },
+      data: {
+        customer_name: data.customer_name ?? oldBill.customer_name,
+        customer_phone: data.customer_phone ?? oldBill.customer_phone,
+        customer_gstin: data.customer_gstin ?? oldBill.customer_gstin,
+        billing_address: data.billing_address ?? oldBill.billing_address,
+        billing_state: data.billing_state ?? oldBill.billing_state,
+        payment_method: data.payment_method ?? oldBill.payment_method,
+        payment_status: data.payment_status ?? oldBill.payment_status,
+        subtotal,
+        gst_amount: totalGst,
+        discount_amount: discountAmount,
+        total_amount: totalAmount,
+        ...(data.items ? {
+          items: {
+            create: normalizedItems.map(it => ({
+              medicine_name: it.medicine_name,
+              inventory_id: it.inventory_id,
+              batch_number: it.batch_number,
+              expiry_date: it.expiry_date,
+              unit: it.unit,
+              mrp: it.mrp,
+              quantity: it.quantity,
+              discount_type: it.discount_type,
+              discount_value: it.discount_value,
+              line_total: it.line_total,
+            }))
+          }
+        } : {})
+      },
+      include: { items: true, patient: true }
+    });
+
+    // 5. Update inventory for each NEW item
+    if (data.items) {
+      for (const it of normalizedItems) {
+        if (it.inventory_id) {
+          await tx.shopInventory.update({
+            where: { id: it.inventory_id },
+            data: { stock_qty: { decrement: it.quantity } },
+          });
+        }
+      }
+    }
+
+    // 6. Update Accounting/Income record
+    if (oldBill.income_entry) {
+      await tx.incomeEntry.update({
+        where: { id: oldBill.income_entry.id },
+        data: {
+          amount: totalAmount,
+          payment_method: (data.payment_method ?? oldBill.payment_method) as any,
+          entry_date: new Date(),
+        }
+      });
+    } else if (updatedBill.payment_status === 'paid' && updatedBill.payment_method !== 'credit') {
+      // If it wasn't paid before but is now, or we just want to ensure it exists
+      await tx.incomeEntry.create({
+        data: {
+          shop_id: shop.id,
+          entry_type: 'sale_income' as any,
+          amount: totalAmount,
+          payment_method: updatedBill.payment_method as any,
+          reference_bill_id: billId,
+          entry_date: new Date(),
+          created_by: userId,
+        }
+      });
+    }
+
+    // 7. Update Credit record if applicable
+    if (oldBill.payment_method === 'credit' || updatedBill.payment_method === 'credit') {
+      const oldAmount = Number(oldBill.total_amount);
+      const newAmount = Number(updatedBill.total_amount);
+      const diff = newAmount - oldAmount;
+
+      if (oldBill.credit_transactions.length > 0) {
+        // Update existing transaction
+        const firstTx = oldBill.credit_transactions[0];
+        await tx.creditTransaction.update({
+          where: { id: firstTx.id },
+          data: { amount: newAmount }
+        });
+        
+        await tx.creditCustomer.update({
+          where: { id: firstTx.customer_id },
+          data: { total_outstanding: { increment: diff } }
+        });
+      }
+    }
+
+    return updatedBill;
   });
 }
+
 

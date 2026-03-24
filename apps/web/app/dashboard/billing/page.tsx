@@ -82,6 +82,15 @@ function normalizeState(s?: string | null): string {
   return STATE_MAP[cleaned] || cleaned;
 }
 
+const INDIAN_STATES = [
+  'Andaman and Nicobar Islands', 'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar',
+  'Chandigarh', 'Chhattisgarh', 'Dadra and Nagar Haveli and Daman and Diu', 'Delhi', 'Goa',
+  'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu and Kashmir', 'Jharkhand', 'Karnataka',
+  'Kerala', 'Ladakh', 'Lakshadweep', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya',
+  'Mizoram', 'Nagaland', 'Odisha', 'Puducherry', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
+  'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal'
+];
+
 // ── Thermal Print & WhatsApp ─────────────────────────────────────────────────
 
 function printInvoice(bill: BillData, shopData: any) {
@@ -622,34 +631,117 @@ function BillDetailModal({ bill, onClose, onPay }: {
     customer_phone: bill.customer_phone ?? '',
     customer_gstin: bill.customer_gstin ?? '',
     billing_address: bill.billing_address ?? '',
-    billing_state: bill.billing_state ?? ''
+    billing_state: bill.billing_state ?? '',
+    discount_amount: String(bill.discount_amount || 0),
+    items: bill.items.map(it => ({
+      ...it,
+      inventory_id: (it as any).inventory_id || '',
+      mrp: String(it.mrp),
+      quantity: String(it.quantity),
+      discount_value: String(it.discount_value || 0),
+      gst_rate: String((it as any).gst_rate || 12)
+    }))
   });
+
+  const [suggestions, setSuggestions] = useState<Record<number, any[]>>({});
+  const searchTimers = useRef<Record<number, any>>({});
 
   const updateMutation = useMutation({
     mutationFn: (data: any) => billApi.update(bill.id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['bill-history'] });
+      qc.invalidateQueries({ queryKey: ['bill-stats'] });
+      qc.invalidateQueries({ queryKey: ['billing-today-stats'] });
       setIsEditing(false);
       onClose();
-    }
+    },
+    onError: (err: any) => alert(err.response?.data?.error?.message || 'Update failed')
   });
 
   const voidMutation = useMutation({
     mutationFn: (id: string) => billApi.void(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['bill-history'] });
+      qc.invalidateQueries({ queryKey: ['bill-stats'] });
+      qc.invalidateQueries({ queryKey: ['billing-today-stats'] });
       onClose();
     }
   });
 
   const { data: shopData } = useQuery({ queryKey: ['shop-me'], queryFn: () => shopApi.getMyShop().then(r => r.data.data), staleTime: 5 * 60 * 1000 });
   const shopName = (shopData as any)?.shop_name ?? 'Medical Shop';
+  const isTaxInvoice = (shopData as any)?.gst_type === 'regular';
+
+  const addItem = () => {
+    setFormData(prev => ({
+      ...prev,
+      items: [...prev.items, {
+        medicine_name: '', inventory_id: '', batch_number: '', expiry_date: '', unit: 'strip',
+        mrp: '', quantity: '1', discount_type: 'percentage', discount_value: '0', gst_rate: '12', line_total: 0
+      } as any]
+    }));
+  };
+
+  const removeItem = (idx: number) => {
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== idx)
+    }));
+  };
+
+  const updateItemField = (idx: number, field: string, value: any) => {
+    setFormData(prev => {
+      const newItems = [...prev.items];
+      newItems[idx] = { ...newItems[idx], [field]: value };
+      return { ...prev, items: newItems };
+    });
+
+    if (field === 'medicine_name') {
+      if (searchTimers.current[idx]) clearTimeout(searchTimers.current[idx]);
+      if (value.length < 2) {
+        setSuggestions(p => ({ ...p, [idx]: [] }));
+        return;
+      }
+      searchTimers.current[idx] = setTimeout(async () => {
+        try {
+          const res = await inventoryApi.list({ q: value, limit: 8 });
+          setSuggestions(p => ({ ...p, [idx]: res.data.data ?? [] }));
+        } catch { /* ignore */ }
+      }, 250);
+    }
+  };
+
+  const selectSuggestion = (idx: number, inv: any) => {
+    setFormData(prev => {
+      const newItems = [...prev.items];
+      newItems[idx] = {
+        ...newItems[idx],
+        medicine_name: inv.medicine_name,
+        inventory_id: inv.id,
+        batch_number: inv.batch_number,
+        expiry_date: inv.expiry_date ? inv.expiry_date.split('T')[0] : '',
+        unit: inv.unit || 'strip',
+        mrp: String(inv.mrp),
+        gst_rate: String(inv.gst_rate || 12)
+      };
+      return { ...prev, items: newItems };
+    });
+    setSuggestions(p => ({ ...p, [idx]: [] }));
+  };
+
+  const editSubtotal = formData.items.reduce((s, it) => s + (Number(it.quantity) || 0) * (Number(it.mrp) || 0), 0);
+  const editGst = isTaxInvoice ? formData.items.reduce((s, it) => {
+    const sub = (Number(it.quantity) || 0) * (Number(it.mrp) || 0);
+    const disc = it.discount_type === 'percentage' ? (sub * (Number(it.discount_value) || 0)) / 100 : (Number(it.quantity) || 0) * (Number(it.discount_value) || 0);
+    return s + ((sub - disc) * (Number(it.gst_rate) || 0)) / 100;
+  }, 0) : 0;
+  const editTotal = editSubtotal - (Number(formData.discount_amount) || 0) + editGst;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={onClose} />
 
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-auto animate-in">
+      <div className={`relative bg-white rounded-3xl shadow-2xl w-full ${isEditing ? 'max-w-4xl' : 'max-w-lg'} max-h-[90vh] overflow-auto animate-in transition-all duration-300`}>
         <div className="sticky top-0 z-10 bg-gradient-to-r from-[#0f0f1a] to-[#1a1a2e] px-6 py-5 rounded-t-3xl">
           <div className="flex items-center justify-between">
             <div>
@@ -666,17 +758,16 @@ function BillDetailModal({ bill, onClose, onPay }: {
         </div>
 
         <div className="px-6 py-6 space-y-6">
-          {/* Action Row */}
           <div className="flex gap-2">
             <button
               onClick={() => setIsEditing(!isEditing)}
               className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold transition-all ${isEditing ? 'bg-violet-600 text-white shadow-lg shadow-violet-200' : 'bg-violet-50 text-violet-600 border border-violet-100'}`}
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
-              {isEditing ? 'Cancel Edit' : 'Edit Customer'}
+              {isEditing ? 'Cancel Edit' : 'Edit Bill'}
             </button>
             <button
-              onClick={() => { if(confirm('Confirm Voiding this bill?')) voidMutation.mutate(bill.id); }}
+              onClick={() => { if(confirm('Confirm Voiding this bill? Inventory will be reversed.')) voidMutation.mutate(bill.id); }}
               disabled={voidMutation.isPending}
               className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100 transition-all flex items-center gap-2"
             >
@@ -686,9 +777,9 @@ function BillDetailModal({ bill, onClose, onPay }: {
           </div>
 
           {isEditing ? (
-            <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 space-y-4 animate-in slide-in-from-top-2">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 grid grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="col-span-2 lg:col-span-1">
                   <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Customer Name</label>
                   <input type="text" value={formData.customer_name} onChange={e => setFormData({...formData, customer_name: e.target.value})} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-500" />
                 </div>
@@ -704,18 +795,123 @@ function BillDetailModal({ bill, onClose, onPay }: {
                   <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Address</label>
                   <input type="text" value={formData.billing_address} onChange={e => setFormData({...formData, billing_address: e.target.value})} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-500" />
                 </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">State</label>
+                  <select value={formData.billing_state} onChange={e => setFormData({...formData, billing_state: e.target.value})} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-500">
+                    <option value="">Select State</option>
+                    {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
               </div>
+
+              <div className="overflow-x-auto -mx-2 px-2">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100">
+                      <th className="pb-2 w-[40%]">Medicine</th>
+                      <th className="pb-2 text-center">Batch</th>
+                      <th className="pb-2 text-center w-16">Qty</th>
+                      <th className="pb-2 text-center w-24">MRP</th>
+                      <th className="pb-2 text-center w-20">Disc</th>
+                      <th className="pb-2 text-right">Total</th>
+                      <th className="pb-2 w-8"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {formData.items.map((item, idx) => (
+                      <tr key={idx}>
+                        <td className="py-2 pr-2 relative">
+                          <input 
+                            type="text" value={item.medicine_name}
+                            onChange={e => updateItemField(idx, 'medicine_name', e.target.value)}
+                            placeholder="Medicine Name"
+                            className="w-full bg-transparent border-0 font-medium text-gray-900 focus:ring-0 p-0"
+                          />
+                          {suggestions[idx]?.length > 0 && (
+                            <div className="absolute z-20 top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden mt-1">
+                              {suggestions[idx].map((s, si) => (
+                                <button key={si} onMouseDown={() => selectSuggestion(idx, s)} className="w-full text-left px-3 py-2 text-xs hover:bg-violet-50 border-b border-gray-50 last:border-0 flex justify-between">
+                                  <span>{s.medicine_name} <span className="text-[10px] text-gray-400">(Stock: {s.stock_qty})</span></span>
+                                  <span className="font-bold">₹{s.mrp}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2 text-center text-[11px] font-mono text-gray-500">
+                          <input type="text" value={item.batch_number} onChange={e => updateItemField(idx, 'batch_number', e.target.value)} className="w-full bg-transparent border-0 text-center focus:ring-0 p-0" />
+                        </td>
+                        <td className="py-2 text-center">
+                          <input type="number" value={item.quantity} onChange={e => updateItemField(idx, 'quantity', e.target.value)} className="w-full bg-transparent border-0 text-center font-bold focus:ring-0 p-0" />
+                        </td>
+                        <td className="py-2 text-center">
+                          <input type="number" value={item.mrp} onChange={e => updateItemField(idx, 'mrp', e.target.value)} className="w-full bg-transparent border-0 text-center font-bold text-violet-600 focus:ring-0 p-0" />
+                        </td>
+                        <td className="py-2 text-center">
+                           <input type="number" value={item.discount_value} onChange={e => updateItemField(idx, 'discount_value', e.target.value)} className="w-full bg-transparent border-0 text-center text-emerald-600 font-bold focus:ring-0 p-0" />
+                        </td>
+                        <td className="py-2 text-right font-black">
+                          {fmtCurrency((Number(item.quantity) || 0) * (Number(item.mrp) || 0) * (1 - (item.discount_type === 'percentage' ? (Number(item.discount_value) || 0)/100 : 0)))}
+                        </td>
+                        <td className="py-2 text-right">
+                          <button onClick={() => removeItem(idx)} className="text-gray-300 hover:text-red-500 transition-colors">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <button onClick={addItem} className="mt-3 text-xs font-bold text-violet-600 hover:text-violet-700 flex items-center gap-1.5 ml-1">+ Add New Item</button>
+              </div>
+
+              <div className="bg-violet-50 rounded-2xl p-5 border border-violet-100 flex flex-col md:flex-row gap-6 justify-between items-center">
+                <div className="flex gap-6">
+                  <div>
+                    <p className="text-[10px] font-bold text-violet-400 uppercase tracking-widest mb-1">Items Total</p>
+                    <p className="text-lg font-black text-violet-900">{fmtCurrency(editSubtotal)}</p>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-violet-400 uppercase tracking-widest mb-1 block">Global Discount</label>
+                    <input type="number" value={formData.discount_amount} onChange={e => setFormData({...formData, discount_amount: e.target.value})} className="bg-white border border-violet-200 rounded-lg px-2 py-1 w-20 text-sm font-bold text-emerald-600 outline-none" />
+                  </div>
+                  {isTaxInvoice && (
+                    <div>
+                      <p className="text-[10px] font-bold text-violet-400 uppercase tracking-widest mb-1">Est. GST</p>
+                      <p className="text-lg font-black text-violet-900">{fmtCurrency(editGst)}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="text-right">
+                   <p className="text-[10px] font-bold text-violet-400 uppercase tracking-widest mb-1">Adjusted Bill Total</p>
+                   <p className="text-3xl font-black text-violet-800">{fmtCurrency(Math.round(editTotal))}</p>
+                </div>
+              </div>
+
               <button 
-                onClick={() => updateMutation.mutate(formData)}
+                onClick={() => {
+                  const payload = {
+                    ...formData,
+                    discount_amount: Number(formData.discount_amount),
+                    items: formData.items.map(it => ({
+                      ...it,
+                      quantity: Number(it.quantity),
+                      mrp: Number(it.mrp),
+                      discount_value: Number(it.discount_value),
+                      gst_rate: Number(it.gst_rate)
+                    }))
+                  };
+                  updateMutation.mutate(payload);
+                }}
                 disabled={updateMutation.isPending}
-                className="w-full bg-violet-600 text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-violet-200 active:scale-95 transition-all"
+                className="w-full bg-gradient-to-r from-violet-600 to-indigo-700 text-white py-4 rounded-2xl text-base font-black shadow-xl shadow-violet-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
               >
-                {updateMutation.isPending ? 'Updating...' : 'Save Changes'}
+                {updateMutation.isPending ? 'Saving Changes...' : 'Confirm & Update Bill'}
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
               </button>
             </div>
           ) : (
             <>
-              {/* Patient Profile View */}
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-500/20">
                   <span className="text-white font-bold text-lg">{(bill.customer_name ?? bill.patient?.full_name ?? 'W').charAt(0).toUpperCase()}</span>
@@ -731,94 +927,90 @@ function BillDetailModal({ bill, onClose, onPay }: {
                   </div>
                 </div>
               </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Items ({bill.items.length})</p>
+                </div>
+                <div className="bg-gray-50/80 rounded-2xl p-4 border border-gray-100">
+                  {bill.items.map((item, i) => (
+                    <div key={item.id} className={`flex items-start justify-between py-3 ${i > 0 ? 'border-t border-gray-200/50' : ''}`}>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-gray-900 font-bold text-sm tracking-tight">{item.medicine_name}</span>
+                        <div className="flex items-center gap-2 text-[10px]">
+                          <span className="text-gray-400">Qty: <span className="text-gray-900 font-semibold">{item.quantity}</span></span>
+                          {item.batch_number && <span className="text-gray-400">Batch: <span className="text-gray-600 font-mono">{item.batch_number}</span></span>}
+                          {item.expiry_date && <span className="text-orange-500 font-medium">Exp: {fmtDate(item.expiry_date)}</span>}
+                        </div>
+                      </div>
+                      <span className="font-bold text-gray-900 text-sm whitespace-nowrap">{fmtCurrency(item.line_total)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-violet-50 rounded-2xl p-5 border border-violet-100/50 space-y-2.5">
+                <div className="flex justify-between text-sm text-gray-500"><span>Subtotal</span><span className="font-medium">{fmtCurrency(bill.subtotal)}</span></div>
+                {bill.discount_amount > 0 && (
+                  <div className="flex justify-between text-sm text-emerald-600"><span>Discount</span><span className="font-medium">−{fmtCurrency(bill.discount_amount)}</span></div>
+                )}
+                {(() => {
+                  if (bill.gst_amount <= 0) return null;
+                  const shopStateNormalized = normalizeState(shopData?.state);
+                  const billingStateNormalized = normalizeState(bill.billing_state);
+                  const isInterState = billingStateNormalized && shopStateNormalized && billingStateNormalized !== shopStateNormalized;
+
+                  if (isInterState) {
+                    return <div className="flex justify-between text-sm text-gray-500"><span>IGST</span><span className="font-medium">{fmtCurrency(bill.gst_amount)}</span></div>;
+                  }
+                  return (
+                    <>
+                      <div className="flex justify-between text-sm text-gray-500"><span>CGST</span><span className="font-medium">{fmtCurrency(bill.gst_amount / 2)}</span></div>
+                      <div className="flex justify-between text-sm text-gray-500"><span>SGST</span><span className="font-medium">{fmtCurrency(bill.gst_amount / 2)}</span></div>
+                    </>
+                  );
+                })()}
+                <div className="flex justify-between font-black text-violet-800 text-2xl pt-3 border-t border-violet-200/50 mt-1">
+                  <span>Total</span><span>{fmtCurrency(Math.round(bill.total_amount))}</span>
+                </div>
+              </div>
+
+              {bill.payment_status !== 'paid' && (
+                <div>
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">Record Final Payment</p>
+                  <div className="flex gap-2">
+                    {(['cash', 'upi', 'card', 'credit'] as const).map((m) => (
+                      <button key={m} onClick={() => onPay(bill.id, m)}
+                        className="flex-1 border-2 border-gray-100 rounded-xl py-3 text-sm font-bold text-gray-700 hover:border-violet-600 hover:text-violet-600 hover:bg-violet-50 transition-all active:scale-95">
+                        {METHOD_LABEL[m]?.icon} {m.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => printInvoice(bill, shopData)}
+                  className="flex-1 flex items-center justify-center gap-2 bg-gray-900 text-white rounded-xl py-3 text-sm font-bold hover:bg-black transition-all shadow-lg shadow-gray-200 active:scale-95"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.821l.821-.821L12 16.179l3.459-3.459.821.821L12 17.821l-5.28-5.28zM6 18h12V6H6v12z" /><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12h-15" /></svg>
+                  Print Invoice
+                </button>
+                <button
+                  onClick={() => sendWhatsApp(bill, shopName, shopData)}
+                  className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 text-white rounded-xl py-3 text-sm font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100 active:scale-95"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" /></svg>
+                  WhatsApp
+                </button>
+              </div>
             </>
           )}
-
-          {/* Items Section */}
-          <div>
-            <div className="flex items-center justify-between mb-3 px-1">
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Items ({bill.items.length})</p>
-            </div>
-            <div className="bg-gray-50/80 rounded-2xl p-4 border border-gray-100">
-              {bill.items.map((item, i) => (
-                <div key={item.id} className={`flex items-start justify-between py-3 ${i > 0 ? 'border-t border-gray-200/50' : ''}`}>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-gray-900 font-bold text-sm tracking-tight">{item.medicine_name}</span>
-                    <div className="flex items-center gap-2 text-[10px]">
-                      <span className="text-gray-400">Qty: <span className="text-gray-900 font-semibold">{item.quantity}</span></span>
-                      {item.batch_number && <span className="text-gray-400">Batch: <span className="text-gray-600 font-mono">{item.batch_number}</span></span>}
-                      {item.expiry_date && <span className="text-orange-500 font-medium">Exp: {fmtDate(item.expiry_date)}</span>}
-                    </div>
-                  </div>
-                  <span className="font-bold text-gray-900 text-sm whitespace-nowrap">{fmtCurrency(item.line_total)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Totals */}
-          <div className="bg-violet-50 rounded-2xl p-5 border border-violet-100/50 space-y-2.5">
-            <div className="flex justify-between text-sm text-gray-500"><span>Subtotal</span><span className="font-medium">{fmtCurrency(bill.subtotal)}</span></div>
-            {bill.discount_amount > 0 && (
-              <div className="flex justify-between text-sm text-emerald-600"><span>Discount</span><span className="font-medium">−{fmtCurrency(bill.discount_amount)}</span></div>
-            )}
-            {(() => {
-              if (bill.gst_amount <= 0) return null;
-              const shopStateNormalized = normalizeState(shopData?.state);
-              const billingStateNormalized = normalizeState(bill.billing_state);
-              const isInterState = billingStateNormalized && shopStateNormalized && billingStateNormalized !== shopStateNormalized;
-
-              if (isInterState) {
-                return <div className="flex justify-between text-sm text-gray-500"><span>IGST</span><span className="font-medium">{fmtCurrency(bill.gst_amount)}</span></div>;
-              }
-              return (
-                <>
-                  <div className="flex justify-between text-sm text-gray-500"><span>CGST</span><span className="font-medium">{fmtCurrency(bill.gst_amount / 2)}</span></div>
-                  <div className="flex justify-between text-sm text-gray-500"><span>SGST</span><span className="font-medium">{fmtCurrency(bill.gst_amount / 2)}</span></div>
-                </>
-              );
-            })()}
-            <div className="flex justify-between font-black text-violet-800 text-2xl pt-3 border-t border-violet-200/50 mt-1">
-              <span>Total</span><span>{fmtCurrency(Math.round(bill.total_amount))}</span>
-            </div>
-          </div>
-
-          {/* Pay */}
-          {bill.payment_status !== 'paid' && (
-            <div>
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">Record Final Payment</p>
-              <div className="flex gap-2">
-                {(['cash', 'upi', 'card', 'credit'] as const).map((m) => (
-                  <button key={m} onClick={() => onPay(bill.id, m)}
-                    className="flex-1 border-2 border-gray-100 rounded-xl py-3 text-sm font-bold text-gray-700 hover:border-violet-600 hover:text-violet-600 hover:bg-violet-50 transition-all active:scale-95">
-                    {METHOD_LABEL[m].icon} {m.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Print & WhatsApp */}
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={() => printInvoice(bill, shopData)}
-              className="flex-1 flex items-center justify-center gap-2 bg-gray-900 text-white rounded-xl py-3 text-sm font-bold hover:bg-black transition-all shadow-lg shadow-gray-200 active:scale-95"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.821l.821-.821L12 16.179l3.459-3.459.821.821L12 17.821l-5.28-5.28zM6 18h12V6H6v12z" /><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12h-15" /></svg>
-              Print Invoice
-            </button>
-            <button
-              onClick={() => sendWhatsApp(bill, shopName, shopData)}
-              className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 text-white rounded-xl py-3 text-sm font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100 active:scale-95"
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" /></svg>
-              WhatsApp
-            </button>
-          </div>
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 // ── Bill History Tab ─────────────────────────────────────────────────────────
@@ -1111,14 +1303,8 @@ interface WalkInItem {
   inventory_id?: string;
   stock_qty?: number;
 }
-const INDIAN_STATES = [
-  'Andaman and Nicobar Islands', 'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar',
-  'Chandigarh', 'Chhattisgarh', 'Dadra and Nagar Haveli and Daman and Diu', 'Delhi', 'Goa',
-  'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu and Kashmir', 'Jharkhand', 'Karnataka',
-  'Kerala', 'Ladakh', 'Lakshadweep', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya',
-  'Mizoram', 'Nagaland', 'Odisha', 'Puducherry', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
-  'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal'
-];
+
+
 
 const EMPTY_ITEM: WalkInItem = {
   medicine_name: '',
