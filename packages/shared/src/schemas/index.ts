@@ -211,6 +211,7 @@ export const addInventoryItemSchema = z.object({
   reorder_level: z.number().int().min(0).default(10),
   discount_type: z.enum(['percentage', 'amount']).default('percentage'),
   discount_value: z.number().min(0).default(0),
+  rack_location: z.string().max(50).optional(),
   // Fields below come from purchase invoice — optional on creation
   stock_qty: z.number().int().min(0).default(0),
   purchase_price: z.number().min(0).optional(),

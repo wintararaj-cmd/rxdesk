@@ -206,9 +206,32 @@ router.post('/', requireRole('shop_owner'), async (req, res, next) => {
   try {
     const shop = await getShopByUser(req.user!.id);
     const data = addInventoryItemSchema.parse(req.body);
+    
+    // Ensure parent ShopMedicine exists
+    const shopMed = await prisma.shopMedicine.upsert({
+      where: {
+        shop_id_medicine_name_unit: {
+          shop_id: shop.id,
+          medicine_name: data.medicine_name.trim(),
+          unit: data.unit || 'strip',
+        }
+      },
+      update: {
+        rack_location: data.rack_location || undefined,
+      },
+      create: {
+        shop_id: shop.id,
+        medicine_name: data.medicine_name.trim(),
+        unit: data.unit || 'strip',
+        reorder_level: data.reorder_level || 10,
+        rack_location: data.rack_location || undefined,
+      }
+    });
+
     const item = await prisma.shopInventory.create({
       data: {
         shop_id: shop.id,
+        shop_medicine_id: shopMed.id,
         ...data,
         expiry_date: data.expiry_date ? new Date(data.expiry_date) : undefined,
       },
@@ -280,6 +303,7 @@ router.post('/import', requireRole('shop_owner'), async (req, res, next) => {
       hsn_code?: string;
       discount_type?: 'percentage' | 'amount';
       discount_value?: number;
+      rack_location?: string;
     };
 
     const errors: { row: number; error: string }[] = [];
@@ -309,6 +333,7 @@ router.post('/import', requireRole('shop_owner'), async (req, res, next) => {
         hsn_code:       row.hsn_code       ? String(row.hsn_code).trim()      : undefined,
         discount_type:  (dType === 'amount' || dType === 'percentage') ? (dType as any) : undefined,
         discount_value: row.discount_value != null ? Number(row.discount_value) : undefined,
+        rack_location:  row.rack_location ? String(row.rack_location).trim() : undefined,
       };
       if (row.expiry_date) {
         const d = new Date(String(row.expiry_date));
@@ -317,28 +342,67 @@ router.post('/import', requireRole('shop_owner'), async (req, res, next) => {
       valid.push({ ...p, rowIndex: i });
     }
 
-    // ── Step 2: single bulk-fetch of all possibly-matching existing items ───
+    // Look up key: "lower_name||unit"
+    const uniqueMedicineKeys = [...new Set(valid.map(r => `${r.medicine_name.toLowerCase().trim()}||${r.unit.toLowerCase().trim()}`))];
+    const shopMedMapping = new Map<string, string>();
+
+    // Step 2: Ensure all parent ShopMedicine records exist
+    await prisma.$transaction(async (tx) => {
+      for (const key of uniqueMedicineKeys) {
+        const [mName, unit] = key.split('||');
+        const rowIndex = valid.find(r => r.medicine_name.toLowerCase().trim() === mName && r.unit.toLowerCase().trim() === unit);
+        const reorderLevel = rowIndex?.reorder_level ?? 10;
+        const rackLocation = rowIndex?.rack_location;
+
+        const sm = await tx.shopMedicine.upsert({
+          where: {
+            shop_id_medicine_name_unit: {
+              shop_id: shop.id,
+              medicine_name: mName.toUpperCase(), // Normalize for mapping if needed, but match input mostly
+              unit: unit,
+            }
+          },
+          update: {
+            rack_location: rackLocation || undefined,
+          },
+          create: {
+            shop_id: shop.id,
+            medicine_name: mName.toUpperCase(),
+            unit: unit,
+            reorder_level: reorderLevel,
+            rack_location: rackLocation || undefined,
+          }
+        });
+        shopMedMapping.set(key, sm.id);
+      }
+    });
+
+    // Step 3: Single bulk-fetch of all possibly-matching existing inventory batches
     const uniqueNames = [...new Set(valid.map((r) => r.medicine_name.toLowerCase()))];
     const existing = await prisma.shopInventory.findMany({
       where: {
         shop_id:       shop.id,
         medicine_name: { in: uniqueNames, mode: 'insensitive' },
       },
-      select: { id: true, medicine_name: true, batch_number: true },
+      select: { id: true, medicine_name: true, batch_number: true, unit: true },
     });
 
-    // Lookup key: "lower_name||batch_or_empty"
+    // Lookup key: "lower_name||unit||batch_or_empty"
     const existingMap = new Map<string, string>(
-      existing.map((e) => [`${e.medicine_name.toLowerCase()}||${e.batch_number ?? ''}`, e.id])
+      existing.map((e) => [`${e.medicine_name.toLowerCase().trim()}||${e.unit.toLowerCase().trim()}||${e.batch_number ?? ''}`, e.id])
     );
 
-    // ── Step 3: classify each row as insert or update ──────────────────────
-    const toInsert: NonNullable<Parameters<typeof prisma.shopInventory.createMany>[0]>['data'] = [];
-    const toUpdate: Array<{ id: string; data: Omit<ParsedPayload, 'shop_id' | 'medicine_name'> }> = [];
+    // Step 4: Classify each row as insert or update
+    const toInsert: any[] = [];
+    const toUpdate: Array<{ id: string; data: any }> = [];
 
     for (const r of valid) {
-      const key = `${r.medicine_name.toLowerCase()}||${r.batch_number ?? ''}`;
-      const existingId = existingMap.get(key);
+      const medKey = `${r.medicine_name.toLowerCase().trim()}||${r.unit.toLowerCase().trim()}`;
+      const batchKey = `${medKey}||${r.batch_number ?? ''}`;
+      
+      const shopMedId = shopMedMapping.get(medKey);
+      const existingId = existingMap.get(batchKey);
+      
       const updateData = {
         mrp:            r.mrp,
         stock_qty:      r.stock_qty,
@@ -350,28 +414,27 @@ router.post('/import', requireRole('shop_owner'), async (req, res, next) => {
         hsn_code:       r.hsn_code,
         discount_type:  r.discount_type,
         discount_value: r.discount_value,
+        shop_medicine_id: shopMedId,
       };
 
       if (existingId) {
         toUpdate.push({ id: existingId, data: updateData });
       } else {
         toInsert.push({
-          shop_id:      r.shop_id,
-          medicine_name: r.medicine_name,
-          batch_number: r.batch_number,
+          shop_id:        r.shop_id,
+          medicine_name:  r.medicine_name,
+          batch_number:   r.batch_number,
           ...updateData,
         });
       }
     }
 
-    // ── Step 4: execute as a single transaction ────────────────────────────
-    // createMany for all inserts, then updates in parallel chunks of 100
+    // Step 5: Execute as a transaction
     await prisma.$transaction(
       async (tx) => {
         if (toInsert.length > 0) {
           await tx.shopInventory.createMany({ data: toInsert, skipDuplicates: true });
         }
-        // Chunk updates so the transaction stays manageable
         const CHUNK = 100;
         for (let i = 0; i < toUpdate.length; i += CHUNK) {
           await Promise.all(
@@ -381,11 +444,11 @@ router.post('/import', requireRole('shop_owner'), async (req, res, next) => {
           );
         }
       },
-      { timeout: 60_000 }
+      { timeout: 90_000 }
     );
 
     const result = { inserted: toInsert.length, updated: toUpdate.length, errors };
-    logger.info(`Bulk import shop=${shop.id}: +${result.inserted} inserted, ~${result.updated} updated, ${result.errors.length} errors`);
+    logger.info(`Bulk import rack-system shop=${shop.id}: +${result.inserted} inserted, ~${result.updated} updated, ${result.errors.length} errors`);
     res.json({ success: true, data: result });
   } catch (err) { next(err); }
 });

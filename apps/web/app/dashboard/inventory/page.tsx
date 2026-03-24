@@ -347,6 +347,7 @@ export default function InventoryPage() {
       hsn_code: form.hsn_code || undefined,
       unit: form.unit || 'strip',
       reorder_level: Number(form.reorder_level) || 10,
+      rack_location: form.rack_location || '',
       mrp: Number(form.mrp),
       gst_rate: Number(form.gst_rate) || 12,
       discount_type: form.discount_type,
@@ -435,7 +436,8 @@ export default function InventoryPage() {
     { key: 'unit', label: 'Unit', type: 'select', span: 1 },
     { key: 'discount_type', label: 'Disc. Type', type: 'select', span: 1 },
     { key: 'discount_value', label: 'Disc. Val', type: 'number', span: 1 },
-    { key: 'reorder_level', label: 'Reorder Level', type: 'number', span: 2, placeholder: 'Minimum stock before alert (default 10)' },
+    { key: 'reorder_level', label: 'Reorder Level', type: 'number', span: 1, placeholder: '10' },
+    { key: 'rack_location', label: 'Rack Location', type: 'text', span: 1, placeholder: 'e.g. A-1' },
   ];
 
   // Edit form — all fields
@@ -473,7 +475,7 @@ export default function InventoryPage() {
           {tab === 'stock' && (
             <div className="flex gap-3 items-center">
               <button
-                onClick={() => downloadCsv('inventory_import_template.csv', 'medicine_name,quantity,mrp,purchase_price,batch_number,expiry_date,gst_rate,hsn_code,unit,discount_type,discount_value,reorder_level\n"Paracetamol 500 MG",100,15.50,10.20,"B123","2026-12-31",12,"30049099","strip","percentage",10,50')}
+                onClick={() => downloadCsv('inventory_import_template.csv', 'medicine_name,quantity,mrp,purchase_price,batch_number,expiry_date,gst_rate,hsn_code,unit,discount_type,discount_value,reorder_level,rack_location\n"Paracetamol 500 MG",100,15.50,10.20,"B123","2026-12-31",12,"30049099","strip","percentage",10,50,"A-1"')}
                 className="text-[10px] text-violet-400 font-bold uppercase hover:underline"
               >
                 Template
