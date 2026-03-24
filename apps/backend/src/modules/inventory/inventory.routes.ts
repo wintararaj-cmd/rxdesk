@@ -54,6 +54,62 @@ router.get('/master', requireRole('shop_owner'), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /inventory/reports/batch-supplier — Detailed report for batch-wise and supplier-wise stock
+router.get('/reports/batch-supplier', requireRole('shop_owner'), async (req, res, next) => {
+  try {
+    const shop = await getShopByUser(req.user!.id);
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    
+    // We use a LATERAL JOIN (emulated via subquery in Postgres) to find the LATEST supplier for each batch.
+    // If no purchase record exists (manual entry), supplier fields will be null.
+    const items = await prisma.$queryRaw<any[]>`
+      SELECT 
+        si.id as inventory_id,
+        si.medicine_name,
+        si.batch_number,
+        si.expiry_date,
+        si.stock_qty,
+        si.mrp,
+        si.purchase_price,
+        si.unit,
+        sm.rack_location,
+        m.generic_name,
+        latest_purchase.supplier_name,
+        latest_purchase.invoice_number,
+        latest_purchase.invoice_date
+      FROM shop_inventory si
+      LEFT JOIN shop_medicines sm ON si.shop_medicine_id = sm.id
+      LEFT JOIN medicines m ON si.medicine_id = m.id
+      LEFT JOIN LATERAL (
+        SELECT s.name as supplier_name, pe.invoice_number, pe.invoice_date
+        FROM purchase_items pi
+        JOIN purchase_entries pe ON pi.purchase_id = pe.id
+        LEFT JOIN suppliers s ON pe.supplier_id = s.id
+        WHERE pi.medicine_name = si.medicine_name 
+          AND pi.batch_number = si.batch_number
+          AND pe.shop_id = si.shop_id
+        ORDER BY pe.invoice_date DESC
+        LIMIT 1
+      ) latest_purchase ON true
+      WHERE si.shop_id = ${shop.id}
+        AND si.stock_qty > 0
+        ${q ? Prisma.sql`AND si.medicine_name ILIKE ${'%' + q + '%'}` : Prisma.empty}
+      ORDER BY si.medicine_name ASC, si.expiry_date ASC
+    `;
+
+    const formatted = items.map(it => ({
+      ...it,
+      stock_qty: Number(it.stock_qty),
+      mrp: Number(it.mrp),
+      purchase_price: Number(it.purchase_price || 0),
+      total_purchase_value: Number(it.stock_qty) * Number(it.purchase_price || 0),
+      total_mrp_value: Number(it.stock_qty) * Number(it.mrp),
+    }));
+
+    res.json({ success: true, data: formatted });
+  } catch (err) { next(err); }
+});
+
 // GET /inventory  — paginated
 router.get('/', requireRole('shop_owner'), async (req, res, next) => {
   try {

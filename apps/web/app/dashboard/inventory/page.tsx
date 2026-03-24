@@ -216,7 +216,7 @@ function InventoryMasterRow({ item, onEdit }: { item: MasterInventoryItem; onEdi
 
 export default function InventoryPage() {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<'stock' | 'catalog' | 'finder'>('stock');
+  const [tab, setTab] = useState<'stock' | 'catalog' | 'finder' | 'reports'>('stock');
   const [finderQuery, setFinderQuery] = useState('');
   const [finderInput, setFinderInput] = useState('');
   const finderDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -606,10 +606,17 @@ export default function InventoryPage() {
         >
           🔍 Finder
         </button>
+        <button
+          onClick={() => setTab('reports')}
+          className={`px-5 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${tab === 'reports' ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          📊 Reports
+        </button>
       </div>
 
       {/* ── FINDER TAB ───────────────────────────────────────────── */}
       {tab === 'finder' && <MedicineFinder />}
+      {tab === 'reports' && <StockSupplierReport />}
 
       {/* ── CATALOG TAB ─────────────────────────────────────────── */}
       {tab === 'catalog' && (
@@ -1022,6 +1029,148 @@ function MedicineFinder() {
           <p className="text-sm text-gray-400 mt-1">We'll find all alternatives with the same composition</p>
         </div>
       )}
+    </div>
+  );
+}
+
+function StockSupplierReport() {
+  const [q, setQ] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const debounce = useRef<any>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['stock-supplier-report', q],
+    queryFn: () => inventoryApi.stockSupplierReport(q).then(r => r.data.data),
+  });
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchInput(e.target.value);
+    if (debounce.current) clearTimeout(debounce.current);
+    debounce.current = setTimeout(() => setQ(e.target.value.trim()), 400);
+  };
+
+  const downloadReport = () => {
+    if (!data) return;
+    const headers = ['Medicine', 'Generic', 'Batch', 'Expiry', 'Rack', 'Supplier', 'Invoice', 'Inv. Date', 'Stock', 'Unit', 'Purchase Price', 'MRP', 'Total Value (P)', 'Total Value (M)'];
+    const rows = data.map((it: any) => [
+      `"${it.medicine_name}"`,
+      `"${it.generic_name || ''}"`,
+      `"${it.batch_number || ''}"`,
+      it.expiry_date ? new Date(it.expiry_date).toISOString().split('T')[0] : '',
+      `"${it.rack_location || ''}"`,
+      `"${it.supplier_name || 'Manual/NA'}"`,
+      `"${it.invoice_number || ''}"`,
+      it.invoice_date ? new Date(it.invoice_date).toISOString().split('T')[0] : '',
+      it.stock_qty,
+      `"${it.unit}"`,
+      it.purchase_price,
+      it.mrp,
+      it.total_purchase_value,
+      it.total_mrp_value
+    ]);
+    const csv = [headers.join(','), ...rows.map((r: any[]) => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `stock_report_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <div className="space-y-4 animate-in fade-in duration-300">
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <h2 className="text-xl font-black text-gray-900 tracking-tight">Batch-wise &amp; Supplier-wise Stock</h2>
+          <p className="text-xs text-gray-400 font-medium">Detailed breakdown of current stock with purchase origins</p>
+        </div>
+        <button 
+          onClick={downloadReport}
+          disabled={!data || data.length === 0}
+          className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center gap-2 disabled:opacity-50"
+        >
+          <span>📥</span> Download CSV
+        </button>
+      </div>
+      
+      <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-xl shadow-gray-100/50">
+        <div className="mb-6 flex items-center justify-between">
+          <div className="relative w-full max-w-sm">
+            <span className="absolute left-3.5 top-2.5 text-gray-400">🔍</span>
+            <input 
+              type="text" 
+              placeholder="Search by medicine name…"
+              className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:border-violet-400 focus:bg-white transition-all shadow-inner"
+              value={searchInput}
+              onChange={handleSearchChange}
+            />
+          </div>
+          <div className="text-right">
+             <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest leading-none">Total Stock Value (P.Price)</p>
+             <p className="text-xl font-black text-violet-600">₹{data?.reduce((s: number, it: any) => s + (it.total_purchase_value || 0), 0).toLocaleString('en-IN')}</p>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto rounded-2xl border border-gray-100">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-gray-50/80">
+                <th className="px-4 py-4 text-left font-black text-gray-400 uppercase text-[9px] tracking-widest border-b border-gray-100">Medicine / Generic</th>
+                <th className="px-4 py-4 text-left font-black text-gray-400 uppercase text-[9px] tracking-widest border-b border-gray-100">Batch / Expiry</th>
+                <th className="px-4 py-4 text-left font-black text-gray-400 uppercase text-[9px] tracking-widest border-b border-gray-100 text-center">Rack</th>
+                <th className="px-4 py-4 text-left font-black text-gray-400 uppercase text-[9px] tracking-widest border-b border-gray-100">Supplier / Invoice</th>
+                <th className="px-4 py-4 text-right font-black text-gray-400 uppercase text-[9px] tracking-widest border-b border-gray-100">Stock</th>
+                <th className="px-4 py-4 text-right font-black text-gray-400 uppercase text-[9px] tracking-widest border-b border-gray-100">P.Price / MRP</th>
+                <th className="px-4 py-4 text-right font-black text-gray-400 uppercase text-[9px] tracking-widest border-b border-gray-100">Total Val</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {isLoading && <tr><td colSpan={7} className="text-center py-20 text-gray-400 italic">Calculating report data…</td></tr>}
+              {data && data.length === 0 && <tr><td colSpan={7} className="text-center py-20 text-gray-400 font-medium">No records found.</td></tr>}
+              {data?.map((it: any) => (
+                <tr key={it.inventory_id} className="hover:bg-violet-50/40 transition-colors">
+                  <td className="px-4 py-3.5">
+                    <p className="font-bold text-gray-900 leading-tight">{it.medicine_name}</p>
+                    <p className="text-[10px] text-gray-400 leading-tight uppercase font-medium mt-0.5">{it.generic_name || 'Generic Not Linked'}</p>
+                  </td>
+                  <td className="px-4 py-3.5">
+                    <p className="font-mono text-xs text-gray-700 bg-gray-100 w-fit px-1.5 rounded">{it.batch_number || 'N/A'}</p>
+                    {it.expiry_date && <p className={`text-[10px] font-black mt-1 ${new Date(it.expiry_date).getTime() < new Date().getTime() ? 'text-red-600' : 'text-orange-500'}`}>EXP: {new Date(it.expiry_date).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</p>}
+                  </td>
+                  <td className="px-4 py-3.5 text-center">
+                    {it.rack_location ? (
+                      <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg text-[10px] font-black tracking-tight border border-indigo-100">📍 {it.rack_location}</span>
+                    ) : (
+                      <span className="text-gray-300 italic text-[10px]">No Rack</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3.5">
+                    <p className="text-xs font-bold text-gray-900">{it.supplier_name || <span className="text-gray-400 font-normal italic text-[10px]">Manual Entry</span>}</p>
+                    {it.invoice_number && <p className="text-[10px] text-gray-500 mt-0.5">Inv: #{it.invoice_number}</p>}
+                  </td>
+                  <td className="px-4 py-3.5 text-right">
+                    <p className="font-black text-emerald-600 text-sm">{it.stock_qty}</p>
+                    <p className="text-[10px] font-medium text-gray-400 lowercase">{it.unit}</p>
+                  </td>
+                  <td className="px-4 py-3.5 text-right text-gray-600">
+                    <p className="text-xs font-bold">₹{it.purchase_price.toFixed(2)}</p>
+                    <p className="text-[9px] text-gray-400 font-medium tracking-tight">MRP ₹{it.mrp.toFixed(2)}</p>
+                  </td>
+                  <td className="px-4 py-3.5 text-right">
+                    <p className="text-xs font-black text-gray-900">₹{it.total_purchase_value.toFixed(0)}</p>
+                    <div className="w-full bg-gray-100 h-1 rounded-full mt-1.5 overflow-hidden">
+                       <div className="bg-emerald-500 h-full" style={{ width: `${Math.min(100, (it.total_purchase_value / 5000) * 100)}%` }}></div>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
