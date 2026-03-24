@@ -657,6 +657,7 @@ function BillDetailModal({ bill, onClose, onPay }: {
       qc.invalidateQueries({ queryKey: ['bill-history'] });
       qc.invalidateQueries({ queryKey: ['bill-stats'] });
       qc.invalidateQueries({ queryKey: ['billing-today-stats'] });
+      qc.invalidateQueries({ queryKey: ['inventory'] });
       setIsEditing(false);
       onClose();
     },
@@ -669,6 +670,7 @@ function BillDetailModal({ bill, onClose, onPay }: {
       qc.invalidateQueries({ queryKey: ['bill-history'] });
       qc.invalidateQueries({ queryKey: ['bill-stats'] });
       qc.invalidateQueries({ queryKey: ['billing-today-stats'] });
+      qc.invalidateQueries({ queryKey: ['inventory'] });
       onClose();
     }
   });
@@ -1116,6 +1118,7 @@ function BillHistoryTab() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['bill-history'] });
       qc.invalidateQueries({ queryKey: ['bill-stats'] });
+      qc.invalidateQueries({ queryKey: ['inventory'] });
       alert('Bill voided successfully');
     },
     onError: (err: any) => alert(err.response?.data?.error?.message || 'Failed to void bill')

@@ -846,6 +846,7 @@ function PurchasesTab() {
     mutationFn: (payload: object) => editingId ? accountingApi.updatePurchase(editingId, payload) : accountingApi.createPurchase(payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['web-purchases'] });
+      qc.invalidateQueries({ queryKey: ['inventory'] });
       resetForm();
       setShowForm(false);
       setTriedToSubmit(false);
@@ -896,6 +897,7 @@ function PurchasesTab() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['web-purchases'] });
       qc.invalidateQueries({ queryKey: ['web-outstandings'] });
+      qc.invalidateQueries({ queryKey: ['inventory'] });
       alert('Purchase successfully voided');
     },
     onError: (err: any) => {
