@@ -36,7 +36,7 @@ router.get('/master', requireRole('shop_owner'), async (req, res, next) => {
         MIN(si.mrp) as min_mrp
       FROM shop_medicines sm
       LEFT JOIN shop_inventory si ON si.shop_medicine_id = sm.id
-      WHERE sm.shop_id = ${shop.id}::uuid
+      WHERE sm.shop_id = ${shop.id}
       ${q ? Prisma.sql`AND sm.medicine_name ILIKE ${'%' + q + '%'}` : Prisma.empty}
       GROUP BY sm.id
       ORDER BY sm.medicine_name ASC
