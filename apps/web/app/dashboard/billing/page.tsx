@@ -17,6 +17,7 @@ interface BillItem {
   discount_type: string;
   discount_value: number;
   line_total: number;
+  gst_rate?: number;
 }
 interface BillData {
   id: string;

@@ -879,7 +879,8 @@ export async function updateBill(billId: string, userId: string, data: any) {
     interface NormalizedItem {
       medicine_name: string;
       inventory_id?: string;
-      batch_number?: string;
+      hsn_code?: string | null;
+      batch_number?: string | null;
       expiry_date?: string | null;
       mrp: number;
       quantity: number;
@@ -914,6 +915,7 @@ export async function updateBill(billId: string, userId: string, data: any) {
         return {
           medicine_name: it.medicine_name,
           inventory_id: (it.inventory_id && it.inventory_id !== '') ? it.inventory_id : null,
+          hsn_code: it.hsn_code,
           batch_number: it.batch_number,
           expiry_date: it.expiry_date ? new Date(it.expiry_date) : null,
           mrp,
@@ -948,12 +950,14 @@ export async function updateBill(billId: string, userId: string, data: any) {
             create: normalizedItems.map(it => ({
               medicine_name: it.medicine_name,
               inventory_id: it.inventory_id,
+              hsn_code: it.hsn_code,
               batch_number: it.batch_number,
               expiry_date: it.expiry_date,
               mrp: it.mrp,
               quantity: it.quantity,
               discount_type: it.discount_type,
               discount_value: it.discount_value,
+              gst_rate: it.gst_rate,
               line_total: it.line_total,
             }))
           }
