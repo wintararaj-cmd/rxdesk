@@ -749,7 +749,7 @@ export async function searchCustomers(userId: string, query: string) {
         { name: { contains: query, mode: 'insensitive' } },
       ],
     },
-    select: { name: true, phone: true, address: true, state: true },
+    select: { name: true, phone: true, address: true },
     take: 10,
   });
 
@@ -758,7 +758,7 @@ export async function searchCustomers(userId: string, query: string) {
     customer_phone: c.phone || '',
     customer_gstin: null,
     billing_address: c.address,
-    billing_state: c.state,
+    billing_state: null,
     source: 'master'
   }));
 
