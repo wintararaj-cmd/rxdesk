@@ -351,34 +351,48 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
       const totalQty = item.quantity + (item.free_qty ?? 0);
       const mName = item.medicine_name.trim();
       const bNumber = (item.batch_number || '').trim();
+      const unit = item.unit || 'strip';
 
-      // 1. Try to find exact match (Name + Batch)
+      // 1. Ensure ShopMedicine (Master Record) exists
+      const shopMed = await tx.shopMedicine.upsert({
+        where: {
+          shop_id_medicine_name_unit: {
+            shop_id: shop.id,
+            medicine_name: mName,
+            unit: unit,
+          }
+        },
+        update: {
+          medicine_id: item.medicine_id || null,
+        },
+        create: {
+          shop_id: shop.id,
+          medicine_id: item.medicine_id || null,
+          medicine_name: mName,
+          unit: unit,
+        }
+      });
+
+      // 2. Find exact batch match
       let existing = await tx.shopInventory.findFirst({
         where: {
           shop_id: shop.id,
-          AND: [
-            {
-              OR: [
-                ...(item.medicine_id ? [{ medicine_id: item.medicine_id }] : []),
-                { medicine_name: { equals: mName, mode: 'insensitive' } }
-              ]
-            },
-            bNumber === ''
-              ? { OR: [{ batch_number: '' }, { batch_number: null }] }
-              : { batch_number: { equals: bNumber, mode: 'insensitive' } }
-          ]
+          shop_medicine_id: shopMed.id,
+          ...(bNumber === ''
+            ? { OR: [{ batch_number: '' }, { batch_number: null }] }
+            : { batch_number: { equals: bNumber, mode: 'insensitive' } })
         },
       });
 
-      // 2. Fallback: If no exact match, find many for the same medicine and pick one with negative stock
+      // 3. Fallback: find any negative stock batch for this medicine
       if (!existing) {
         existing = await tx.shopInventory.findFirst({
           where: {
             shop_id: shop.id,
-            medicine_name: { equals: mName, mode: 'insensitive' },
+            shop_medicine_id: shopMed.id,
             stock_qty: { lt: 0 },
           },
-          orderBy: { stock_qty: 'asc' }, // Pick the most negative one
+          orderBy: { stock_qty: 'asc' },
         });
       }
 
@@ -389,16 +403,18 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
             stock_qty: { increment: totalQty },
             mrp: item.mrp,
             purchase_price: item.purchase_price,
-            unit: item.unit ?? existing.unit,
+            unit: unit,
             expiry_date: new Date(item.expiry_date),
             hsn_code: item.hsn_code ?? existing.hsn_code,
-            ...(item.medicine_id ? { medicine_id: item.medicine_id } : {}),
+            shop_medicine_id: shopMed.id,
+            medicine_id: item.medicine_id || null,
           },
         });
       } else {
         await tx.shopInventory.create({
           data: {
             shop_id: shop.id,
+            shop_medicine_id: shopMed.id,
             medicine_id: item.medicine_id || null,
             medicine_name: mName,
             batch_number: bNumber,
@@ -407,7 +423,7 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
             purchase_price: item.purchase_price,
             stock_qty: totalQty,
             gst_rate: item.gst_rate,
-            unit: item.unit ?? 'strip',
+            unit: unit,
             hsn_code: item.hsn_code,
           },
         });
@@ -529,31 +545,45 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
       const totalQty = item.quantity + (item.free_qty ?? 0);
       const mName = item.medicine_name.trim();
       const bNumber = (item.batch_number || '').trim();
+      const unit = item.unit || 'strip';
 
-      // 1. Try to find exact match (Name + Batch)
+      // 1. Ensure ShopMedicine (Master Record) exists
+      const shopMed = await tx.shopMedicine.upsert({
+        where: {
+          shop_id_medicine_name_unit: {
+            shop_id: shop.id,
+            medicine_name: mName,
+            unit: unit,
+          }
+        },
+        update: {
+          medicine_id: item.medicine_id || null,
+        },
+        create: {
+          shop_id: shop.id,
+          medicine_id: item.medicine_id || null,
+          medicine_name: mName,
+          unit: unit,
+        }
+      });
+
+      // 2. Find exact batch match
       let existing = await tx.shopInventory.findFirst({
         where: {
           shop_id: shop.id,
-          AND: [
-            {
-              OR: [
-                ...(item.medicine_id ? [{ medicine_id: item.medicine_id }] : []),
-                { medicine_name: { equals: mName, mode: 'insensitive' } }
-              ]
-            },
-            bNumber === ''
-              ? { OR: [{ batch_number: '' }, { batch_number: null }] }
-              : { batch_number: { equals: bNumber, mode: 'insensitive' } }
-          ]
+          shop_medicine_id: shopMed.id,
+          ...(bNumber === ''
+            ? { OR: [{ batch_number: '' }, { batch_number: null }] }
+            : { batch_number: { equals: bNumber, mode: 'insensitive' } })
         },
       });
 
-      // 2. Fallback: If no exact match, find one with negative stock
+      // 3. Fallback: find any negative stock batch for this medicine
       if (!existing) {
         existing = await tx.shopInventory.findFirst({
           where: {
             shop_id: shop.id,
-            medicine_name: { equals: mName, mode: 'insensitive' },
+            shop_medicine_id: shopMed.id,
             stock_qty: { lt: 0 },
           },
           orderBy: { stock_qty: 'asc' },
@@ -567,16 +597,18 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
             stock_qty: { increment: totalQty },
             mrp: item.mrp,
             purchase_price: item.purchase_price,
-            unit: item.unit ?? existing.unit,
+            unit: unit,
             expiry_date: new Date(item.expiry_date),
             hsn_code: item.hsn_code ?? existing.hsn_code,
-            ...(item.medicine_id ? { medicine_id: item.medicine_id } : {}),
+            shop_medicine_id: shopMed.id,
+            medicine_id: item.medicine_id || null,
           },
         });
       } else {
         await tx.shopInventory.create({
           data: {
             shop_id: shop.id,
+            shop_medicine_id: shopMed.id,
             medicine_id: item.medicine_id || null,
             medicine_name: mName,
             batch_number: bNumber,
@@ -585,7 +617,7 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
             purchase_price: item.purchase_price,
             stock_qty: totalQty,
             gst_rate: item.gst_rate,
-            unit: item.unit ?? 'strip',
+            unit: unit,
             hsn_code: item.hsn_code,
           },
         });

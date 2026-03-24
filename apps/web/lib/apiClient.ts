@@ -113,6 +113,9 @@ export const medicinesApi = {
 
 export const inventoryApi = {
   list: (params?: { page?: number; q?: string; low_stock?: boolean; limit?: number }) => apiClient.get('/inventory', { params }),
+  masterList: (params?: { q?: string }) => apiClient.get('/inventory/master', { params }),
+  masterBatches: (id: string) => apiClient.get(`/inventory/master/${id}/batches`),
+  updateMaster: (id: string, data: { rack_location?: string; reorder_level?: number }) => apiClient.patch(`/inventory/master/${id}`, data),
   add: (data: object) => apiClient.post('/inventory', data),
   update: (id: string, data: object) => apiClient.patch(`/inventory/${id}`, data),
   remove: (id: string) => apiClient.delete(`/inventory/${id}`),

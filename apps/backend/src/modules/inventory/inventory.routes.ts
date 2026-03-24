@@ -13,6 +13,46 @@ async function getShopByUser(userId: string) {
   return shop;
 }
 
+// GET /inventory/master (Hierarchical Rack System Level 1)
+router.get('/master', requireRole('shop_owner'), async (req, res, next) => {
+  try {
+    const shop = await getShopByUser(req.user!.id);
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    
+    // Using $queryRaw to perform efficient aggregation
+    // This returns one row per medicine with total stock and nearest expiry
+    const items = await prisma.$queryRaw<any[]>`
+      SELECT 
+        sm.id,
+        sm.medicine_id,
+        sm.medicine_name,
+        sm.unit,
+        sm.rack_location,
+        sm.reorder_level,
+        COALESCE(SUM(si.stock_qty), 0) as total_stock,
+        MIN(CASE WHEN si.stock_qty > 0 THEN si.expiry_date ELSE NULL END) as nearest_expiry,
+        MAX(si.mrp) as max_mrp,
+        MIN(si.mrp) as min_mrp
+      FROM shop_medicines sm
+      LEFT JOIN shop_inventory si ON si.shop_medicine_id = sm.id
+      WHERE sm.shop_id = ${shop.id}::uuid
+      ${q ? prisma.sql`AND sm.medicine_name ILIKE ${'%' + q + '%'}` : prisma.sql``}
+      GROUP BY sm.id
+      ORDER BY sm.medicine_name ASC
+    `;
+
+    // Process BigInt/Decimal issues from raw query if any
+    const formatted = items.map(it => ({
+      ...it,
+      total_stock: Number(it.total_stock),
+      max_mrp: Number(it.max_mrp),
+      min_mrp: Number(it.min_mrp),
+    }));
+
+    res.json({ success: true, data: formatted });
+  } catch (err) { next(err); }
+});
+
 // GET /inventory  — paginated
 router.get('/', requireRole('shop_owner'), async (req, res, next) => {
   try {
@@ -57,6 +97,38 @@ router.get('/', requireRole('shop_owner'), async (req, res, next) => {
       data: inventory,
       pagination: { page, pageSize: PAGE_SIZE, total, totalPages: Math.ceil(total / PAGE_SIZE) },
     });
+  } catch (err) { next(err); }
+});
+
+// PATCH /inventory/master/:id - Update rack or reorder level
+router.patch('/master/:id', requireRole('shop_owner'), async (req, res, next) => {
+  try {
+    const shop = await getShopByUser(req.user!.id);
+    const id = req.params.id;
+    const { rack_location, reorder_level } = req.body;
+
+    const updated = await prisma.shopMedicine.update({
+      where: { id, shop_id: shop.id },
+      data: {
+        ...(rack_location !== undefined ? { rack_location } : {}),
+        ...(reorder_level !== undefined ? { reorder_level: Number(reorder_level) } : {}),
+      }
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (err) { next(err); }
+});
+
+// GET /inventory/master/:id/batches
+router.get('/master/:id/batches', requireRole('shop_owner'), async (req, res, next) => {
+  try {
+    const shop = await getShopByUser(req.user!.id);
+    const id = req.params.id;
+    const batches = await prisma.shopInventory.findMany({
+      where: { shop_id: shop.id, shop_medicine_id: id },
+      orderBy: { expiry_date: 'asc' },
+    });
+    res.json({ success: true, data: batches });
   } catch (err) { next(err); }
 });
 

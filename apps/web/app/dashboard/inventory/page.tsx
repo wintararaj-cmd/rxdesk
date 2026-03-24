@@ -92,7 +92,110 @@ const EMPTY_EDIT_FORM = {
   expiry_date: '',
   discount_type: 'percentage',
   discount_value: '0',
+  rack_location: '',
 };
+
+// Component for each medicine in the master list
+function InventoryMasterRow({ item, onEdit }: { item: MasterInventoryItem; onEdit: (it: MasterInventoryItem) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const { data: batches = [], isLoading } = useQuery<BatchItem[]>({
+    queryKey: ['inventory-batches', item.id],
+    queryFn: () => inventoryApi.masterBatches(item.id).then((r) => r.data.data),
+    enabled: expanded,
+  });
+
+  const isLowStock = item.total_stock <= item.reorder_level;
+
+  return (
+    <>
+      <tr className={`hover:bg-gray-50/80 transition-colors border-b border-gray-50 ${isLowStock ? 'bg-red-50/30' : ''}`}>
+        <td className="px-4 py-3">
+          <button 
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center gap-2 group text-left"
+          >
+            <div className={`w-5 h-5 flex items-center justify-center rounded transition-colors ${expanded ? 'bg-violet-100 text-violet-600' : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200'}`}>
+              <svg className={`w-3 h-3 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900 group-hover:text-violet-700">{item.medicine_name}</p>
+              <p className="text-[10px] text-gray-400 uppercase tracking-tight">{item.unit || 'strip'}</p>
+            </div>
+          </button>
+        </td>
+        <td className="px-4 py-3">
+          <span className={`text-sm font-bold ${isLowStock ? 'text-red-600' : 'text-gray-900'}`}>
+            {item.total_stock}
+          </span>
+        </td>
+        <td className="px-4 py-3 text-sm text-gray-500 font-mono bg-gray-50/50">
+          {item.rack_location || <span className="text-gray-300 italic">No Rack</span>}
+        </td>
+        <td className="px-4 py-3 text-sm text-gray-500">{item.reorder_level}</td>
+        <td className="px-4 py-3 text-sm text-gray-900">
+          {item.min_mrp === item.max_mrp ? `₹${item.min_mrp.toFixed(2)}` : `₹${item.min_mrp} - ${item.max_mrp}`}
+        </td>
+        <td className="px-4 py-3 text-sm text-gray-500">
+          {item.nearest_expiry ? (
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+              new Date(item.nearest_expiry).getTime() < new Date().getTime() ? 'bg-red-100 text-red-700' : 'bg-amber-50 text-amber-700'
+            }`}>
+              {new Date(item.nearest_expiry).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' })}
+            </span>
+          ) : '—'}
+        </td>
+        <td className="px-4 py-3 text-right">
+          <button
+            onClick={() => onEdit(item)}
+            className="text-xs text-violet-600 hover:text-violet-800 font-bold uppercase tracking-wider"
+          >
+            Edit
+          </button>
+        </td>
+      </tr>
+      {expanded && (
+        <tr>
+          <td colSpan={7} className="px-4 py-2 bg-gray-50/40 border-b border-gray-100">
+            <div className="pl-7 pr-4 py-3 border-l-2 border-violet-100">
+              {isLoading ? (
+                <p className="text-xs text-gray-400 italic">Fetching batches...</p>
+              ) : batches.length === 0 ? (
+                <p className="text-xs text-gray-400 italic">No storage records found.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-gray-100 bg-white shadow-sm">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50/80">
+                      <tr className="border-b border-gray-100">
+                        <th className="px-3 py-2 text-left text-gray-500 font-bold uppercase tracking-tighter">Batch No.</th>
+                        <th className="px-3 py-2 text-left text-gray-500 font-bold uppercase tracking-tighter">Expiry</th>
+                        <th className="px-3 py-2 text-left text-gray-500 font-bold uppercase tracking-tighter text-right">Stock</th>
+                        <th className="px-3 py-2 text-left text-gray-500 font-bold uppercase tracking-tighter text-right">MRP</th>
+                        <th className="px-3 py-2 text-left text-gray-500 font-bold uppercase tracking-tighter text-right">Purchase Price</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {batches.filter(b => b.stock_qty !== 0).map((batch) => (
+                        <tr key={batch.id} className="hover:bg-violet-50/30">
+                          <td className="px-3 py-2 font-mono text-gray-700 font-medium">{batch.batch_number || 'No Batch'}</td>
+                          <td className="px-3 py-2 text-gray-500">{batch.expiry_date ? new Date(batch.expiry_date).toLocaleDateString('en-IN') : 'No Expiry'}</td>
+                          <td className="px-3 py-2 text-right font-bold text-gray-900">{batch.stock_qty}</td>
+                          <td className="px-3 py-2 text-right text-gray-600">₹{Number(batch.mrp).toFixed(2)}</td>
+                          <td className="px-3 py-2 text-right text-gray-400">₹{Number(batch.purchase_price).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
 
 export default function InventoryPage() {
   const qc = useQueryClient();
@@ -147,13 +250,14 @@ export default function InventoryPage() {
   const catalogItems = catalogResult?.data ?? [];
   const catalogPagination = catalogResult?.pagination;
 
-  const { data: queryResult, isLoading } = useQuery<{ data: InventoryItem[]; pagination: Pagination }>({
-    queryKey: ['inventory', page, search],
-    queryFn: () => inventoryApi.list({ page, q: search || undefined }).then((r) => ({ data: r.data.data, pagination: r.data.pagination })),
+  const { data: queryResult, isLoading } = useQuery<{ data: MasterInventoryItem[] }>({
+    queryKey: ['inventory', search],
+    queryFn: () => inventoryApi.masterList({ q: search || undefined }).then((r) => ({ data: r.data.data })),
     placeholderData: (prev) => prev,
+    enabled: tab === 'stock',
   });
   const items = queryResult?.data ?? [];
-  const pagination = queryResult?.pagination;
+  const pagination = null; // No pagination for master list for now
 
   const addMutation = useMutation({
     mutationFn: (data: object) => inventoryApi.add(data),
@@ -260,24 +364,48 @@ export default function InventoryPage() {
       alert('Medicine name is required');
       return;
     }
-    updateMutation.mutate({
-      id: editItem.id,
-      data: {
-        medicine_name: editForm.medicine_name,
-        hsn_code: editForm.hsn_code || undefined,
-        unit: editForm.unit || undefined,
-        stock_qty: editForm.stock_qty ? Number(editForm.stock_qty) : undefined,
-        reorder_level: editForm.reorder_level ? Number(editForm.reorder_level) : undefined,
-        mrp: editForm.mrp ? Number(editForm.mrp) : undefined,
-        gst_rate: editForm.gst_rate ? Number(editForm.gst_rate) : undefined,
-        purchase_price: editForm.purchase_price ? Number(editForm.purchase_price) : undefined,
-        batch_number: editForm.batch_number || undefined,
-        expiry_date: editForm.expiry_date || undefined,
-        discount_type: editForm.discount_type,
-        discount_value: editForm.discount_value ? Number(editForm.discount_value) : undefined,
-      },
-    });
+
+    // Check if we are editing a Master record or a Batch record
+    const isMaster = 'total_stock' in editItem;
+
+    if (isMaster) {
+      updateMasterMutation.mutate({
+        id: editItem.id,
+        data: {
+          rack_location: editForm.rack_location,
+          reorder_level: editForm.reorder_level ? Number(editForm.reorder_level) : undefined,
+        }
+      });
+    } else {
+      updateMutation.mutate({
+        id: editItem.id,
+        data: {
+          medicine_name: editForm.medicine_name,
+          hsn_code: editForm.hsn_code || undefined,
+          unit: editForm.unit || undefined,
+          stock_qty: editForm.stock_qty ? Number(editForm.stock_qty) : undefined,
+          reorder_level: editForm.reorder_level ? Number(editForm.reorder_level) : undefined,
+          mrp: editForm.mrp ? Number(editForm.mrp) : undefined,
+          gst_rate: editForm.gst_rate ? Number(editForm.gst_rate) : undefined,
+          purchase_price: editForm.purchase_price ? Number(editForm.purchase_price) : undefined,
+          batch_number: editForm.batch_number || undefined,
+          expiry_date: editForm.expiry_date || undefined,
+          discount_type: editForm.discount_type,
+          discount_value: editForm.discount_value ? Number(editForm.discount_value) : undefined,
+        },
+      });
+    }
   };
+
+  const updateMasterMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => inventoryApi.updateMaster(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['inventory'] });
+      setEditItem(null);
+      setEditForm({});
+      setTriedToSubmit(false);
+    },
+  });
 
   const GST_RATES = ['0', '5', '12', '18', '28'];
   const UNITS = ['strip', 'bottle', 'packet', 'vial', 'tube', 'piece', 'box'];
@@ -303,7 +431,8 @@ export default function InventoryPage() {
     { key: 'unit', label: 'Unit', type: 'select', span: 1 },
     { key: 'discount_type', label: 'Disc. Type', type: 'select', span: 1 },
     { key: 'discount_value', label: 'Disc. Val', type: 'number', span: 1 },
-    { key: 'reorder_level', label: 'Reorder Level', type: 'number', span: 2 },
+    { key: 'reorder_level', label: 'Reorder Level', type: 'number', span: 1 },
+    { key: 'rack_location', label: 'Rack Location', type: 'text', span: 1 },
     { key: 'stock_qty', label: 'Stock Qty', type: 'number', span: 1, note: 'Auto-updated from purchase invoices' },
     { key: 'purchase_price', label: 'Purchase Price (₹)', type: 'number', span: 1, note: 'Auto-updated from purchase invoices' },
     { key: 'batch_number', label: 'Batch No.', type: 'text', span: 1, note: 'Auto-updated from purchase invoices' },
@@ -692,62 +821,32 @@ export default function InventoryPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
-              {['Medicine', 'Stock', 'Reorder', 'Price', 'Discount', 'GST', 'Expiry', 'Actions'].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
+              {['Medicine', 'Stock', 'Rack', 'Reorder', 'MRP Range', 'Next Expiry', 'Actions'].map((h) => (
+                <th key={h} className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {isLoading ? (
-              <tr><td colSpan={7} className="text-center py-12 text-gray-400">Loading…</td></tr>
+              <tr><td colSpan={7} className="text-center py-12">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-6 h-6 border-2 border-violet-200 border-t-violet-600 rounded-full animate-spin" />
+                  <p className="text-xs text-gray-400 font-medium">Loading Inventory...</p>
+                </div>
+              </td></tr>
             ) : items.length === 0 ? (
               <tr><td colSpan={7} className="text-center py-12 text-gray-400">{search ? 'No results found.' : 'No items yet. Add your first item.'}</td></tr>
-            ) : items.map((item) => (
-              <tr key={item.id} className={item.stock_qty <= item.reorder_level ? 'bg-red-50' : ''}>
-                <td className="px-4 py-3">
-                  <p className="font-medium text-gray-900">{item.medicine_name}</p>
-                  {item.medicine?.generic_name && (
-                    <p className="text-gray-400 text-xs">{item.medicine.generic_name}</p>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`font-semibold ${item.stock_qty <= item.reorder_level ? 'text-red-600' : 'text-gray-900'}`}>
-                    {item.stock_qty}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-gray-500">{item.reorder_level}</td>
-                <td className="px-4 py-3 text-gray-900">₹{item.mrp}</td>
-                <td className="px-4 py-3 text-gray-500">
-                  {item.discount_value > 0 ? (
-                    <span className="text-emerald-600 font-medium">
-                      {item.discount_type === 'percentage' ? `${item.discount_value}%` : `₹${item.discount_value}`}
-                    </span>
-                  ) : (
-                    <span className="text-gray-300">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-gray-500">{item.gst_rate ?? 12}%</td>
-                <td className="px-4 py-3 text-gray-500">
-                  {item.expiry_date ? new Date(item.expiry_date).toLocaleDateString('en-IN') : '—'}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => openEdit(item)}
-                      className="text-xs text-violet-600 hover:text-violet-800 font-medium"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => deleteMutation.mutate(item.id)}
-                      disabled={deleteMutation.isPending}
-                      className="text-xs text-red-500 hover:text-red-700"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </td>
-              </tr>
+            ) : (items as any[]).map((item: MasterInventoryItem) => (
+              <InventoryMasterRow key={item.id} item={item} onEdit={(it) => {
+                // For edit, we populate a simpler form or handle rack-only update
+                setEditItem({ ...it, stock_qty: it.total_stock, medicine_name: it.medicine_name, gst_rate: 12 } as any);
+                setEditForm({
+                   medicine_name: it.medicine_name,
+                   rack_location: it.rack_location || '',
+                   reorder_level: String(it.reorder_level),
+                   unit: it.unit || 'strip',
+                });
+              }} />
             ))}
           </tbody>
         </table>
