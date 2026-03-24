@@ -347,31 +347,43 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
     // Upsert inventory for each item
     for (const item of itemsWithTotals) {
       const totalQty = item.quantity + (item.free_qty ?? 0);
+      const mName = item.medicine_name.trim();
+      const bNumber = (item.batch_number || '').trim();
+
       const existing = await tx.shopInventory.findFirst({
         where: {
           shop_id: shop.id,
-          medicine_name: item.medicine_name,
-          batch_number: item.batch_number,
+          medicine_name: { equals: mName, mode: 'insensitive' },
+          batch_number: { equals: bNumber, mode: 'insensitive' },
         },
       });
+
       if (existing) {
         await tx.shopInventory.update({
           where: { id: existing.id },
-          data: { stock_qty: { increment: totalQty }, mrp: item.mrp, purchase_price: item.purchase_price, unit: item.unit ?? existing.unit },
+          data: {
+            stock_qty: { increment: totalQty },
+            mrp: item.mrp,
+            purchase_price: item.purchase_price,
+            unit: item.unit ?? existing.unit,
+            expiry_date: new Date(item.expiry_date),
+            hsn_code: item.hsn_code ?? existing.hsn_code,
+          },
         });
       } else {
         await tx.shopInventory.create({
           data: {
             shop_id: shop.id,
             medicine_id: item.medicine_id ?? null,
-            medicine_name: item.medicine_name,
-            batch_number: item.batch_number,
+            medicine_name: mName,
+            batch_number: bNumber,
             expiry_date: new Date(item.expiry_date),
             mrp: item.mrp,
             purchase_price: item.purchase_price,
             stock_qty: totalQty,
             gst_rate: item.gst_rate,
             unit: item.unit ?? 'strip',
+            hsn_code: item.hsn_code,
           },
         });
       }
@@ -474,31 +486,43 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
     // 5. Update inventory for each NEW item
     for (const item of itemsWithTotals) {
       const totalQty = item.quantity + (item.free_qty ?? 0);
+      const mName = item.medicine_name.trim();
+      const bNumber = (item.batch_number || '').trim();
+
       const existing = await tx.shopInventory.findFirst({
         where: {
           shop_id: shop.id,
-          medicine_name: item.medicine_name,
-          batch_number: item.batch_number,
+          medicine_name: { equals: mName, mode: 'insensitive' },
+          batch_number: { equals: bNumber, mode: 'insensitive' },
         },
       });
+
       if (existing) {
         await tx.shopInventory.update({
           where: { id: existing.id },
-          data: { stock_qty: { increment: totalQty }, mrp: item.mrp, purchase_price: item.purchase_price, unit: item.unit ?? existing.unit },
+          data: {
+            stock_qty: { increment: totalQty },
+            mrp: item.mrp,
+            purchase_price: item.purchase_price,
+            unit: item.unit ?? existing.unit,
+            expiry_date: new Date(item.expiry_date),
+            hsn_code: item.hsn_code ?? existing.hsn_code,
+          },
         });
       } else {
         await tx.shopInventory.create({
           data: {
             shop_id: shop.id,
             medicine_id: item.medicine_id ?? null,
-            medicine_name: item.medicine_name,
-            batch_number: item.batch_number,
+            medicine_name: mName,
+            batch_number: bNumber,
             expiry_date: new Date(item.expiry_date),
             mrp: item.mrp,
             purchase_price: item.purchase_price,
             stock_qty: totalQty,
             gst_rate: item.gst_rate,
             unit: item.unit ?? 'strip',
+            hsn_code: item.hsn_code,
           },
         });
       }
