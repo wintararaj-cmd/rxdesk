@@ -1002,7 +1002,7 @@ function PurchasesTab() {
       return;
     }
 
-    createMutation.mutate({
+    const payload = {
       supplier_id: supplierId || undefined,
       invoice_number: invoiceNumber || undefined,
       invoice_date: invoiceDate,
@@ -1022,7 +1022,10 @@ function PurchasesTab() {
         gst_rate: Number(it.gst_rate) || 12,
         hsn_code: it.hsn_code || undefined,
       })),
-    });
+    };
+    console.log('[DEBUGLOG] Submitting purchase payload:', payload);
+
+    createMutation.mutate(payload);
   };
 
   const statusColor: Record<string, string> = {

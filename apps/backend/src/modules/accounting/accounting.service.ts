@@ -315,6 +315,7 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
 
   const purchase = await prisma.$transaction(async (tx) => {
     // Create purchase entry
+    logger.info(`[DEBUGLOG] CreatePurchaseEntry items: ${JSON.stringify(input.items.map(i => ({ mid: i.medicine_id, name: i.medicine_name })))}`);
     const pe = await tx.purchaseEntry.create({
       data: {
         shop_id: shop.id,
@@ -351,7 +352,8 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
       const mName = item.medicine_name.trim();
       const bNumber = (item.batch_number || '').trim();
 
-      const existing = await tx.shopInventory.findFirst({
+      // 1. Try to find exact match (Name + Batch)
+      let existing = await tx.shopInventory.findFirst({
         where: {
           shop_id: shop.id,
           AND: [
@@ -367,6 +369,18 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
           ]
         },
       });
+
+      // 2. Fallback: If no exact match, find many for the same medicine and pick one with negative stock
+      if (!existing) {
+        existing = await tx.shopInventory.findFirst({
+          where: {
+            shop_id: shop.id,
+            medicine_name: { equals: mName, mode: 'insensitive' },
+            stock_qty: { lt: 0 },
+          },
+          orderBy: { stock_qty: 'asc' }, // Pick the most negative one
+        });
+      }
 
       if (existing) {
         await tx.shopInventory.update({
@@ -480,6 +494,7 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
     const totalAmount = itemsWithTotals.reduce((s, i) => s + i.line_total, 0);
 
     // 4. Update the entry
+    logger.info(`[DEBUGLOG] UpdatePurchaseEntry items: ${JSON.stringify(input.items.map(i => ({ mid: i.medicine_id, name: i.medicine_name })))}`);
     const updatedPe = await tx.purchaseEntry.update({
       where: { id },
       data: {
@@ -515,7 +530,8 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
       const mName = item.medicine_name.trim();
       const bNumber = (item.batch_number || '').trim();
 
-      const existing = await tx.shopInventory.findFirst({
+      // 1. Try to find exact match (Name + Batch)
+      let existing = await tx.shopInventory.findFirst({
         where: {
           shop_id: shop.id,
           AND: [
@@ -531,6 +547,18 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
           ]
         },
       });
+
+      // 2. Fallback: If no exact match, find one with negative stock
+      if (!existing) {
+        existing = await tx.shopInventory.findFirst({
+          where: {
+            shop_id: shop.id,
+            medicine_name: { equals: mName, mode: 'insensitive' },
+            stock_qty: { lt: 0 },
+          },
+          orderBy: { stock_qty: 'asc' },
+        });
+      }
 
       if (existing) {
         await tx.shopInventory.update({
