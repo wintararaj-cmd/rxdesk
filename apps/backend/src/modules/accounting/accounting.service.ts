@@ -289,6 +289,7 @@ export interface CreatePurchaseInput {
     mrp: number;
     discount_pct?: number;
     gst_rate?: number;
+    hsn_code?: string;
     unit?: string;
   }[];
 }
@@ -305,7 +306,7 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
     const taxableVal = baseTotal - discountAmt;
     const gstAmt = taxableVal * (gstRate / 100);
     const lineTotal = taxableVal + gstAmt;
-    return { ...item, discount_pct: discountPct, gst_rate: gstRate, line_total: lineTotal, gst_amount: gstAmt };
+    return { ...item, hsn_code: item.hsn_code, discount_pct: discountPct, gst_rate: gstRate, line_total: lineTotal, gst_amount: gstAmt };
   });
 
   const subtotal = itemsWithTotals.reduce((s, i) => s + i.purchase_price * i.quantity, 0);
@@ -446,7 +447,7 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
       const taxableVal = baseTotal - discountAmt;
       const gstAmt = taxableVal * (gstRate / 100);
       const lineTotal = taxableVal + gstAmt;
-      return { ...item, discount_pct: discountPct, gst_rate: gstRate, line_total: lineTotal, gst_amount: gstAmt };
+      return { ...item, hsn_code: item.hsn_code, discount_pct: discountPct, gst_rate: gstRate, line_total: lineTotal, gst_amount: gstAmt };
     });
 
     const subtotal = itemsWithTotals.reduce((s, i) => s + i.purchase_price * i.quantity, 0);
