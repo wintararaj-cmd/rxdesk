@@ -676,7 +676,7 @@ function BillDetailModal({ bill, onClose, onPay }: {
     setFormData(prev => ({
       ...prev,
       items: [...prev.items, {
-        medicine_name: '', inventory_id: '', batch_number: '', expiry_date: '', unit: 'strip',
+        medicine_name: '', inventory_id: '', batch_number: '', expiry_date: '',
         mrp: '', quantity: '1', discount_type: 'percentage', discount_value: '0', gst_rate: '12', line_total: 0
       } as any]
     }));
@@ -720,7 +720,6 @@ function BillDetailModal({ bill, onClose, onPay }: {
         inventory_id: inv.id,
         batch_number: inv.batch_number,
         expiry_date: inv.expiry_date ? inv.expiry_date.split('T')[0] : '',
-        unit: inv.unit || 'strip',
         mrp: String(inv.mrp),
         gst_rate: String(inv.gst_rate || 12)
       };

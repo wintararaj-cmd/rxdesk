@@ -876,7 +876,6 @@ export async function updateBill(billId: string, userId: string, data: any) {
       inventory_id?: string;
       batch_number?: string;
       expiry_date?: string | null;
-      unit: string;
       mrp: number;
       quantity: number;
       discount_type: 'percentage' | 'amount';
@@ -912,7 +911,6 @@ export async function updateBill(billId: string, userId: string, data: any) {
           inventory_id: it.inventory_id,
           batch_number: it.batch_number,
           expiry_date: it.expiry_date ? new Date(it.expiry_date) : null,
-          unit: it.unit || 'piece',
           mrp,
           quantity: qty,
           discount_type: it.discount_type || 'percentage',
@@ -947,7 +945,6 @@ export async function updateBill(billId: string, userId: string, data: any) {
               inventory_id: it.inventory_id,
               batch_number: it.batch_number,
               expiry_date: it.expiry_date,
-              unit: it.unit,
               mrp: it.mrp,
               quantity: it.quantity,
               discount_type: it.discount_type,
