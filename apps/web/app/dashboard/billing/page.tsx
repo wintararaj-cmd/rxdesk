@@ -1396,7 +1396,17 @@ function WalkInSaleTab() {
   const [globalDiscount, setGlobalDiscount] = useState('');
   const [items, setItems] = useState<WalkInItem[]>([{ ...EMPTY_ITEM }]);
   const [createdBill, setCreatedBill] = useState<BillData | null>(null);
-  const [suggestions, setSuggestions] = useState<Record<number, { id: string; medicine_name: string; unit?: string; mrp: number; gst_rate: number; batch_number: string; expiry_date: string; stock_qty: number }[]>>({});
+  const [suggestions, setSuggestions] = useState<Record<number, { 
+    id: string; 
+    medicine_name: string; 
+    unit?: string; 
+    mrp: number; 
+    gst_rate: number; 
+    batch_number: string; 
+    expiry_date: any; 
+    stock_qty: number;
+    shop_medicine?: { rack_location?: string };
+  }[]>>({});
   const searchTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
   const [customerSearchResults, setCustomerSearchResults] = useState<{ customer_name: string | null; customer_phone: string; customer_gstin?: string; billing_address?: string; billing_state?: string }[]>([]);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
@@ -1936,7 +1946,7 @@ function WalkInSaleTab() {
                                 <span className={`text-[10px] px-1 rounded ${si === (suggHighlights[idx] ?? -1) ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'}`}>B: {s.batch_number || 'N/A'}</span>
                                 {s.shop_medicine?.rack_location && (
                                   <span className={`text-[10px] px-1 rounded ${si === (suggHighlights[idx] ?? -1) ? 'bg-indigo-400 text-white' : 'bg-indigo-50 text-indigo-500 font-bold'}`}>
-                                    📍 {s.shop_medicine.rack_location}
+                                    📍 {s.shop_medicine?.rack_location}
                                   </span>
                                 )}
                                 {s.expiry_date && <span className={`text-[10px] ${si === (suggHighlights[idx] ?? -1) ? 'text-violet-100' : 'text-orange-600'}`}>E: {fmtDate(s.expiry_date)}</span>}
