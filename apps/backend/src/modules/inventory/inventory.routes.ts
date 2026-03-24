@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { Prisma } from '@prisma/client';
 import { requireRole } from '../../middleware/auth';
 import { addInventoryItemSchema, updateInventorySchema } from '@rxdesk/shared';
 import prisma from '../../config/database';
@@ -36,7 +37,7 @@ router.get('/master', requireRole('shop_owner'), async (req, res, next) => {
       FROM shop_medicines sm
       LEFT JOIN shop_inventory si ON si.shop_medicine_id = sm.id
       WHERE sm.shop_id = ${shop.id}::uuid
-      ${q ? prisma.sql`AND sm.medicine_name ILIKE ${'%' + q + '%'}` : prisma.sql``}
+      ${q ? Prisma.sql`AND sm.medicine_name ILIKE ${'%' + q + '%'}` : Prisma.empty}
       GROUP BY sm.id
       ORDER BY sm.medicine_name ASC
     `;
