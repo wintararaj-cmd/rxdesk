@@ -324,6 +324,7 @@ model MedicalShop {
   sale_returns        SaleReturn[]
   purchase_returns    PurchaseReturn[]
   contra_entries      ContraEntry[]
+  shop_medicines      ShopMedicine[]
 
   @@map("medical_shops")
 }
@@ -474,35 +475,62 @@ model Medicine {
   inventory          ShopInventory[]
   prescription_items PrescriptionItem[]
   purchase_items     PurchaseItem[]
+  shop_medicines     ShopMedicine[]
 
   @@map("medicines")
 }
 
-model ShopInventory {
+model ShopMedicine {
   id             String       @id @default(uuid())
   shop_id        String
-  medicine_id    String?
-  medicine_name  String
-  hsn_code       String?
-  batch_number   String?
-  expiry_date    DateTime?    @db.Date
-  mrp            Decimal      @db.Decimal(10, 2)
-  purchase_price Decimal?     @db.Decimal(10, 2)
-  gst_rate       Decimal      @default(12.0) @db.Decimal(5, 2)
-  stock_qty      Int          @default(0)
-  reorder_level  Int          @default(10)
+  medicine_id    String?      // Links to global catalog
+  medicine_name  String       // Snapshot of name
+  rack_location  String?
   unit           String       @default("strip")
-  discount_type  DiscountType @default(percentage)
-  discount_value Decimal      @default(0) @db.Decimal(10, 2)
+  reorder_level  Int          @default(10)
+  is_active      Boolean      @default(true)
   created_at     DateTime     @default(now())
   updated_at     DateTime     @updatedAt
 
   // Relations
   shop       MedicalShop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
   medicine   Medicine?   @relation(fields: [medicine_id], references: [id])
-  bill_items BillItem[]
+  batches    ShopInventory[]
+
+  @@unique([shop_id, medicine_name, unit])
+  @@index([shop_id])
+  @@index([medicine_id])
+  @@map("shop_medicines")
+}
+
+model ShopInventory {
+  id               String       @id @default(uuid())
+  shop_id          String
+  shop_medicine_id String?      // Temporary optional for migration
+  medicine_id      String?
+  medicine_name    String
+  hsn_code         String?
+  batch_number     String?
+  expiry_date      DateTime?    @db.Date
+  mrp              Decimal      @db.Decimal(10, 2)
+  purchase_price   Decimal?     @db.Decimal(10, 2)
+  gst_rate         Decimal      @default(12.0) @db.Decimal(5, 2)
+  stock_qty        Int          @default(0)
+  reorder_level    Int          @default(10)
+  unit             String       @default("strip")
+  discount_type    DiscountType @default(percentage)
+  discount_value   Decimal      @default(0) @db.Decimal(10, 2)
+  created_at       DateTime     @default(now())
+  updated_at       DateTime     @updatedAt
+
+  // Relations
+  shop          MedicalShop   @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  shop_medicine ShopMedicine? @relation(fields: [shop_medicine_id], references: [id], onDelete: Cascade)
+  medicine      Medicine?     @relation(fields: [medicine_id], references: [id])
+  bill_items    BillItem[]
 
   @@index([shop_id])
+  @@index([shop_medicine_id])
   @@index([medicine_id])
   @@map("shop_inventory")
 }
