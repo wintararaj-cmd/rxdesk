@@ -298,7 +298,7 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
   const shop = await getShopOrThrow(userId);
 
   // Calculate totals
-  const itemsWithTotals = input.items.map((item) => {
+  const itemsWithTotals = input.items.map((item): any => {
     const discountPct = item.discount_pct ?? 0;
     const gstRate = item.gst_rate ?? 12;
     const baseTotal = item.purchase_price * item.quantity;
@@ -306,7 +306,7 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
     const taxableVal = baseTotal - discountAmt;
     const gstAmt = taxableVal * (gstRate / 100);
     const lineTotal = taxableVal + gstAmt;
-    return { ...item, hsn_code: item.hsn_code, discount_pct: discountPct, gst_rate: gstRate, line_total: lineTotal, gst_amount: gstAmt };
+    return { ...item, discount_pct: discountPct, gst_rate: gstRate, line_total: lineTotal, gst_amount: gstAmt };
   });
 
   const subtotal = itemsWithTotals.reduce((s, i) => s + i.purchase_price * i.quantity, 0);
@@ -439,7 +439,7 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
     await tx.purchaseItem.deleteMany({ where: { purchase_id: id } });
 
     // 3. New Totals
-    const itemsWithTotals = input.items.map((item) => {
+    const itemsWithTotals = input.items.map((item): any => {
       const discountPct = item.discount_pct ?? 0;
       const gstRate = item.gst_rate ?? 12;
       const baseTotal = item.purchase_price * item.quantity;
@@ -447,7 +447,7 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
       const taxableVal = baseTotal - discountAmt;
       const gstAmt = taxableVal * (gstRate / 100);
       const lineTotal = taxableVal + gstAmt;
-      return { ...item, hsn_code: item.hsn_code, discount_pct: discountPct, gst_rate: gstRate, line_total: lineTotal, gst_amount: gstAmt };
+      return { ...item, discount_pct: discountPct, gst_rate: gstRate, line_total: lineTotal, gst_amount: gstAmt };
     });
 
     const subtotal = itemsWithTotals.reduce((s, i) => s + i.purchase_price * i.quantity, 0);
