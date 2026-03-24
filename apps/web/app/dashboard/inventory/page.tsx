@@ -92,6 +92,7 @@ const EMPTY_ADD_FORM = {
   unit: 'strip',
   discount_type: 'percentage',
   discount_value: '0',
+  rack_location: '',
 };
 
 // Edit form — all fields (manual stock corrections + purchase-invoice fields)
