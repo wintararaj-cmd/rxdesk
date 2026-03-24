@@ -867,38 +867,6 @@ export default function InventoryPage() {
           </tbody>
         </table>
       </div>
-
-      {/* Pagination */}
-      {pagination && pagination.totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4">
-          <p className="text-xs text-gray-400">
-            Showing {((pagination.page - 1) * pagination.pageSize) + 1}–{Math.min(pagination.page * pagination.pageSize, pagination.total)} of {pagination.total.toLocaleString()}
-          </p>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setPage(1)}
-              disabled={page === 1}
-              className="px-2 py-1 text-xs rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
-            >«</button>
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="px-3 py-1 text-xs rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
-            >Prev</button>
-            <span className="px-3 py-1 text-xs text-gray-600 font-medium">{page} / {pagination.totalPages}</span>
-            <button
-              onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
-              disabled={page === pagination.totalPages}
-              className="px-3 py-1 text-xs rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
-            >Next</button>
-            <button
-              onClick={() => setPage(pagination.totalPages)}
-              disabled={page === pagination.totalPages}
-              className="px-2 py-1 text-xs rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
-            >»</button>
-          </div>
-        </div>
-      )}
       </>)}
     </div>
   );
