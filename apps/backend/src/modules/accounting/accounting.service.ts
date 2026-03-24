@@ -2838,19 +2838,16 @@ export async function voidPurchase(userId: string, id: string) {
 
     // 1. Reverse Inventory
     for (const item of purchase.items) {
-      if (item.batch_number) {
-        // Decrease batch count
-        await tx.shopInventory.updateMany({
-          where: {
-            shop_id: shop.id,
-            medicine_name: item.medicine_name,
-            batch_number: item.batch_number,
-          },
-          data: {
-            stock_qty: { decrement: item.quantity + (item.free_qty || 0) },
-          },
-        });
-      }
+      await tx.shopInventory.updateMany({
+        where: {
+          shop_id: shop.id,
+          medicine_name: { equals: item.medicine_name.trim(), mode: 'insensitive' },
+          batch_number: { equals: (item.batch_number || '').trim(), mode: 'insensitive' },
+        },
+        data: {
+          stock_qty: { decrement: item.quantity + (item.free_qty || 0) },
+        },
+      });
     }
 
     // 2. Remove associated payments/income/expense logs if any
