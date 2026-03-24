@@ -328,7 +328,7 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
         created_by: userId,
         items: {
           create: itemsWithTotals.map((item) => ({
-            medicine_id: item.medicine_id ?? null,
+            medicine_id: item.medicine_id || null,
             medicine_name: item.medicine_name,
             batch_number: (item.batch_number || '').trim(),
             expiry_date: new Date(item.expiry_date),
@@ -385,7 +385,7 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
         await tx.shopInventory.create({
           data: {
             shop_id: shop.id,
-            medicine_id: item.medicine_id ?? null,
+            medicine_id: item.medicine_id || null,
             medicine_name: mName,
             batch_number: bNumber,
             expiry_date: new Date(item.expiry_date),
@@ -492,7 +492,7 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
         total_amount: totalAmount,
         items: {
           create: itemsWithTotals.map((item) => ({
-            medicine_id: item.medicine_id ?? null,
+            medicine_id: item.medicine_id || null,
             medicine_name: item.medicine_name,
             batch_number: (item.batch_number || '').trim(),
             expiry_date: new Date(item.expiry_date),
@@ -549,7 +549,7 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
         await tx.shopInventory.create({
           data: {
             shop_id: shop.id,
-            medicine_id: item.medicine_id ?? null,
+            medicine_id: item.medicine_id || null,
             medicine_name: mName,
             batch_number: bNumber,
             expiry_date: new Date(item.expiry_date),
