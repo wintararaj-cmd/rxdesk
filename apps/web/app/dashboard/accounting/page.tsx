@@ -929,6 +929,7 @@ function PurchasesTab() {
             const medRes = await medicinesApi.catalog({ q: value });
             const catalogItems = (medRes.data.data ?? []).slice(0, 8).map((m: any) => ({
               id: m.id,
+              medicine_id: m.id,
               medicine_name: m.name,
               mrp: 0,
               gst_rate: m.gst_rate ?? 12,
@@ -945,7 +946,7 @@ function PurchasesTab() {
     setPiItems((prev) => prev.map((it, i) =>
       i === idx ? {
         ...it,
-        medicine_id: inv.medicine_id || inv.id || '',
+        medicine_id: inv.medicine_id || '',
         medicine_name: inv.medicine_name || inv.name || '',
         mrp: String(inv.mrp || ''),
         gst_rate: String(inv.gst_rate ?? 12),
