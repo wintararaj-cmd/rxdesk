@@ -913,7 +913,7 @@ export async function updateBill(billId: string, userId: string, data: any) {
 
         return {
           medicine_name: it.medicine_name,
-          inventory_id: it.inventory_id,
+          inventory_id: (it.inventory_id && it.inventory_id !== '') ? it.inventory_id : null,
           batch_number: it.batch_number,
           expiry_date: it.expiry_date ? new Date(it.expiry_date) : null,
           mrp,
@@ -959,7 +959,7 @@ export async function updateBill(billId: string, userId: string, data: any) {
           }
         } : {})
       },
-      include: { items: true, patient: true }
+      include: { items: true, patient: true, income_entry: true, credit_transactions: true }
     });
 
     // 5. Update inventory for each NEW item
@@ -975,23 +975,29 @@ export async function updateBill(billId: string, userId: string, data: any) {
     }
 
     // 6. Update Accounting/Income record
-    if (oldBill.income_entry) {
-      await tx.incomeEntry.update({
-        where: { id: oldBill.income_entry.id },
-        data: {
-          amount: totalAmount,
-          payment_method: (data.payment_method ?? oldBill.payment_method) as any,
-          entry_date: new Date(),
-        }
-      });
-    } else if (updatedBill.payment_status === 'paid' && updatedBill.payment_method !== 'credit') {
-      // If it wasn't paid before but is now, or we just want to ensure it exists
+    const pm = data.payment_method ?? oldBill.payment_method;
+    const ps = data.payment_status ?? oldBill.payment_status;
+
+    if (updatedBill.income_entry) {
+      if (ps === 'paid' && pm !== 'credit') {
+        await tx.incomeEntry.update({
+          where: { id: updatedBill.income_entry.id },
+          data: {
+            amount: totalAmount,
+            payment_method: pm as any,
+          }
+        });
+      } else {
+        // If changed to pending or credit, delete income entry
+        await tx.incomeEntry.delete({ where: { id: updatedBill.income_entry.id } });
+      }
+    } else if (ps === 'paid' && pm !== 'credit') {
       await tx.incomeEntry.create({
         data: {
           shop_id: shop.id,
           entry_type: 'sale_income' as any,
           amount: totalAmount,
-          payment_method: updatedBill.payment_method as any,
+          payment_method: pm as any,
           reference_bill_id: billId,
           entry_date: new Date(),
           created_by: userId,
@@ -1000,22 +1006,65 @@ export async function updateBill(billId: string, userId: string, data: any) {
     }
 
     // 7. Update Credit record if applicable
-    if (oldBill.payment_method === 'credit' || updatedBill.payment_method === 'credit') {
-      const oldAmount = Number(oldBill.total_amount);
-      const newAmount = Number(updatedBill.total_amount);
-      const diff = newAmount - oldAmount;
-
-      if (oldBill.credit_transactions.length > 0) {
-        // Update existing transaction
-        const firstTx = oldBill.credit_transactions[0];
-        await tx.creditTransaction.update({
-          where: { id: firstTx.id },
-          data: { amount: newAmount }
-        });
-        
+    if (oldBill.payment_method === 'credit' && pm !== 'credit') {
+      // Transition from Credit to Cash/UPI/etc: Clear outstandings
+      for (const txn of oldBill.credit_transactions) {
         await tx.creditCustomer.update({
-          where: { id: firstTx.customer_id },
+          where: { id: txn.customer_id },
+          data: { total_outstanding: { decrement: txn.amount } },
+        });
+        await tx.creditTransaction.delete({ where: { id: txn.id } });
+      }
+    } else if (pm === 'credit') {
+      // Ensure CreditTransaction exists and is updated
+      let creditCustomer = await tx.creditCustomer.findFirst({
+        where: {
+          shop_id: shop.id,
+          OR: [
+            (updatedBill.patient_id ? { patient_id: updatedBill.patient_id } : {}),
+            (updatedBill.customer_phone ? { phone: updatedBill.customer_phone } : {})
+          ].filter(o => Object.keys(o).length > 0) as any
+        },
+      });
+
+      if (!creditCustomer) {
+        creditCustomer = await tx.creditCustomer.create({
+          data: {
+            shop_id: shop.id,
+            patient_id: updatedBill.patient_id,
+            name: updatedBill.customer_name || 'Walk-in Customer',
+            phone: updatedBill.customer_phone,
+            total_outstanding: 0,
+          },
+        });
+      }
+
+      const existingTxn = await tx.creditTransaction.findFirst({ where: { bill_id: billId } });
+      if (existingTxn) {
+        const diff = Number(updatedBill.total_amount) - Number(existingTxn.amount);
+        await tx.creditTransaction.update({
+          where: { id: existingTxn.id },
+          data: { amount: updatedBill.total_amount }
+        });
+        await tx.creditCustomer.update({
+          where: { id: creditCustomer.id },
           data: { total_outstanding: { increment: diff } }
+        });
+      } else {
+        await tx.creditTransaction.create({
+          data: {
+            customer_id: creditCustomer.id,
+            shop_id: shop.id,
+            type: 'credit_given',
+            amount: Number(updatedBill.total_amount),
+            bill_id: billId,
+            transaction_date: new Date(),
+            created_by: userId,
+          },
+        });
+        await tx.creditCustomer.update({
+          where: { id: creditCustomer.id },
+          data: { total_outstanding: { increment: Number(updatedBill.total_amount) } },
         });
       }
     }

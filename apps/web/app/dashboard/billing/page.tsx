@@ -632,6 +632,8 @@ function BillDetailModal({ bill, onClose, onPay }: {
     customer_gstin: bill.customer_gstin ?? '',
     billing_address: bill.billing_address ?? '',
     billing_state: bill.billing_state ?? '',
+    payment_method: bill.payment_method,
+    payment_status: bill.payment_status,
     discount_amount: String(bill.discount_amount || 0),
     items: bill.items.map(it => ({
       ...it,
@@ -837,10 +839,26 @@ function BillDetailModal({ bill, onClose, onPay }: {
                   <input type="text" value={formData.billing_address} onChange={e => setFormData({...formData, billing_address: e.target.value})} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-500" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">State</label>
                   <select value={formData.billing_state} onChange={e => setFormData({...formData, billing_state: e.target.value})} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-500">
                     <option value="">Select State</option>
                     {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Payment Method</label>
+                  <select value={formData.payment_method} onChange={e => setFormData({...formData, payment_method: e.target.value as any})} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-500">
+                    <option value="cash">Cash</option>
+                    <option value="upi">UPI</option>
+                    <option value="card">Card</option>
+                    <option value="credit">Credit/Pay Later</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Status</label>
+                  <select value={formData.payment_status} onChange={e => setFormData({...formData, payment_status: e.target.value as any})} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-500">
+                    <option value="paid">Paid</option>
+                    <option value="pending">Pending</option>
+                    <option value="partial">Partial</option>
                   </select>
                 </div>
               </div>
@@ -936,6 +954,7 @@ function BillDetailModal({ bill, onClose, onPay }: {
                     discount_amount: Number(formData.discount_amount),
                     items: formData.items.map(it => ({
                       ...it,
+                      inventory_id: (it as any).inventory_id && (it as any).inventory_id !== '' ? (it as any).inventory_id : null,
                       quantity: Number(it.quantity),
                       mrp: Number(it.mrp),
                       discount_value: Number(it.discount_value),
