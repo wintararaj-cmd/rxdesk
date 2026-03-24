@@ -46,6 +46,7 @@ interface MasterInventoryItem {
   id: string;
   medicine_id?: string;
   medicine_name: string;
+  hsn_code?: string;
   unit?: string;
   rack_location?: string;
   reorder_level: number;
@@ -138,7 +139,10 @@ function InventoryMasterRow({ item, onEdit }: { item: MasterInventoryItem; onEdi
             </div>
             <div>
               <p className="font-semibold text-gray-900 group-hover:text-violet-700">{item.medicine_name}</p>
-              <p className="text-[10px] text-gray-400 uppercase tracking-tight">{item.unit || 'strip'}</p>
+              <p className="text-[10px] text-gray-400 uppercase tracking-tight">
+                {item.unit || 'strip'}
+                {item.hsn_code && <span className="ml-2 bg-gray-100 px-1 rounded">HSN: {item.hsn_code}</span>}
+              </p>
             </div>
           </button>
         </td>
@@ -392,6 +396,7 @@ export default function InventoryPage() {
         data: {
           rack_location: editForm.rack_location,
           reorder_level: editForm.reorder_level ? Number(editForm.reorder_level) : undefined,
+          hsn_code: editForm.hsn_code || undefined,
         }
       });
     } else {
@@ -871,6 +876,7 @@ export default function InventoryPage() {
                    rack_location: it.rack_location || '',
                    reorder_level: String(it.reorder_level),
                    unit: it.unit || 'strip',
+                   hsn_code: it.hsn_code || '',
                 });
               }} />
             ))}
@@ -1134,7 +1140,10 @@ function StockSupplierReport() {
                 <tr key={it.inventory_id} className="hover:bg-violet-50/40 transition-colors">
                   <td className="px-4 py-3.5">
                     <p className="font-bold text-gray-900 leading-tight">{it.medicine_name}</p>
-                    <p className="text-[10px] text-gray-400 leading-tight uppercase font-medium mt-0.5">{it.generic_name || 'Generic Not Linked'}</p>
+                    <p className="text-[10px] text-gray-400 leading-tight uppercase font-medium mt-0.5">
+                      {it.generic_name || 'Generic Not Linked'}
+                      {it.hsn_code && <span className="ml-2 font-black text-violet-400">HSN: {it.hsn_code}</span>}
+                    </p>
                   </td>
                   <td className="px-4 py-3.5">
                     <p className="font-mono text-xs text-gray-700 bg-gray-100 w-fit px-1.5 rounded">{it.batch_number || 'N/A'}</p>

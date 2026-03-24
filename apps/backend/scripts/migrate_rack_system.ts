@@ -11,6 +11,7 @@ async function main() {
       medicine_id: true,
       medicine_name: true,
       unit: true,
+      hsn_code: true,
       reorder_level: true,
     }
   });
@@ -20,6 +21,7 @@ async function main() {
     medicine_id: string | null;
     medicine_name: string;
     unit: string;
+    hsn_code: string | null;
     reorder_level: number;
   }>();
 
@@ -31,6 +33,7 @@ async function main() {
         medicine_id: inv.medicine_id ?? null,
         medicine_name: inv.medicine_name.trim(),
         unit: inv.unit,
+        hsn_code: inv.hsn_code ?? null,
         reorder_level: inv.reorder_level,
       });
     }
@@ -51,11 +54,14 @@ async function main() {
           unit: group.unit,
         }
       },
-      update: {},
+      update: {
+        hsn_code: group.hsn_code,
+      },
       create: {
         shop_id: group.shop_id,
         medicine_id: group.medicine_id,
         medicine_name: group.medicine_name,
+        hsn_code: group.hsn_code,
         unit: group.unit,
         reorder_level: group.reorder_level,
       }

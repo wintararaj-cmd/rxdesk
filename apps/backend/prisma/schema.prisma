@@ -485,6 +485,7 @@ model ShopMedicine {
   shop_id        String
   medicine_id    String?      // Links to global catalog
   medicine_name  String       // Snapshot of name
+  hsn_code       String?
   rack_location  String?
   unit           String       @default("strip")
   reorder_level  Int          @default(10)

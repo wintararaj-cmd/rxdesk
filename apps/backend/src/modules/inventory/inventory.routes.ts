@@ -27,6 +27,7 @@ router.get('/master', requireRole('shop_owner'), async (req, res, next) => {
         sm.id,
         sm.medicine_id,
         sm.medicine_name,
+        sm.hsn_code,
         sm.unit,
         sm.rack_location,
         sm.reorder_level,
@@ -73,6 +74,7 @@ router.get('/reports/batch-supplier', requireRole('shop_owner'), async (req, res
         si.purchase_price,
         si.unit,
         sm.rack_location,
+        sm.hsn_code,
         m.generic_name,
         latest_purchase.supplier_name,
         latest_purchase.invoice_number,
@@ -173,12 +175,13 @@ router.patch('/master/:id', requireRole('shop_owner'), async (req, res, next) =>
   try {
     const shop = await getShopByUser(req.user!.id);
     const id = req.params.id;
-    const { rack_location, reorder_level } = req.body;
+    const { rack_location, reorder_level, hsn_code } = req.body;
 
     const updated = await prisma.shopMedicine.update({
       where: { id, shop_id: shop.id },
       data: {
         ...(rack_location !== undefined ? { rack_location } : {}),
+        ...(hsn_code !== undefined ? { hsn_code } : {}),
         ...(reorder_level !== undefined ? { reorder_level: Number(reorder_level) } : {}),
       }
     });
@@ -343,24 +346,27 @@ async function handleInventoryUpdate(req: any, res: any, next: any) {
         },
         update: {
           rack_location: data.rack_location || undefined,
+          hsn_code: data.hsn_code || undefined,
         },
         create: {
           shop_id: shop.id,
           medicine_name: mName,
+          hsn_code: data.hsn_code || undefined,
           unit: unit,
           reorder_level: data.reorder_level || existing.reorder_level || 10,
           rack_location: data.rack_location || undefined,
         }
       });
       shopMedId = shopMed.id;
-    } else if (data.rack_location !== undefined || data.reorder_level !== undefined) {
-      // Update rack/reorder on existing master
+    } else if (data.rack_location !== undefined || data.reorder_level !== undefined || data.hsn_code !== undefined) {
+      // Update rack/reorder/hsn on existing master
       if (shopMedId) {
         await prisma.shopMedicine.update({
           where: { id: shopMedId },
           data: {
             rack_location: data.rack_location || undefined,
             reorder_level: data.reorder_level || undefined,
+            hsn_code: data.hsn_code || undefined,
           }
         });
       }
