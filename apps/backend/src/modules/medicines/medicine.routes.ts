@@ -8,7 +8,7 @@ const router = Router();
 router.get('/', async (req, res, next) => {
   try {
     const q = (req.query.q as string) || '';
-    const PAGE_SIZE = 50;
+    const PAGE_SIZE = req.query.pageSize ? Math.min(100, Math.max(1, Number(req.query.pageSize))) : 50;
     const page = Math.max(1, req.query.page ? Number(req.query.page) : 1);
     const skip = (page - 1) * PAGE_SIZE;
 

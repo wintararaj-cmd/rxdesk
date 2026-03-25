@@ -105,7 +105,7 @@ export const appointmentApi = {
 };
 
 export const medicinesApi = {
-  catalog: (params?: { page?: number; q?: string }) => apiClient.get('/medicines', { params }),
+  catalog: (params?: { page?: number; q?: string; pageSize?: number }) => apiClient.get('/medicines', { params }),
   search: (q: string) => apiClient.get('/medicines/search', { params: { q } }),
   compositionSearch: (q: string, shopId?: string) =>
     apiClient.get('/medicines/composition-search', { params: { q, ...(shopId ? { shop_id: shopId } : {}) } }),
