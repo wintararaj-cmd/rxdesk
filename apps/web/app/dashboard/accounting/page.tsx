@@ -986,8 +986,8 @@ function PurchasesTab() {
           const invItems = res.data.data ?? [];
           if (invItems.length > 0) {
             // Group by name for the suggestion dropdown to satisfy user request "show medicine name only not batch wise"
-            const grouped = new Map();
-            invItems.forEach(it => {
+            const grouped = new Map<string, any>();
+            invItems.forEach((it: any) => {
               const key = (it.medicine_name || it.name || '').toLowerCase().trim();
               if(!grouped.has(key)) grouped.set(key, it);
             });
