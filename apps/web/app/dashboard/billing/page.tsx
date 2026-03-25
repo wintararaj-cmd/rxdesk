@@ -1366,6 +1366,7 @@ interface WalkInItem {
   expiry_date?: string;
   inventory_id?: string;
   stock_qty?: number;
+  available_batches?: any[];
 }
 
 
@@ -1381,7 +1382,8 @@ const EMPTY_ITEM: WalkInItem = {
   batch_number: '',
   expiry_date: '',
   inventory_id: '',
-  stock_qty: 0
+  stock_qty: 0,
+  available_batches: []
 };
 
 function WalkInSaleTab() {
@@ -1396,17 +1398,7 @@ function WalkInSaleTab() {
   const [globalDiscount, setGlobalDiscount] = useState('');
   const [items, setItems] = useState<WalkInItem[]>([{ ...EMPTY_ITEM }]);
   const [createdBill, setCreatedBill] = useState<BillData | null>(null);
-  const [suggestions, setSuggestions] = useState<Record<number, { 
-    id: string; 
-    medicine_name: string; 
-    unit?: string; 
-    mrp: number; 
-    gst_rate: number; 
-    batch_number: string; 
-    expiry_date: any; 
-    stock_qty: number;
-    shop_medicine?: { rack_location?: string };
-  }[]>>({});
+  const [suggestions, setSuggestions] = useState<Record<number, any[]>>({});
   const searchTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
   const [customerSearchResults, setCustomerSearchResults] = useState<{ customer_name: string | null; customer_phone: string; customer_gstin?: string; billing_address?: string; billing_state?: string }[]>([]);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
@@ -1479,10 +1471,36 @@ function WalkInSaleTab() {
       }
       searchTimers.current[idx] = setTimeout(async () => {
         try {
-          const res = await inventoryApi.list({ q: value, limit: 12 });
+          const res = await inventoryApi.list({ q: value, limit: 20 });
           const invItems = res.data.data ?? [];
+          
           if (invItems.length > 0) {
-            setSuggestions((prev) => ({ ...prev, [idx]: invItems }));
+            // Group by medicine name to show total stock
+            const grouped = invItems.reduce((acc: any, inv: any) => {
+              const name = inv.medicine_name.toLowerCase().trim();
+              if (!acc[name]) {
+                acc[name] = { 
+                  ...inv, 
+                  total_stock: 0, 
+                  batches: [] 
+                };
+              }
+              acc[name].total_stock += inv.stock_qty || 0;
+              acc[name].batches.push(inv);
+              return acc;
+            }, {});
+            
+            const results = Object.values(grouped).map((g: any) => {
+              // Sort batches by expiry date (FEFO) - earliest first
+              g.batches.sort((a: any, b: any) => {
+                if (!a.expiry_date) return 1;
+                if (!b.expiry_date) return -1;
+                return new Date(a.expiry_date).getTime() - new Date(b.expiry_date).getTime();
+              });
+              return g;
+            });
+            
+            setSuggestions((prev) => ({ ...prev, [idx]: results }));
           } else {
             const medRes = await medicinesApi.catalog({ q: value });
             const catalogItems = (medRes.data.data ?? []).slice(0, 8).map((m: any) => ({
@@ -1494,35 +1512,39 @@ function WalkInSaleTab() {
               batch_number: 'N/A',
               expiry_date: null,
               stock_qty: 0,
+              total_stock: 0,
+              batches: []
             }));
             setSuggestions((prev) => ({ ...prev, [idx]: catalogItems }));
           }
           setSuggHighlights((p) => ({ ...p, [idx]: -1 }));
-        } catch { /* ignore search errors */ }
+        } catch { /* ignore */ }
       }, 250);
     }
   };
 
-  const selectSuggestion = (idx: number, inv: any) => {
+  const selectSuggestion = (idx: number, group: any) => {
+    // FEFO Selection: pick the first batch with stock_qty > 0, else pick the first batch at all
+    const bestBatch = group.batches?.find((b: any) => b.stock_qty > 0) || group.batches?.[0] || group;
+    
     setItems((prev) => prev.map((it, i) =>
       i === idx ? {
         ...it,
-        medicine_name: inv.medicine_name,
-        unit: inv.unit ?? it.unit,
-        mrp: String(inv.mrp),
-        gst_rate: String(inv.gst_rate ?? 12),
-        discount_type: (inv.discount_type as any) ?? it.discount_type,
-        discount_value: String(inv.discount_value ?? 0),
-        batch_number: inv.batch_number ?? '',
-        expiry_date: inv.expiry_date ?? '',
-        inventory_id: inv.id,
-        stock_qty: inv.stock_qty ?? 0,
+        medicine_name: group.medicine_name,
+        unit: bestBatch.unit ?? it.unit,
+        mrp: String(bestBatch.mrp),
+        gst_rate: String(bestBatch.gst_rate ?? 12),
+        batch_number: bestBatch.batch_number ?? '',
+        expiry_date: bestBatch.expiry_date ?? '',
+        inventory_id: bestBatch.id,
+        stock_qty: bestBatch.stock_qty ?? 0,
+        available_batches: group.batches ?? []
       } : it
     ));
     setSuggestions((prev) => ({ ...prev, [idx]: [] }));
     setSuggHighlights((p) => ({ ...p, [idx]: -1 }));
     setTimeout(() => {
-      if (inv.stock_qty > 0) {
+      if (bestBatch.stock_qty > 0) {
         qtyRefs.current[idx]?.focus();
       } else {
         mrpRefs.current[idx]?.focus();
@@ -1930,31 +1952,34 @@ function WalkInSaleTab() {
                     {suggestions[idx] && suggestions[idx].length > 0 && (
                       <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden min-w-[340px]">
                         <div className="bg-gray-50 px-3 py-1.5 border-b border-gray-100 flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-tight">
-                          <span>Medicine & Batch</span>
-                          <span>Stock | MRP</span>
+                          <span>Medicine</span>
+                          <span>Total Stock | MRP</span>
                         </div>
                         {suggestions[idx].map((s, si) => (
                           <button
-                            key={s.id}
+                            key={s.id || si}
                             type="button"
                             onMouseDown={() => selectSuggestion(idx, s)}
-                            className={`w-full flex items-center justify-between px-3 py-3 text-sm text-left transition-colors border-b border-gray-50 last:border-0 ${si === (suggHighlights[idx] ?? -1) ? 'bg-violet-600 text-white shadow-inner' : 'hover:bg-violet-50'}`}
+                            className={`w-full flex items-center justify-between px-4 py-4 text-sm text-left transition-colors border-b border-gray-50 last:border-0 ${si === (suggHighlights[idx] ?? -1) ? 'bg-violet-600 text-white shadow-inner' : 'hover:bg-violet-50'}`}
                           >
                             <div className="flex flex-col gap-0.5">
-                              <span className={`font-semibold ${si === (suggHighlights[idx] ?? -1) ? 'text-white' : 'text-gray-900'}`}>{s.medicine_name}</span>
+                              <span className={`font-bold text-base ${si === (suggHighlights[idx] ?? -1) ? 'text-white' : 'text-gray-900'}`}>{s.medicine_name}</span>
                               <div className="flex items-center gap-2">
-                                <span className={`text-[10px] px-1 rounded ${si === (suggHighlights[idx] ?? -1) ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'}`}>B: {s.batch_number || 'N/A'}</span>
-                                {s.shop_medicine?.rack_location && (
-                                  <span className={`text-[10px] px-1 rounded ${si === (suggHighlights[idx] ?? -1) ? 'bg-indigo-400 text-white' : 'bg-indigo-50 text-indigo-500 font-bold'}`}>
-                                    📍 {s.shop_medicine?.rack_location}
+                                {s.batches?.length > 0 && (
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${si === (suggHighlights[idx] ?? -1) ? 'bg-white/20 text-white' : 'bg-violet-100 text-violet-600'}`}>
+                                    {s.batches.length} Batches
                                   </span>
                                 )}
-                                {s.expiry_date && <span className={`text-[10px] ${si === (suggHighlights[idx] ?? -1) ? 'text-violet-100' : 'text-orange-600'}`}>E: {fmtDate(s.expiry_date)}</span>}
+                                {s.expiry_date && (
+                                  <span className={`text-[10px] ${si === (suggHighlights[idx] ?? -1) ? 'text-violet-100' : 'text-orange-600'}`}>
+                                    FEFO Exp: {fmtDate(s.expiry_date)}
+                                  </span>
+                                )}
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className={`text-xs font-bold leading-tight ${si === (suggHighlights[idx] ?? -1) ? 'text-white' : s.stock_qty <= 5 ? 'text-red-500' : 'text-emerald-600'}`}>
-                                {s.stock_qty} <span className="font-normal text-[10px] opacity-70">Stocks</span>
+                              <div className={`text-base font-black leading-tight ${si === (suggHighlights[idx] ?? -1) ? 'text-white' : s.total_stock <= 5 ? 'text-red-500' : 'text-emerald-600'}`}>
+                                {s.total_stock ?? s.stock_qty} <span className="font-normal text-[10px] uppercase opacity-70">Strip</span>
                               </div>
                               <div className={`text-sm font-bold ${si === (suggHighlights[idx] ?? -1) ? 'text-white' : 'text-violet-600'}`}>₹{s.mrp}</div>
                             </div>
@@ -1972,8 +1997,35 @@ function WalkInSaleTab() {
                   </div>
                   {/* Batch & Exp */}
                   <div>
-                    <input type="text" placeholder="Batch" value={item.batch_number} onChange={(e) => updateItem(idx, 'batch_number', e.target.value)}
-                      className="w-full border border-gray-200 rounded-lg px-2 h-9 text-[11px] text-gray-900 outline-none focus:border-violet-500 font-mono" />
+                    {item.available_batches && item.available_batches.length > 0 ? (
+                      <select 
+                        value={item.inventory_id} 
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const b = item.available_batches?.find(bb => bb.id === val);
+                          if (b) {
+                            setItems((prev) => prev.map((it, i) => i === idx ? {
+                              ...it,
+                              inventory_id: b.id,
+                              batch_number: b.batch_number,
+                              expiry_date: b.expiry_date,
+                              mrp: String(b.mrp),
+                              stock_qty: b.stock_qty
+                            } : it));
+                          }
+                        }}
+                        className="w-full border border-gray-200 rounded-lg px-1 h-9 text-[11px] text-gray-900 outline-none focus:border-violet-500 font-mono"
+                      >
+                        {item.available_batches.map(b => (
+                          <option key={b.id} value={b.id}>
+                            {b.batch_number} ({b.stock_qty})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input type="text" placeholder="Batch" value={item.batch_number} onChange={(e) => updateItem(idx, 'batch_number', e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg px-2 h-9 text-[11px] text-gray-900 outline-none focus:border-violet-500 font-mono" />
+                    )}
                   </div>
                   <div>
                     <input type="text" placeholder="Exp" value={item.expiry_date ? fmtDate(item.expiry_date) : ''} readOnly
