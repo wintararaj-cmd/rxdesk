@@ -466,7 +466,7 @@ model Medicine {
   strength      String?
   manufacturer  String?
   hsn_code      String?
-  gst_rate      Decimal       @default(12.0) @db.Decimal(5, 2)
+  gst_rate      Decimal       @default(5.0) @db.Decimal(5, 2)
   is_schedule_h Boolean       @default(false)
   is_active     Boolean       @default(true)
   created_at    DateTime      @default(now())
@@ -515,7 +515,7 @@ model ShopInventory {
   expiry_date      DateTime?    @db.Date
   mrp              Decimal      @db.Decimal(10, 2)
   purchase_price   Decimal?     @db.Decimal(10, 2)
-  gst_rate         Decimal      @default(12.0) @db.Decimal(5, 2)
+  gst_rate         Decimal      @default(5.0) @db.Decimal(5, 2)
   stock_qty        Int          @default(0)
   reorder_level    Int          @default(10)
   unit             String       @default("strip")
@@ -582,7 +582,7 @@ model BillItem {
   quantity       Int
   discount_type  DiscountType @default(percentage)
   discount_value Decimal      @default(0) @db.Decimal(10, 2)
-  gst_rate       Decimal      @default(12.0) @db.Decimal(5, 2)
+  gst_rate       Decimal      @default(5.0) @db.Decimal(5, 2)
   line_total     Decimal      @db.Decimal(12, 2)
 
   // Relations

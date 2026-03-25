@@ -207,7 +207,7 @@ export const addInventoryItemSchema = z.object({
   hsn_code: z.string().max(20).optional(),
   unit: z.string().max(20).default('strip'),
   mrp: z.number().min(0),
-  gst_rate: z.number().min(0).max(100).default(12),
+  gst_rate: z.number().min(0).max(100).default(5),
   reorder_level: z.number().int().min(0).default(10),
   discount_type: z.enum(['percentage', 'amount']).default('percentage'),
   discount_value: z.number().min(0).default(0),

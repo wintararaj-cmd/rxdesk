@@ -285,7 +285,30 @@ router.post('/', requireRole('shop_owner'), async (req, res, next) => {
     const shop = await getShopByUser(req.user!.id);
     const data = addInventoryItemSchema.parse(req.body);
     
-    // Ensure parent ShopMedicine exists
+    // 1. If medicine_id is missing, try to link by name
+    let medicine_id = data.medicine_id;
+    let hsn = data.hsn_code;
+    let gst = data.gst_rate;
+
+    if (!medicine_id) {
+      const globalMed = await prisma.medicine.findFirst({
+        where: { name: { equals: data.medicine_name.trim(), mode: 'insensitive' } }
+      });
+      if (globalMed) {
+        medicine_id = globalMed.id;
+        if (!hsn) hsn = globalMed.hsn_code || undefined;
+        if (gst === undefined || gst === 12) gst = Number(globalMed.gst_rate);
+      }
+    } else if (!hsn || !gst) {
+      // If medicine_id is provided, pull HSN/GST if they're missing
+      const globalMed = await prisma.medicine.findUnique({ where: { id: medicine_id } });
+      if (globalMed) {
+        if (!hsn) hsn = globalMed.hsn_code || undefined;
+        if (gst === undefined || gst === 12) gst = Number(globalMed.gst_rate);
+      }
+    }
+
+    // 2. Ensure parent ShopMedicine exists/updated
     const shopMed = await prisma.shopMedicine.upsert({
       where: {
         shop_id_medicine_name_unit: {
@@ -296,22 +319,38 @@ router.post('/', requireRole('shop_owner'), async (req, res, next) => {
       },
       update: {
         rack_location: data.rack_location || undefined,
+        hsn_code: hsn || undefined,
+        medicine_id: medicine_id || undefined,
       },
       create: {
         shop_id: shop.id,
+        medicine_id: medicine_id || undefined,
         medicine_name: data.medicine_name.trim(),
+        hsn_code: hsn || undefined,
         unit: data.unit || 'strip',
         reorder_level: data.reorder_level || 10,
         rack_location: data.rack_location || undefined,
       }
     });
 
+    // 3. Create the batch record
     const item = await prisma.shopInventory.create({
       data: {
         shop_id: shop.id,
         shop_medicine_id: shopMed.id,
-        ...data,
+        medicine_name: data.medicine_name.trim(),
+        hsn_code: hsn || undefined,
+        gst_rate: gst ?? 12,
+        batch_number: data.batch_number,
         expiry_date: data.expiry_date ? new Date(data.expiry_date) : undefined,
+        mrp: data.mrp,
+        purchase_price: data.purchase_price,
+        stock_qty: data.stock_qty,
+        unit: data.unit || 'strip',
+        reorder_level: data.reorder_level || 10,
+        discount_type: data.discount_type,
+        discount_value: data.discount_value,
+        medicine_id: medicine_id || undefined,
       },
     });
     res.status(201).json({ success: true, data: item, message: 'Medicine added to inventory' });

@@ -88,7 +88,7 @@ const EMPTY_ADD_FORM = {
   medicine_name: '',
   reorder_level: '',
   mrp: '',
-  gst_rate: '12',
+  gst_rate: '5',
   hsn_code: '',
   unit: 'strip',
   discount_type: 'percentage',
@@ -103,7 +103,7 @@ const EMPTY_EDIT_FORM = {
   unit: 'strip',
   reorder_level: '',
   mrp: '',
-  gst_rate: '12',
+  gst_rate: '5',
   stock_qty: '',
   purchase_price: '',
   batch_number: '',
@@ -289,6 +289,23 @@ export default function InventoryPage() {
     },
   });
 
+  const [catSuggestionsQuery, setCatSuggestionsQuery] = useState('');
+  const { data: catSuggestions = [] } = useQuery<CatalogMedicine[]>({
+    queryKey: ['medicine-suggestions', catSuggestionsQuery],
+    queryFn: () => medicinesApi.catalog({ q: catSuggestionsQuery, pageSize: 5 }).then((r) => r.data.data),
+    enabled: catSuggestionsQuery.length >= 2,
+  });
+
+  const handleSelectSuggestion = (m: CatalogMedicine) => {
+    setForm({
+      ...form,
+      medicine_name: m.name,
+      hsn_code: m.hsn_code ?? '',
+      gst_rate: String(m.gst_rate ?? 5),
+    });
+    setCatSuggestionsQuery('');
+  };
+
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: object }) => inventoryApi.update(id, data),
     onSuccess: () => {
@@ -354,7 +371,7 @@ export default function InventoryPage() {
       reorder_level: Number(form.reorder_level) || 10,
       rack_location: form.rack_location || '',
       mrp: Number(form.mrp),
-      gst_rate: Number(form.gst_rate) || 12,
+      gst_rate: Number(form.gst_rate) || 5,
       discount_type: form.discount_type,
       discount_value: Number(form.discount_value) || 0,
       // stock starts at 0 — populated via purchase invoices
@@ -371,7 +388,7 @@ export default function InventoryPage() {
       stock_qty: String(item.stock_qty),
       reorder_level: String(item.reorder_level),
       mrp: String(item.mrp),
-      gst_rate: String(item.gst_rate ?? 12),
+      gst_rate: String(item.gst_rate ?? 5),
       purchase_price: item.purchase_price != null ? String(item.purchase_price) : '',
       batch_number: item.batch_number ?? '',
       expiry_date: item.expiry_date ? item.expiry_date.split('T')[0] : '',
@@ -639,16 +656,16 @@ export default function InventoryPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  {['Medicine', 'Generic Name', 'Form', 'Strength', 'Manufacturer', 'GST', 'Sch.H'].map((h) => (
+                  {['Medicine', 'HSN', 'Generic Name', 'Form', 'Strength', 'Manufacturer', 'GST', 'Sch.H'].map((h) => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {catLoading ? (
-                  <tr><td colSpan={7} className="text-center py-12 text-gray-400">Loading…</td></tr>
+                  <tr><td colSpan={8} className="text-center py-12 text-gray-400">Loading…</td></tr>
                 ) : catalogItems.length === 0 ? (
-                  <tr><td colSpan={7} className="text-center py-12 text-gray-400">{catSearch ? 'No results found.' : 'No medicines in catalog.'}</td></tr>
+                  <tr><td colSpan={8} className="text-center py-12 text-gray-400">{catSearch ? 'No results found.' : 'No medicines in catalog.'}</td></tr>
                 ) : catalogItems.map((m) => (
                   <tr key={m.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
@@ -657,6 +674,7 @@ export default function InventoryPage() {
                         <p className="text-gray-400 text-xs">{m.brand_name}</p>
                       )}
                     </td>
+                    <td className="px-4 py-3 text-gray-600">{m.hsn_code ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-600">{m.generic_name ?? '—'}</td>
                     <td className="px-4 py-3">
                       {m.form && (
@@ -665,7 +683,7 @@ export default function InventoryPage() {
                     </td>
                     <td className="px-4 py-3 text-gray-600">{m.strength ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{m.manufacturer ?? '—'}</td>
-                    <td className="px-4 py-3 text-gray-500">{m.gst_rate ?? 12}%</td>
+                    <td className="px-4 py-3 text-gray-500">{m.gst_rate ?? 5}%</td>
                     <td className="px-4 py-3">
                       {m.is_schedule_h ? (
                         <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full font-medium">Yes</span>
@@ -719,39 +737,79 @@ export default function InventoryPage() {
             {ADD_FIELDS.map(({ key, label, type, span, placeholder }) => (
               <div key={key} className={span === 2 ? 'col-span-2' : ''}>
                 <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
-                {type === 'select' && key === 'gst_rate' ? (
-                  <select
-                    className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 bg-white"
-                    value={form.gst_rate}
-                    onChange={(e) => setForm({ ...form, gst_rate: e.target.value })}
-                  >
-                    {GST_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
-                  </select>
-                ) : type === 'select' && key === 'unit' ? (
-                  <select
-                    className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 bg-white"
-                    value={form.unit}
-                    onChange={(e) => setForm({ ...form, unit: e.target.value })}
-                  >
-                    {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-                  </select>
-                ) : type === 'select' && key === 'discount_type' ? (
-                  <select
-                    className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 bg-white"
-                    value={form.discount_type}
-                    onChange={(e) => setForm({ ...form, discount_type: e.target.value as any })}
-                  >
-                    <option value="percentage">Percentage (%)</option>
-                    <option value="amount">Amount (₹)</option>
-                  </select>
-                ) : (
-                  <input
-                    type={type}
-                    placeholder={placeholder}
-                    className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 placeholder:text-gray-300"
-                    value={form[key as keyof typeof EMPTY_ADD_FORM]}
-                    onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-                  />
+                {type === 'select' ? (
+                  key === 'gst_rate' ? (
+                    <select
+                      className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 bg-white"
+                      value={form.gst_rate}
+                      onChange={(e) => setForm({ ...form, gst_rate: e.target.value })}
+                    >
+                      {GST_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
+                    </select>
+                  ) : key === 'unit' ? (
+                    <select
+                      className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 bg-white"
+                      value={form.unit}
+                      onChange={(e) => setForm({ ...form, unit: e.target.value })}
+                    >
+                      {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                    </select>
+                  ) : ( // This 'else' covers 'discount_type'
+                    <select
+                      className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 bg-white"
+                      value={form.discount_type}
+                      onChange={(e) => setForm({ ...form, discount_type: e.target.value as any })}
+                    >
+                      <option value="percentage">Percentage (%)</option>
+                      <option value="amount">Amount (₹)</option>
+                    </select>
+                  )
+                ) : ( // This 'else' covers non-'select' types (the input field)
+                  <div className="relative">
+                    <input
+                      type={type}
+                      placeholder={placeholder}
+                      className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 placeholder:text-gray-300"
+                      value={form[key as keyof typeof EMPTY_ADD_FORM]}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setForm({ ...form, [key]: val });
+                        if (key === 'medicine_name') {
+                          setCatSuggestionsQuery(val);
+                        }
+                      }}
+                      onFocus={() => {
+                        if (key === 'medicine_name' && form.medicine_name.length >= 2) {
+                          setCatSuggestionsQuery(form.medicine_name);
+                        }
+                      }}
+                    />
+                    {key === 'medicine_name' && catSuggestions.length > 0 && catSuggestionsQuery.length >= 2 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                        {catSuggestions.map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            className="w-full text-left px-4 py-2 hover:bg-violet-50 transition-colors group border-b border-gray-50 last:border-0"
+                            onClick={() => handleSelectSuggestion(m)}
+                          >
+                            <div className="flex justify-between items-center text-left">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-gray-900 group-hover:text-violet-700 truncate">{m.name}</p>
+                                <p className="text-[10px] text-gray-400 font-medium uppercase truncate">
+                                  {m.generic_name || 'No Generic'} • {m.form || 'Tab'}
+                                </p>
+                              </div>
+                              <div className="text-right ml-2 shrink-0">
+                                {m.hsn_code && <p className="text-[10px] font-black text-violet-400">HSN: {m.hsn_code}</p>}
+                                <p className="text-[10px] font-bold text-gray-400">{m.gst_rate ?? 5}% GST</p>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             ))}
@@ -792,7 +850,7 @@ export default function InventoryPage() {
                   {type === 'select' && key === 'gst_rate' ? (
                     <select
                       className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 bg-white"
-                      value={editForm.gst_rate ?? '12'}
+                      value={editForm.gst_rate ?? '5'}
                       onChange={(e) => setEditForm({ ...editForm, gst_rate: e.target.value })}
                     >
                       {GST_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
@@ -870,7 +928,7 @@ export default function InventoryPage() {
             ) : (items as any[]).map((item: MasterInventoryItem) => (
               <InventoryMasterRow key={item.id} item={item} onEdit={(it) => {
                 // For edit, we populate a simpler form or handle rack-only update
-                setEditItem({ ...it, stock_qty: it.total_stock, medicine_name: it.medicine_name, gst_rate: 12 } as any);
+                setEditItem({ ...it, stock_qty: it.total_stock, medicine_name: it.medicine_name, gst_rate: 5 } as any);
                 setEditForm({
                    medicine_name: it.medicine_name,
                    rack_location: it.rack_location || '',
