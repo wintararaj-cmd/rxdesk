@@ -923,7 +923,7 @@ function PurchasesTab() {
         purchase_price: String(it.purchase_price),
         mrp: String(it.mrp),
         discount_pct: String(it.discount_pct || 0),
-        gst_rate: String(it.gst_rate || 12),
+        gst_rate: String(it.gst_rate || 5),
         unit: it.unit || 'strip',
         hsn_code: it.hsn_code || '',
         line_total: it.line_total
@@ -981,7 +981,7 @@ function PurchasesTab() {
               medicine_id: m.id,
               medicine_name: m.name,
               mrp: 0,
-              gst_rate: m.gst_rate ?? 12,
+              gst_rate: m.gst_rate ?? 5,
             }));
             setSuggestions((p) => ({ ...p, [idx]: catalogItems }));
           }
@@ -1074,7 +1074,7 @@ function PurchasesTab() {
         purchase_price: Number(it.purchase_price),
         mrp: Number(it.mrp) || Number(it.purchase_price),
         discount_pct: Number(it.discount_pct) || 0,
-        gst_rate: Number(it.gst_rate) || 12,
+        gst_rate: Number(it.gst_rate) || 5,
         hsn_code: it.hsn_code || undefined,
       })),
     };
