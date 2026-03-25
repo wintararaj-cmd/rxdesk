@@ -300,7 +300,7 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
   // Calculate totals
   const itemsWithTotals = input.items.map((item): any => {
     const discountPct = item.discount_pct ?? 0;
-    const gstRate = item.gst_rate ?? 12;
+    const gstRate = item.gst_rate ?? 5;
     const baseTotal = item.purchase_price * item.quantity;
     const discountAmt = baseTotal * (discountPct / 100);
     const taxableVal = baseTotal - discountAmt;
@@ -338,7 +338,7 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
             purchase_price: item.purchase_price,
             mrp: item.mrp,
             discount_pct: item.discount_pct,
-            gst_rate: item.gst_rate,
+            gst_rate: item.gst_rate ?? 5,
             line_total: item.line_total,
           })),
         },
@@ -362,15 +362,17 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
             unit: unit,
           }
         },
-        update: {
-          medicine_id: item.medicine_id || null,
-        },
         create: {
           shop_id: shop.id,
           medicine_id: item.medicine_id || null,
           medicine_name: mName,
           unit: unit,
-        }
+          hsn_code: item.hsn_code,
+        },
+        update: {
+          medicine_id: item.medicine_id || null,
+          hsn_code: item.hsn_code || undefined,
+        },
       });
 
       // 2. Find exact batch match
@@ -422,7 +424,7 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
             mrp: item.mrp,
             purchase_price: item.purchase_price,
             stock_qty: totalQty,
-            gst_rate: item.gst_rate,
+            gst_rate: item.gst_rate ?? 5,
             unit: unit,
             hsn_code: item.hsn_code,
           },
@@ -496,7 +498,7 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
     // 3. New Totals
     const itemsWithTotals = input.items.map((item): any => {
       const discountPct = item.discount_pct ?? 0;
-      const gstRate = item.gst_rate ?? 12;
+      const gstRate = item.gst_rate ?? 5;
       const baseTotal = item.purchase_price * item.quantity;
       const discountAmt = baseTotal * (discountPct / 100);
       const taxableVal = baseTotal - discountAmt;
@@ -532,7 +534,7 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
             purchase_price: item.purchase_price,
             mrp: item.mrp,
             discount_pct: item.discount_pct,
-            gst_rate: item.gst_rate,
+            gst_rate: item.gst_rate ?? 5,
             line_total: item.line_total,
           })),
         },
@@ -556,15 +558,17 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
             unit: unit,
           }
         },
-        update: {
-          medicine_id: item.medicine_id || null,
-        },
         create: {
           shop_id: shop.id,
           medicine_id: item.medicine_id || null,
           medicine_name: mName,
           unit: unit,
-        }
+          hsn_code: item.hsn_code,
+        },
+        update: {
+          medicine_id: item.medicine_id || null,
+          hsn_code: item.hsn_code || undefined,
+        },
       });
 
       // 2. Find exact batch match
@@ -616,7 +620,7 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
             mrp: item.mrp,
             purchase_price: item.purchase_price,
             stock_qty: totalQty,
-            gst_rate: item.gst_rate,
+            gst_rate: item.gst_rate ?? 5,
             unit: unit,
             hsn_code: item.hsn_code,
           },

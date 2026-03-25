@@ -155,6 +155,54 @@ function StatCard({ label, value, sub, icon, trend, color = 'violet', textColor 
   );
 }
 
+function HsnEntryModal({ medicineName, onSave, onCancel }: { medicineName: string; onSave: (hsn: string) => void; onCancel: () => void }) {
+  const [hsn, setHsn] = useState('');
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl p-6 shadow-2xl border border-gray-100 w-full max-w-sm animate-in zoom-in-95 duration-200">
+        <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mb-4">
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-black text-gray-900 mb-1">New Medicine Spotted</h3>
+        <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+          <span className="font-bold text-violet-600">{medicineName}</span> is not in your master catalog. 
+          Please enter the HSN code for accurate GST filing.
+        </p>
+        <div className="space-y-4">
+          <div>
+            <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-1.5 ml-1">HSN Code</label>
+            <input 
+              autoFocus
+              type="text" 
+              value={hsn} 
+              onChange={(e) => setHsn(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && onSave(hsn)}
+              className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-amber-400 shadow-sm transition-all"
+              placeholder="e.g. 300490"
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button 
+              onClick={() => onSave(hsn)}
+              className="flex-1 bg-amber-500 text-white font-bold py-3 rounded-2xl hover:bg-amber-600 transition-all shadow-lg shadow-amber-200 active:scale-95"
+            >
+              Update Record
+            </button>
+            <button 
+              onClick={onCancel}
+              className="px-5 py-3 text-sm font-bold text-gray-400 hover:text-gray-600"
+            >
+              Skip
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── panel tabs ────────────────────────────────────────────────────────────────
 const TABS = ['P&L', 'Expenses', 'Suppliers', 'Purchases', 'Outstandings', 'GST', 'Sale Ret.', 'Pur. Ret.', 'Contra', 'Cashbook', 'Bankbook', 'Settings'] as const;
 type Tab = (typeof TABS)[number];
@@ -788,7 +836,7 @@ function SuppliersTab({ shopGstType }: { shopGstType?: string }) {
 
 const GST_RATES = ['0', '5', '12', '18', '28'];
 const PI_UNITS = ['strip', 'tablet', 'capsule', 'bottle', 'syrup', 'injection', 'vial', 'tube', 'cream', 'ointment', 'sachet', 'packet', 'piece', 'box'];
-const EMPTY_PI_ITEM = { medicine_id: '', medicine_name: '', unit: 'strip', hsn_code: '', batch_number: '', expiry_date: '', quantity: '1', free_qty: '', purchase_price: '', mrp: '', discount_pct: '', gst_rate: '12' };
+const EMPTY_PI_ITEM = { medicine_id: '', medicine_name: '', unit: 'strip', hsn_code: '', batch_number: '', expiry_date: '', quantity: '1', free_qty: '', purchase_price: '', mrp: '', discount_pct: '', gst_rate: '5' };
 type PIItem = typeof EMPTY_PI_ITEM;
 
 function PurchasesTab() {
@@ -822,6 +870,7 @@ function PurchasesTab() {
   const piReceivedDateRef = useRef<HTMLInputElement | null>(null);
   const piNotesRef = useRef<HTMLInputElement | null>(null);
   const [triedToSubmit, setTriedToSubmit] = useState(false);
+  const [activeHsnIdx, setActiveHsnIdx] = useState<number | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -956,6 +1005,12 @@ function PurchasesTab() {
     ));
     setSuggestions((p) => ({ ...p, [idx]: [] }));
     setSuggHighlights((p) => ({ ...p, [idx]: -1 }));
+    
+    // Trigger HSN modal if hsn is missing
+    if (!inv.hsn_code) {
+      setActiveHsnIdx(idx);
+    }
+
     setTimeout(() => {
       if (!piItems[idx].unit) {
         piUnitRefs.current[idx]?.focus();
@@ -1146,13 +1201,29 @@ function PurchasesTab() {
                       <input type="text" placeholder="Search medicine..." value={item.medicine_name}
                         ref={(el) => { piMedRefs.current[idx] = el; }}
                         onChange={(e) => updatePiItem(idx, 'medicine_name', e.target.value)}
+                        onBlur={() => {
+                          setTimeout(() => {
+                            if (item.medicine_name.trim() && !item.medicine_id && !(suggestions[idx]?.length > 0)) {
+                              setActiveHsnIdx(idx);
+                            }
+                            setSuggestions((p) => ({ ...p, [idx]: [] }));
+                          }, 200);
+                        }}
                         onKeyDown={(e) => {
                           const suggs = suggestions[idx] ?? [];
                           const h = suggHighlights[idx] ?? -1;
                           if (e.key === 'ArrowDown') { e.preventDefault(); setSuggHighlights((p) => ({ ...p, [idx]: Math.min(h + 1, suggs.length - 1) })); }
                           else if (e.key === 'ArrowUp') { e.preventDefault(); setSuggHighlights((p) => ({ ...p, [idx]: Math.max(h - 1, 0) })); }
                           else if (e.key === 'Enter' && h >= 0 && suggs[h]) { e.preventDefault(); selectSuggestion(suggs[h], idx); }
-                          else if (e.key === 'Enter' && (h < 0 || suggs.length === 0)) { e.preventDefault(); setSuggestions((p) => ({ ...p, [idx]: [] })); piUnitRefs.current[idx]?.focus(); }
+                          else if (e.key === 'Enter' && (h < 0 || suggs.length === 0)) { 
+                            e.preventDefault(); 
+                            setSuggestions((p) => ({ ...p, [idx]: [] })); 
+                            // If user typed a completely new name (not in suggestions)
+                            if (item.medicine_name.trim() && !item.medicine_id) {
+                              setActiveHsnIdx(idx);
+                            }
+                            piUnitRefs.current[idx]?.focus(); 
+                          }
                           else if (e.key === 'Escape') {
                             setSuggestions((p) => ({ ...p, [idx]: [] }));
                             setSuggHighlights((p) => ({ ...p, [idx]: -1 }));
@@ -1396,6 +1467,17 @@ function PurchasesTab() {
 
       {selectedPurchaseId && (
         <PurchaseDetailModal id={selectedPurchaseId} onClose={() => setSelectedPurchaseId(null)} onEdit={(p) => { setSelectedPurchaseId(null); loadPurchaseForEdit(p); }} />
+      )}
+
+      {activeHsnIdx !== null && (
+        <HsnEntryModal 
+          medicineName={piItems[activeHsnIdx].medicine_name}
+          onSave={(hsn) => {
+            updatePiItem(activeHsnIdx, 'hsn_code', hsn);
+            setActiveHsnIdx(null);
+          }}
+          onCancel={() => setActiveHsnIdx(null)}
+        />
       )}
     </div>
   );
