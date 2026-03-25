@@ -157,6 +157,14 @@ function StatCard({ label, value, sub, icon, trend, color = 'violet', textColor 
 
 function HsnEntryModal({ medicineName, onSave, onCancel }: { medicineName: string; onSave: (hsn: string) => void; onCancel: () => void }) {
   const [hsn, setHsn] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Focus after animation tick
+    const timer = setTimeout(() => inputRef.current?.focus(), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl p-6 shadow-2xl border border-gray-100 w-full max-w-sm animate-in zoom-in-95 duration-200">
@@ -174,11 +182,16 @@ function HsnEntryModal({ medicineName, onSave, onCancel }: { medicineName: strin
           <div>
             <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-1.5 ml-1">HSN Code</label>
             <input 
-              autoFocus
+              ref={inputRef}
               type="text" 
               value={hsn} 
               onChange={(e) => setHsn(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && onSave(hsn)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  onSave(hsn);
+                }
+              }}
               className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-amber-400 shadow-sm transition-all"
               placeholder="e.g. 300490"
             />
@@ -1473,10 +1486,21 @@ function PurchasesTab() {
         <HsnEntryModal 
           medicineName={piItems[activeHsnIdx].medicine_name}
           onSave={(hsn) => {
-            updatePiItem(activeHsnIdx, 'hsn_code', hsn);
+            const idx = activeHsnIdx;
+            updatePiItem(idx, 'hsn_code', hsn);
             setActiveHsnIdx(null);
+            // Re-focus the batch field after modal closes
+            setTimeout(() => {
+              piBatchRefs.current[idx]?.focus();
+            }, 50);
           }}
-          onCancel={() => setActiveHsnIdx(null)}
+          onCancel={() => {
+            const idx = activeHsnIdx;
+            setActiveHsnIdx(null);
+            setTimeout(() => {
+              piBatchRefs.current[idx]?.focus();
+            }, 50);
+          }}
         />
       )}
     </div>
