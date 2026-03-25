@@ -230,9 +230,9 @@ Bill         ─── deducts from ───► ShopInventory
 
 | Plan | Price/Month | Features |
 |---|---|---|
-| **Basic** | ₹499 | 1 doctor link, 50 appointments/month, 2 active sessions, basic billing |
-| **Standard** | ₹999 | 5 doctor links, 250 appointments/month, 5 active sessions, inventory alerts, PDF bills |
-| **Premium** | ₹1,999 | 15 doctor links, unlimited appointments, 10 active sessions, all features, WhatsApp notifications, sales analytics |
+| **Basic** | ₹799 | 1 doctor link, 50 appointments/month, 2 active sessions, basic billing |
+| **Standard** | ₹1,299 | 10 doctor links, 2500 appointments/month, 10 active sessions, inventory alerts, PDF bills |
+| **Premium** | ₹2,299 | 25 doctor links, unlimited appointments, 25 active sessions, all features, WhatsApp notifications, sales analytics |
 | **One-time Onboarding** | ₹999 | Profile setup, training, verification support |
 
 ### Revenue Projections

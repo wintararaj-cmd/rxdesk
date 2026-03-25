@@ -828,9 +828,6 @@ class _MedicineRowState extends State<_MedicineRow> {
                     final batches = (m['batches'] as List).cast<Map<String, dynamic>>();
                     final bestBatch = batches.firstWhere((b) => (b['stock_qty'] ?? 0) > 0, orElse: () => batches[0]);
 
-                    final batches = (m['batches'] as List).cast<Map<String, dynamic>>();
-                    final bestBatch = batches.firstWhere((b) => (b['stock_qty'] ?? 0) > 0, orElse: () => batches[0]);
-
                     widget.item.nameCtrl.text = m['medicine_name'] ?? '';
                     widget.item.mrpCtrl.text  = (bestBatch['mrp'] ?? '').toString();
                     

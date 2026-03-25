@@ -48,7 +48,7 @@ class RoleSelectionScreen extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => LoginScreen(role: title),
+            builder: (context) => const LoginScreen(),
           ),
         );
       },

@@ -55,16 +55,40 @@ async function enforceSessionLimit(userId: string, role: UserRole): Promise<void
   if (!shop) return;
 
   const activePlan = shop.subscriptions[0]?.plan;
-  const maxSessions = activePlan?.max_sessions ?? 5;
+  const maxSessions = activePlan?.max_sessions ?? 2;
   const planName = activePlan?.name ?? 'Basic';
 
   const sessionKeys = await redis.keys(`refresh:${userId}:*`);
   if (sessionKeys.length >= maxSessions) {
-    throw new AppError(
-      403,
-      'SESSION_LIMIT_EXCEEDED',
-      `Your ${planName} plan allows ${maxSessions} active session${maxSessions !== 1 ? 's' : ''}. Please sign out from another device first, or upgrade your plan.`,
-    );
+    /**
+     * AUTO-PRUNING STRATEGY
+     * Instead of blocking login, we automatically remove the oldest session(s).
+     * The oldest session will have the shortest TTL (since all start at 30 days).
+     */
+    try {
+      const ttls = await Promise.all(
+        sessionKeys.map(async (key) => ({ key, ttl: await redis.ttl(key) }))
+      );
+      // Sort by TTL ascending (shortest TTL/oldest session first)
+      const sortedByOldness = ttls.sort((a, b) => a.ttl - b.ttl);
+
+      // Calculate how many sessions to delete to stay at (limit - 1)
+      const countToDelete = Math.max(1, sessionKeys.length - maxSessions + 1);
+      const keysToDelete = sortedByOldness.slice(0, countToDelete).map((item) => item.key);
+
+      await redis.del(...keysToDelete);
+      logger.info(
+        `Session limit reached for user ${userId} (${planName}). Auto-pruned ${keysToDelete.length} stale session(s).`
+      );
+    } catch (err) {
+      logger.error(`Failed to auto-prune session for user ${userId}:`, err);
+      // Fallback: original error if pruning fails
+      throw new AppError(
+        403,
+        'SESSION_LIMIT_EXCEEDED',
+        `Your ${planName} plan allows ${maxSessions} active sessions. Please sign out from another device first, or upgrade your plan.`,
+      );
+    }
   }
 }
 

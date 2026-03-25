@@ -486,7 +486,8 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                             );
                           },
                         ),
-                        if (item['batch_number'].toString().isNotEmpty)
+                      ),
+                      if (item['batch_number'].toString().isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.only(top: 4, left: 4),
                             child: InkWell(
@@ -506,7 +507,6 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                               ),
                             ),
                           ),
-                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         flex: 1,

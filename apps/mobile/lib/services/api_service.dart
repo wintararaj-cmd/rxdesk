@@ -108,6 +108,20 @@ class ApiService {
     final r = await http.get(uri, headers: await _headers());
     return _decode(r);
   }
+
+  static Future<Map<String, dynamic>> getInventoryMaster({String? q}) async {
+    final Map<String, String> params = {};
+    if (q != null && q.isNotEmpty) params['q'] = q;
+    final uri = Uri.parse('$_base/inventory/master').replace(queryParameters: params);
+    final r = await http.get(uri, headers: await _headers());
+    return _decode(r);
+  }
+
+  static Future<List<dynamic>> getMasterBatches(String masterId) async {
+    final uri = Uri.parse('$_base/inventory/master/$masterId/batches');
+    final r = await http.get(uri, headers: await _headers());
+    return (_decode(r)['data'] as List?) ?? [];
+  }
   
   static Future<Map<String, dynamic>> addInventoryItem(Map<String, dynamic> data) async {
     final r = await http.post(Uri.parse('$_base/inventory'),
@@ -117,6 +131,12 @@ class ApiService {
 
   static Future<Map<String, dynamic>> updateInventoryItem(String id, Map<String, dynamic> data) async {
     final r = await http.put(Uri.parse('$_base/inventory/$id'),
+        headers: await _headers(), body: jsonEncode(data));
+    return _decode(r);
+  }
+
+  static Future<Map<String, dynamic>> patchInventoryMaster(String id, Map<String, dynamic> data) async {
+    final r = await http.patch(Uri.parse('$_base/inventory/master/$id'),
         headers: await _headers(), body: jsonEncode(data));
     return _decode(r);
   }
