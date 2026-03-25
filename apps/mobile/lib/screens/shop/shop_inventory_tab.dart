@@ -118,7 +118,8 @@ class _ShopInventoryTabState extends State<ShopInventoryTab> {
                         title: Text(item['medicine_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                         subtitle: Text(
                           'Qty: $stock  |  MRP: ₹${item['mrp'] ?? 0}\n'
-                          'Batch: ${item['batch_number'] ?? 'N/A'}  |  Exp: ${item['expiry_date'] != null ? (item['expiry_date'] as String).split('T')[0] : 'N/A'}',
+                          'Batch: ${item['batch_number'] ?? 'N/A'}  |  Exp: ${item['expiry_date'] != null ? (item['expiry_date'] as String).split('T')[0] : 'N/A'}\n'
+                          'HSN: ${item['hsn_code'] ?? 'N/A'}',
                           style: const TextStyle(fontSize: 11),
                         ),
                         trailing: Row(
@@ -163,6 +164,7 @@ class _ShopInventoryTabState extends State<ShopInventoryTab> {
     final qtyCtrl = TextEditingController();
     final mrpCtrl = TextEditingController();
     final batchCtrl = TextEditingController();
+    final hsnCtrl = TextEditingController();
     
     showDialog(
       context: context,
@@ -178,7 +180,11 @@ class _ShopInventoryTabState extends State<ShopInventoryTab> {
               Expanded(child: TextField(controller: mrpCtrl, decoration: const InputDecoration(labelText: 'MRP'), keyboardType: TextInputType.number)),
             ]),
             const SizedBox(height: 12),
-            TextField(controller: batchCtrl, decoration: const InputDecoration(labelText: 'Batch Number')),
+            Row(children: [
+              Expanded(child: TextField(controller: batchCtrl, decoration: const InputDecoration(labelText: 'Batch Number'))),
+              const SizedBox(width: 12),
+              Expanded(child: TextField(controller: hsnCtrl, decoration: const InputDecoration(labelText: 'HSN Code'))),
+            ]),
           ]),
         ),
         actions: [
@@ -194,6 +200,7 @@ class _ShopInventoryTabState extends State<ShopInventoryTab> {
                   'stock_qty': int.tryParse(qtyCtrl.text) ?? 0,
                   'mrp': double.tryParse(mrpCtrl.text) ?? 0,
                   'batch_number': batchCtrl.text.trim(),
+                  'hsn_code': hsnCtrl.text.trim(),
                 });
                 if (mounted) {
                   Navigator.pop(ctx);
@@ -216,6 +223,7 @@ class _ShopInventoryTabState extends State<ShopInventoryTab> {
     final qtyCtrl = TextEditingController(text: item['stock_qty']?.toString());
     final mrpCtrl = TextEditingController(text: item['mrp']?.toString());
     final batchCtrl = TextEditingController(text: item['batch_number']);
+    final hsnCtrl = TextEditingController(text: item['hsn_code']);
     
     showDialog(
       context: context,
@@ -231,7 +239,11 @@ class _ShopInventoryTabState extends State<ShopInventoryTab> {
               Expanded(child: TextField(controller: mrpCtrl, decoration: const InputDecoration(labelText: 'MRP'), keyboardType: TextInputType.number)),
             ]),
             const SizedBox(height: 12),
-            TextField(controller: batchCtrl, decoration: const InputDecoration(labelText: 'Batch Number')),
+            Row(children: [
+              Expanded(child: TextField(controller: batchCtrl, decoration: const InputDecoration(labelText: 'Batch Number'))),
+              const SizedBox(width: 12),
+              Expanded(child: TextField(controller: hsnCtrl, decoration: const InputDecoration(labelText: 'HSN Code'))),
+            ]),
           ]),
         ),
         actions: [
@@ -244,6 +256,7 @@ class _ShopInventoryTabState extends State<ShopInventoryTab> {
                   'stock_qty': int.tryParse(qtyCtrl.text) ?? 0,
                   'mrp': double.tryParse(mrpCtrl.text) ?? 0,
                   'batch_number': batchCtrl.text.trim(),
+                  'hsn_code': hsnCtrl.text.trim(),
                 });
                 if (mounted) {
                   Navigator.pop(ctx);

@@ -982,10 +982,16 @@ function PurchasesTab() {
       if (value.length < 2) { setSuggestions((p) => ({ ...p, [idx]: [] })); setSuggHighlights((p) => ({ ...p, [idx]: -1 })); return; }
       searchTimers.current[idx] = setTimeout(async () => {
         try {
-          const res = await inventoryApi.list({ q: value, limit: 8 });
+          const res = await inventoryApi.list({ q: value, limit: 15 });
           const invItems = res.data.data ?? [];
           if (invItems.length > 0) {
-            setSuggestions((p) => ({ ...p, [idx]: invItems }));
+            // Group by name for the suggestion dropdown to satisfy user request "show medicine name only not batch wise"
+            const grouped = new Map();
+            invItems.forEach(it => {
+              const key = (it.medicine_name || it.name || '').toLowerCase().trim();
+              if(!grouped.has(key)) grouped.set(key, it);
+            });
+            setSuggestions((p) => ({ ...p, [idx]: Array.from(grouped.values()).slice(0, 8) }));
           } else {
             // Fall back to global medicine catalog for new shops / unknown medicines
             const medRes = await medicinesApi.catalog({ q: value });

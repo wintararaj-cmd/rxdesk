@@ -704,7 +704,7 @@ class _SaleItem {
   String discountType = 'percentage';
 
   final VoidCallback onChanged;
-  List<Map<String, dynamic>> suggestions = [];
+  List<Map<String, dynamic>> availableBatches = [];
   Timer? _debounce;
 
   _SaleItem({required this.onChanged}) {
@@ -719,8 +719,39 @@ class _SaleItem {
     _debounce = Timer(const Duration(milliseconds: 350), () async {
       try {
         final list = await ApiService.searchInventory(q);
-        if (nameCtrl.text != q) return; // Ignore stale result if user changed text or selected an item
-        onResult(list.cast<Map<String, dynamic>>());
+        if (nameCtrl.text != q) return;
+        
+        final invItems = list.cast<Map<String, dynamic>>();
+        
+        // Group by medicine name
+        final Map<String, Map<String, dynamic>> grouped = {};
+        for (var inv in invItems) {
+          final name = (inv['medicine_name'] ?? '').toString().toLowerCase().trim();
+          if (!grouped.containsKey(name)) {
+            grouped[name] = {
+              'medicine_name': inv['medicine_name'],
+              'total_stock': 0,
+              'batches': [],
+            };
+          }
+          grouped[name]!['total_stock'] += (inv['stock_qty'] ?? 0);
+          grouped[name]!['batches'].add(inv);
+        }
+
+        final results = grouped.values.map((g) {
+          final batches = g['batches'] as List;
+          // Sort by expiry (FEFO)
+          batches.sort((a, b) {
+            final expA = a['expiry_date'];
+            final expB = b['expiry_date'];
+            if (expA == null) return 1;
+            if (expB == null) return -1;
+            return expA.toString().compareTo(expB.toString());
+          });
+          return g;
+        }).toList();
+
+        onResult(results);
       } catch (_) { onResult([]); }
     });
   }
@@ -787,30 +818,62 @@ class _MedicineRowState extends State<_MedicineRow> {
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('₹${m['mrp'] ?? 0}  |  Stock: ${m['stock_qty'] ?? 0}',
+                      Text('Total Stock: ${m['total_stock']} | Batches: ${(m['batches'] as List).length}',
                           style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
-                      if (m['batch_number'] != null || m['expiry_date'] != null)
-                        Text('Batch: ${m['batch_number'] ?? 'N/A'}  |  Exp: ${m['expiry_date'] != null ? (m['expiry_date'] as String).split('T')[0] : 'N/A'}',
-                            style: const TextStyle(fontSize: 10, color: Color(0xFF9CA3AF))),
+                      Text('Soonest Exp: ${m['batches'][0]['expiry_date']?.toString().split('T')[0] ?? 'N/A'}',
+                          style: const TextStyle(fontSize: 10, color: Color(0xFF9CA3AF))),
                     ],
                   ),
                   onTap: () {
+                    final batches = (m['batches'] as List).cast<Map<String, dynamic>>();
+                    final bestBatch = batches.firstWhere((b) => (b['stock_qty'] ?? 0) > 0, orElse: () => batches[0]);
+
+                    final batches = (m['batches'] as List).cast<Map<String, dynamic>>();
+                    final bestBatch = batches.firstWhere((b) => (b['stock_qty'] ?? 0) > 0, orElse: () => batches[0]);
+
                     widget.item.nameCtrl.text = m['medicine_name'] ?? '';
-                    widget.item.mrpCtrl.text  = (m['mrp'] ?? '').toString();
+                    widget.item.mrpCtrl.text  = (bestBatch['mrp'] ?? '').toString();
                     
-                    widget.item.inventoryId = m['id'];
-                    widget.item.unit = m['unit'] ?? widget.item.unit;
-                    widget.item.batchNumber = m['batch_number'] ?? '';
-                    widget.item.expiryDate = m['expiry_date'] ?? '';
-                    widget.item.gstRate = (m['gst_rate'] ?? 12).toDouble();
-                    widget.item.discountType = m['discount_type'] ?? widget.item.discountType;
-                    widget.item.discCtrl.text = (m['discount_value'] ?? 0).toString();
+                    widget.item.inventoryId = bestBatch['id'];
+                    widget.item.unit = bestBatch['unit'] ?? widget.item.unit;
+                    widget.item.batchNumber = bestBatch['batch_number'] ?? '';
+                    widget.item.expiryDate = bestBatch['expiry_date'] ?? '';
+                    widget.item.gstRate = (bestBatch['gst_rate'] ?? 12).toDouble();
+                    widget.item.discountType = bestBatch['discount_type'] ?? widget.item.discountType;
+                    widget.item.discCtrl.text = (bestBatch['discount_value'] ?? 0).toString();
+                    widget.item.availableBatches = batches;
 
                     widget.item.onChanged();
                     setState(() => _suggs = []);
-                    FocusScope.of(context).unfocus(); // Unfocus to hide keyboard and clear state if needed
+                    FocusScope.of(context).unfocus(); 
                   },
                 )).toList(),
+              ),
+            ),
+          if (widget.item.batchNumber.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, left: 4),
+              child: InkWell(
+                onTap: () => _showBatchSelector(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.layers_outlined, size: 12, color: Color(0xFF6B7280)),
+                      const SizedBox(width: 4),
+                      Text(
+                        "Batch: ${widget.item.batchNumber}  ▼",
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF374151)),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
         ]),
@@ -865,6 +928,45 @@ class _MedicineRowState extends State<_MedicineRow> {
           ),
         ]),
       ]),
+    );
+  }
+
+  void _showBatchSelector(BuildContext context) {
+    final item = widget.item;
+    if (item.availableBatches.isEmpty) return;
+    
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text("Select Batch", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            ...item.availableBatches.map((b) => ListTile(
+              title: Text("Batch: ${b['batch_number'] ?? 'N/A'}", style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text("Stock: ${b['stock_qty'] ?? 0} | Exp: ${b['expiry_date'] != null ? b['expiry_date'].toString().split('T')[0] : 'N/A'}"),
+              trailing: Text("₹${b['mrp'] ?? 0}", style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
+              selected: item.inventoryId == b['id'],
+              onTap: () {
+                setState(() {
+                  item.batchNumber = b['batch_number'] ?? '';
+                  item.inventoryId = b['id'];
+                  item.mrpCtrl.text = (b['mrp'] ?? 0).toString();
+                  item.expiryDate = b['expiry_date'] ?? '';
+                  item.gstRate = (b['gst_rate'] ?? 12).toDouble();
+                });
+                item.onChanged();
+                Navigator.pop(ctx);
+              },
+            )).toList(),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
     );
   }
 }

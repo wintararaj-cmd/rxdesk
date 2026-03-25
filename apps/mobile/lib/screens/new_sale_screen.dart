@@ -68,7 +68,38 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body)['data'] as List;
-        return data.cast<Map<String, dynamic>>();
+        final invItems = data.cast<Map<String, dynamic>>();
+        
+        // Group by medicine name
+        final Map<String, Map<String, dynamic>> grouped = {};
+        for (var inv in invItems) {
+          final name = (inv['medicine_name'] ?? '').toString().toLowerCase().trim();
+          if (!grouped.containsKey(name)) {
+            grouped[name] = {
+              'medicine_name': inv['medicine_name'],
+              'total_stock': 0,
+              'batches': [],
+              'mrp': inv['mrp'], // fallback
+            };
+          }
+          grouped[name]!['total_stock'] += (inv['stock_qty'] ?? 0);
+          grouped[name]!['batches'].add(inv);
+        }
+
+        final results = grouped.values.map((g) {
+          final batches = g['batches'] as List;
+          // Sort by expiry (FEFO)
+          batches.sort((a, b) {
+            final expA = a['expiry_date'];
+            final expB = b['expiry_date'];
+            if (expA == null) return 1;
+            if (expB == null) return -1;
+            return expA.toString().compareTo(expB.toString());
+          });
+          return g;
+        }).toList();
+
+        return results;
       }
     } catch (_) {}
     return const Iterable.empty();
@@ -103,9 +134,12 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
       mrpCtrl.addListener(_calculateTotals);
 
       _items.add({
-        'medicine_name': nameCtrl, // Keep reference to controller
+        'medicine_name': nameCtrl,
         'qty': qtyCtrl,
         'mrp': mrpCtrl,
+        'batch_number': '',
+        'inventory_id': '',
+        'available_batches': [],
       });
       _calculateTotals();
     });
@@ -135,6 +169,8 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
           "medicine_name": name,
           "mrp": mrp,
           "quantity": qty,
+          "inventory_id": item['inventory_id'],
+          "batch_number": item['batch_number'],
         });
       }
     }
@@ -197,6 +233,44 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
         });
       }
     }
+  }
+
+  void _showBatchSelector(int itemIndex) {
+    final item = _items[itemIndex];
+    final batches = item['available_batches'] as List;
+    
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("Select Batch", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            ...batches.map((b) => ListTile(
+              title: Text("Batch: ${b['batch_number']}"),
+              subtitle: Text("Stock: ${b['stock_qty']} | Exp: ${b['expiry_date']?.toString().split('T')[0] ?? 'N/A'}"),
+              trailing: Text("₹${b['mrp']}", style: const TextStyle(fontWeight: FontWeight.bold)),
+              selected: item['inventory_id'] == b['id'],
+              onTap: () {
+                setState(() {
+                  item['batch_number'] = b['batch_number'] ?? '';
+                  item['inventory_id'] = b['id'] ?? '';
+                  item['mrp'].text = (b['mrp'] ?? 0).toString();
+                });
+                _calculateTotals();
+                Navigator.pop(ctx);
+              },
+            )).toList(),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildSectionTitle(String number, String title, {String? subtitle}) {
@@ -346,10 +420,15 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                           },
                           displayStringForOption: (option) => option['medicine_name'] ?? '',
                           onSelected: (option) {
-                             // Automatically fill MRP when selected
-                             if (option['mrp'] != null) {
-                               item['mrp'].text = option['mrp'].toString();
-                             }
+                             final batches = (option['batches'] as List);
+                             final bestBatch = batches.firstWhere((b) => (b['stock_qty'] ?? 0) > 0, orElse: () => batches[0]);
+                             
+                             setState(() {
+                               item['mrp'].text = (bestBatch['mrp'] ?? 0).toString();
+                               item['batch_number'] = bestBatch['batch_number'] ?? '';
+                               item['inventory_id'] = bestBatch['id'] ?? '';
+                               item['available_batches'] = batches;
+                             });
                              _calculateTotals();
                           },
                           fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
@@ -369,18 +448,33 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                             return Align(
                               alignment: Alignment.topLeft,
                               child: Material(
-                                elevation: 4,
-                                child: SizedBox(
-                                  width: 280,
+                                elevation: 8,
+                                shadowColor: Colors.black45,
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  width: 320,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                   child: ListView.builder(
-                                    padding: const EdgeInsets.all(0),
+                                    padding: EdgeInsets.zero,
                                     shrinkWrap: true,
                                     itemCount: options.length,
                                     itemBuilder: (BuildContext context, int index) {
                                       final option = options.elementAt(index);
+                                      final totalStock = option['total_stock'] ?? 0;
+                                      final batchesCount = (option['batches'] as List).length;
+                                      
                                       return ListTile(
-                                        title: Text(option['medicine_name'] ?? ''),
-                                        subtitle: Text("MRP: ₹${option['mrp'] ?? 0} | Stock: ${option['stock_qty'] ?? 0}"),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                        title: Text(option['medicine_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                        subtitle: Text(
+                                          "Total Stock: $totalStock | $batchesCount Batches\n"
+                                          "Soonest Exp: ${option['batches'][0]['expiry_date']?.toString().split('T')[0] ?? 'N/A'}",
+                                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                        ),
+                                        trailing: Text("₹${option['mrp']}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
                                         onTap: () {
                                           onSelected(option);
                                         },
@@ -392,6 +486,26 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                             );
                           },
                         ),
+                        if (item['batch_number'].toString().isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4, left: 4),
+                            child: InkWell(
+                              onTap: () {
+                                _showBatchSelector(index);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.shade50,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  "Batch: ${item['batch_number']} ▼",
+                                  style: TextStyle(fontSize: 10, color: Colors.blue.shade700, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
