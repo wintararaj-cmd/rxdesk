@@ -1042,6 +1042,26 @@ function PurchasesTab() {
   const addPiItem = () => setPiItems((p) => [...p, { ...EMPTY_PI_ITEM }]);
   const removePiItem = (idx: number) => setPiItems((p) => p.filter((_, i) => i !== idx));
 
+  const clonePiItem = (idx: number) => {
+    const it = piItems[idx];
+    setPiItems((prev) => {
+      const newList = [...prev];
+      // Clone all medicine fields but clear batch, expiry and qty
+      newList.splice(idx + 1, 0, {
+        ...it,
+        batch_number: '',
+        expiry_date: '',
+        quantity: '1',
+        free_qty: '',
+      });
+      return newList;
+    });
+    // Focus batch field of the new row
+    setTimeout(() => {
+      piBatchRefs.current[idx + 1]?.focus();
+    }, 100);
+  };
+
   // Live totals
   const lineTotal = (it: PIItem) => {
     const qty = Number(it.quantity) || 0;
@@ -1198,7 +1218,7 @@ function PurchasesTab() {
 
           {/* Line items */}
           <div>
-            <div className="grid gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-2" style={{ gridTemplateColumns: '2.5fr 1fr 1.5fr 0.8fr 0.8fr 1fr 1fr 0.8fr 1fr 80px 32px' }}>
+            <div className="grid gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-2" style={{ gridTemplateColumns: '2.5fr 1fr 1.5fr 0.8fr 0.8fr 1fr 1fr 0.8fr 1fr 80px 32px 32px' }}>
               <div>Medicine</div>
               <div>Unit</div>
               <div>Batch / Expiry</div>
@@ -1210,11 +1230,12 @@ function PurchasesTab() {
               <div className="text-center">GST%</div>
               <div className="text-right">Line Total</div>
               <div />
+              <div />
             </div>
             <div className="space-y-2">
               {piItems.map((item, idx) => (
                 <div key={idx} className="relative">
-                  <div className="grid gap-2 items-start" style={{ gridTemplateColumns: '2.5fr 1fr 1.5fr 0.8fr 0.8fr 1fr 1fr 0.8fr 1fr 80px 32px' }}>
+                  <div className="grid gap-2 items-start" style={{ gridTemplateColumns: '2.5fr 1fr 1.5fr 0.8fr 0.8fr 1fr 1fr 0.8fr 1fr 80px 32px 32px' }}>
                     {/* Medicine Name with autocomplete */}
                     <div className="relative">
                       <input type="text" placeholder="Search medicine..." value={item.medicine_name}
@@ -1332,6 +1353,12 @@ function PurchasesTab() {
                     </div>
                     <div className="pt-2.5 text-right font-black text-gray-900 text-sm font-mono truncate">
                       {lineTotal(item) > 0 ? fmt(lineTotal(item)) : '—'}
+                    </div>
+                    <div className="pt-2">
+                      <button onClick={() => clonePiItem(idx)} title="Add Multiple Batches"
+                        className="w-8 h-8 rounded-full text-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition-all">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                      </button>
                     </div>
                     <div className="pt-2">
                       <button onClick={() => removePiItem(idx)} disabled={piItems.length === 1}
