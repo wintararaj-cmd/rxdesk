@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { Prisma } from '@prisma/client';
+import * as ExcelJS from 'exceljs';
 import { requireRole } from '../../middleware/auth';
 import { addInventoryItemSchema, updateInventorySchema } from '@rxdesk/shared';
 import prisma from '../../config/database';
@@ -276,6 +277,63 @@ router.get('/expiring', requireRole('shop_owner'), async (req, res, next) => {
     }
 
     res.json({ success: true, data: items });
+  } catch (err) { next(err); }
+});
+
+// GET /inventory/reports/expiry-excel
+router.get('/reports/expiry-excel', requireRole('shop_owner'), async (req, res, next) => {
+  try {
+    const shop = await getShopByUser(req.user!.id);
+    const days = Math.max(1, Math.min(365, req.query.days ? Number(req.query.days) : 90));
+    const now = new Date();
+    const cutoff = new Date(now.getTime() + days * 86_400_000);
+
+    const items = await prisma.shopInventory.findMany({
+      where: {
+        shop_id: shop.id,
+        expiry_date: { not: null, lte: cutoff },
+        stock_qty: { gt: 0 },
+      },
+      orderBy: { expiry_date: 'asc' },
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Expiring Medicines');
+    sheet.columns = [
+      { header: 'Medicine Name', key: 'name', width: 35 },
+      { header: 'Batch Number', key: 'batch', width: 15 },
+      { header: 'Expiry Date', key: 'expiry', width: 15 },
+      { header: 'Qty', key: 'qty', width: 10 },
+      { header: 'Unit', key: 'unit', width: 10 },
+      { header: 'Days Left', key: 'days_left', width: 12 },
+      { header: 'MRP (₹)', key: 'mrp', width: 12 },
+    ];
+
+    items.forEach((i) => {
+      const expiry = i.expiry_date as Date;
+      const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / 86_400_000);
+      sheet.addRow({
+        name: i.medicine_name,
+        batch: i.batch_number,
+        expiry: expiry.toISOString().split('T')[0],
+        qty: i.stock_qty,
+        unit: i.unit,
+        days_left: daysLeft,
+        mrp: Number(i.mrp),
+      });
+    });
+
+    sheet.getRow(1).font = { bold: true };
+    sheet.getRow(1).fill = { 
+        type: 'pattern', 
+        pattern: 'solid', 
+        fgColor: { argb: 'FFEFEFEF' } 
+    };
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=Expiring_Medicines_${days}days.xlsx`);
+    res.send(buffer as any);
   } catch (err) { next(err); }
 });
 

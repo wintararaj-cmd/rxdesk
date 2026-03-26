@@ -2145,8 +2145,27 @@ function OutstandingsTab() {
     );
   }
 
+  const overdueCount = (out?.receivables ?? []).filter((r: any) => r.overdue).length;
+
   return (
     <div className="space-y-6">
+      {overdueCount > 0 && (
+        <div className="bg-rose-50 border border-rose-100 rounded-3xl p-5 flex items-center justify-between animate-in slide-in-from-top-4 duration-500 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-rose-100 rounded-2xl flex items-center justify-center text-rose-600 shadow-inner">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
+            </div>
+            <div>
+              <h4 className="text-rose-900 font-black tracking-tight">Outstanding Alert</h4>
+              <p className="text-rose-600/70 text-xs font-medium uppercase tracking-widest">{overdueCount} customer(s) have not cleared dues in 30+ days.</p>
+            </div>
+          </div>
+          <p className="text-rose-900/40 text-[10px] font-black uppercase tracking-widest mr-4">Action required</p>
+        </div>
+      )}
+
       {/* Search and Summary */}
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative w-full md:w-96 text-gray-900">
@@ -2272,14 +2291,19 @@ function OutstandingsTab() {
               <tbody className="divide-y divide-gray-50">
                 {receivables.map((c: any) => (
                   <Fragment key={c.id}>
-                    <tr onClick={() => toggleExpand(c.id, 'customer')} className={`group cursor-pointer hover:bg-violet-50/30 transition-all ${expandedId === c.id ? 'bg-violet-50/50' : ''}`}>
+                    <tr onClick={() => toggleExpand(c.id, 'customer')} className={`group cursor-pointer transition-all ${c.overdue ? 'bg-rose-50/40 hover:bg-rose-50/60' : 'hover:bg-violet-50/30'} ${expandedId === c.id ? (c.overdue ? 'bg-rose-50' : 'bg-violet-50/50') : ''}`}>
                       <td className="px-5 py-4">
-                        <p className="font-bold text-gray-800 group-hover:text-violet-700 transition-colors">{c.name}</p>
-                        <p className="text-[10px] text-gray-400 font-medium">{c.phone || 'No phone'}</p>
+                        <p className={`font-bold transition-colors ${c.overdue ? 'text-rose-900 group-hover:text-rose-700' : 'text-gray-800 group-hover:text-violet-700'}`}>{c.name}</p>
+                        <p className={`text-[10px] font-medium ${c.overdue ? 'text-rose-400' : 'text-gray-400'}`}>{c.phone || 'No phone'}</p>
                       </td>
                       <td className="px-5 py-4 text-right">
-                        <p className="font-black text-emerald-600">{fmt(c.total_outstanding)}</p>
-                        {c.overdue && <span className="text-[9px] font-black text-rose-500 uppercase tracking-tighter">Overdue</span>}
+                        <p className={`font-black ${c.overdue ? 'text-rose-600' : 'text-emerald-600'}`}>{fmt(c.total_outstanding)}</p>
+                        {c.overdue && (
+                          <div className="flex items-center justify-end gap-1 mt-0.5">
+                            <span className="w-1 h-1 rounded-full bg-rose-500 animate-pulse" />
+                            <span className="text-[9px] font-black text-rose-500 uppercase tracking-tighter">Overdue 30d+</span>
+                          </div>
+                        )}
                       </td>
                        <td className="pr-4 text-gray-300 transition-colors">
                         <div className="flex items-center gap-1">

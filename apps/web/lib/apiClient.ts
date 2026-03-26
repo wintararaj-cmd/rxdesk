@@ -122,6 +122,8 @@ export const inventoryApi = {
   lowStock: () => apiClient.get('/inventory', { params: { low_stock: true } }),
   importBulk: (items: object[]) => apiClient.post('/inventory/import', { items }, { timeout: 120_000 }),
   expiringItems: (days = 90) => apiClient.get('/inventory/expiring', { params: { days } }),
+  exportExpiryExcel: (days = 90) =>
+    apiClient.get('/inventory/reports/expiry-excel', { params: { days }, responseType: 'blob' }),
   stockSupplierReport: (q?: string) => apiClient.get('/inventory/reports/batch-supplier', { params: { q } }),
 };
 

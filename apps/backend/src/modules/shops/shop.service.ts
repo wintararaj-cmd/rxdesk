@@ -179,6 +179,24 @@ export async function getTodayDashboard(userId: string) {
   const lowStockCount = allStock.filter((it) => it.stock_qty <= (it.reorder_level ?? 10)).length;
   const totalInventory = allStock.length;
 
+  // 4. Expiring soon (90 days)
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() + 90);
+  const expiringCount = await prisma.shopInventory.count({
+    where: {
+      shop_id: shop.id,
+      expiry_date: { not: null, lte: cutoff, gte: new Date() },
+      stock_qty: { gt: 0 },
+    },
+  });
+
+  // 5. Customer Outstanding
+  const outstandingResult = await prisma.creditCustomer.aggregate({
+    where: { shop_id: shop.id, total_outstanding: { gt: 0 }, is_active: true },
+    _count: { id: true },
+    _sum: { total_outstanding: true },
+  });
+
   // Combine for both mobile and web frontends
   return {
     shop_id: shop.id,
@@ -190,6 +208,9 @@ export async function getTodayDashboard(userId: string) {
     today_appointments: appointments.length, // Used by web
     pending_bills: pendingBillsCount, // Used by web
     low_stock_count: lowStockCount, // Used by web
+    expiring_count: expiringCount, // New field for dashboard
+    outstanding_count: outstandingResult._count.id, // For alert
+    total_outstanding: Number(outstandingResult._sum.total_outstanding || 0), // For display
     total_inventory: totalInventory, // Used by mobile
   };
 }

@@ -9,7 +9,7 @@ import {
 } from 'recharts';
 import {
   TrendingUp, CalendarDays, Receipt, AlertTriangle,
-  Plus, UserPlus, Package,
+  Plus, UserPlus, Package, Users,
 } from 'lucide-react';
 import { shopApi, appointmentApi, reportsApi } from '../../lib/apiClient';
 import { useAuthStore } from '../../store/authStore';
@@ -34,6 +34,9 @@ interface Dashboard {
   today_appointments: number;
   pending_bills: number;
   low_stock_count: number;
+  expiring_count: number;
+  outstanding_count: number;
+  total_outstanding: number;
 }
 
 interface DailyRevenue { date: string; amount: number; }
@@ -155,10 +158,32 @@ export default function DashboardPage() {
       label: 'Low Stock Items',
       value: dashboard?.low_stock_count ?? 0,
       Icon: AlertTriangle,
-      accent: 'text-red-600',
-      bg: 'bg-red-50',
-      border: 'border-red-100',
-      bar: 'bg-red-500',
+      accent: 'text-rose-600', // Changed to rose for distinction
+      bg: 'bg-rose-50',
+      border: 'border-rose-100',
+      bar: 'bg-rose-500',
+    },
+    {
+      label: 'Expiring Soon',
+      value: dashboard?.expiring_count ?? 0,
+      Icon: Package,
+      accent: 'text-indigo-600',
+      bg: 'bg-indigo-50',
+      border: 'border-indigo-100',
+      bar: 'bg-indigo-500',
+      href: '/dashboard/inventory', 
+    },
+    {
+      label: 'Credit Outstanding',
+      value: fmtRevenue(dashboard?.total_outstanding ?? 0),
+      raw: dashboard?.total_outstanding ?? 0,
+      Icon: Users,
+      accent: 'text-rose-700',
+      bg: 'bg-rose-50',
+      border: 'border-rose-100',
+      bar: 'bg-rose-600',
+      href: '/dashboard/accounting',
+      note: `${dashboard?.outstanding_count ?? 0} customer(s)`,
     },
   ];
 
@@ -196,17 +221,30 @@ export default function DashboardPage() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-7">
-        {stats.map(({ label, value, Icon, accent, bg, border, bar }) => (
-          <div key={label} className={`rounded-2xl border ${border} ${bg} p-5 relative overflow-hidden`}>
-            <div className={`absolute top-0 left-0 w-1 h-full ${bar} rounded-l-2xl`} />
-            <div className={`w-9 h-9 rounded-xl ${bg} border ${border} flex items-center justify-center mb-3 ml-1`}>
-              <Icon className={`w-5 h-5 ${accent}`} />
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 mb-7">
+        {stats.map(({ label, value, Icon, accent, bg, border, bar, href, note }) => {
+          const CardContent = (
+            <div className={`h-full rounded-2xl border ${border} ${bg} p-5 relative overflow-hidden transition-sm hover:shadow-md cursor-default data-active:border-violet-300 ${href ? 'cursor-pointer group/card' : ''}`}>
+              <div className={`absolute top-0 left-0 w-1 h-full ${bar} rounded-l-2xl`} />
+              <div className="flex justify-between items-start">
+                <div className={`w-9 h-9 rounded-xl ${bg} border ${border} flex items-center justify-center mb-3 ml-1`}>
+                  <Icon className={`w-5 h-5 ${accent}`} />
+                </div>
+                {note && <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight bg-white/50 px-2 py-1 rounded-lg border border-gray-100">{note}</span>}
+              </div>
+              <div className={`text-2xl font-bold ml-1 ${accent}`}>{String(value)}</div>
+              <div className="text-xs text-gray-500 font-medium ml-1 mt-1 group-hover/card:text-violet-600 transition-colors">{label}</div>
             </div>
-            <div className={`text-2xl font-bold ml-1 ${accent}`}>{String(value)}</div>
-            <div className="text-xs text-gray-500 font-medium ml-1 mt-1">{label}</div>
-          </div>
-        ))}
+          );
+
+          return href ? (
+            <Link key={label} href={href}>
+              {CardContent}
+            </Link>
+          ) : (
+            <div key={label}>{CardContent}</div>
+          );
+        })}
       </div>
 
       {/* Bottom row: Revenue chart + Queue */}

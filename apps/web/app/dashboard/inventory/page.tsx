@@ -159,13 +159,21 @@ function InventoryMasterRow({ item, onEdit }: { item: MasterInventoryItem; onEdi
           {item.min_mrp === item.max_mrp ? `₹${item.min_mrp.toFixed(2)}` : `₹${item.min_mrp} - ${item.max_mrp}`}
         </td>
         <td className="px-4 py-3 text-sm text-gray-500">
-          {item.nearest_expiry ? (
-            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
-              new Date(item.nearest_expiry).getTime() < new Date().getTime() ? 'bg-red-100 text-red-700' : 'bg-amber-50 text-amber-700'
-            }`}>
-              {new Date(item.nearest_expiry).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' })}
-            </span>
-          ) : '—'}
+          {item.nearest_expiry ? (() => {
+            const expiryDate = new Date(item.nearest_expiry);
+            const daysLeft = Math.ceil((expiryDate.getTime() - new Date().getTime()) / 86400000);
+            const isExpired = daysLeft <= 0;
+            const isCritical = daysLeft <= 30;
+            
+            return (
+              <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                isExpired ? 'bg-red-100 text-red-700' : isCritical ? 'bg-rose-100 text-rose-700' : 'bg-amber-50 text-amber-700'
+              }`}>
+                {expiryDate.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' })}
+                {isCritical && !isExpired && ' (soon)'}
+              </span>
+            );
+          })() : '—'}
         </td>
         <td className="px-4 py-3 text-right">
           <button
@@ -349,6 +357,21 @@ export default function InventoryPage() {
     const d = Math.ceil((new Date(i.expiry_date).getTime() - now.getTime()) / 86_400_000);
     return d > 30 && d <= expiryDays;
   });
+
+  const onExportExpiry = async () => {
+    try {
+      const res = await inventoryApi.exportExpiryExcel(expiryDays);
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Expiring_Medicines_${expiryDays}days.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      alert('Failed to export report');
+    }
+  };
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -549,6 +572,15 @@ export default function InventoryPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <button 
+                onClick={(e) => { e.stopPropagation(); onExportExpiry(); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 text-[11px] font-bold hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
+              >
+                <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+                Export Report
+              </button>
               <div className="flex rounded-lg border border-gray-200 overflow-hidden bg-white text-xs">
                 {[30, 60, 90].map((d) => (
                   <button
