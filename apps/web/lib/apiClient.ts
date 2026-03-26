@@ -109,7 +109,10 @@ export const medicinesApi = {
   search: (q: string) => apiClient.get('/medicines/search', { params: { q } }),
   compositionSearch: (q: string, shopId?: string) =>
     apiClient.get('/medicines/composition-search', { params: { q, ...(shopId ? { shop_id: shopId } : {}) } }),
+  checkAvailability: (name: string, pincode?: string) =>
+    apiClient.get('/medicines/availability', { params: { name, ...(pincode ? { pincode } : {}) } }),
 };
+
 
 export const inventoryApi = {
   list: (params?: { page?: number; q?: string; low_stock?: boolean; limit?: number }) => apiClient.get('/inventory', { params }),
