@@ -257,6 +257,18 @@ export async function seedMedicineCatalog(): Promise<void> {
     },
     data: { gst_rate: 18 }
   });
+
+  // Sync inventory with categorization
+  await prisma.shopInventory.updateMany({
+    where: {
+      gst_rate: { not: 18 },
+      OR: [
+        { medicine_name: { contains: 'vitamin', mode: 'insensitive' } },
+        { medicine_name: { contains: 'multivitamin', mode: 'insensitive' } },
+      ]
+    },
+    data: { gst_rate: 18 }
+  });
 }
 
 // ─── Standalone entrypoint ────────────────────────────────────────────────────
