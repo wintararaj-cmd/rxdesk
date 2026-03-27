@@ -315,7 +315,66 @@ router.post('/broadcast', requireRole('admin'), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// â”€â”€â”€ Sessions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Subscription Plans ───────────────────────────────────────────────────────
+
+// GET /admin/plans — list all plans
+router.get('/plans', requireRole('admin'), async (_req, res, next) => {
+  try {
+    const plans = await prisma.subscriptionPlan.findMany({
+      orderBy: { price_monthly: 'asc' },
+      include: {
+        _count: { select: { subscriptions: true } },
+      },
+    });
+    res.json({ success: true, data: plans });
+  } catch (err) { next(err); }
+});
+
+// POST /admin/plans — create a new plan
+router.post('/plans', requireRole('admin'), async (req, res, next) => {
+  try {
+    const { name, price_monthly, max_doctors, max_appointments_per_month, max_sessions, features } = req.body;
+    if (!name || price_monthly === undefined) {
+      return res.status(400).json({ success: false, error: { message: 'name and price_monthly are required' } });
+    }
+    const plan = await prisma.subscriptionPlan.create({
+      data: {
+        name,
+        price_monthly: parseFloat(price_monthly),
+        max_doctors: parseInt(max_doctors ?? '1'),
+        max_appointments_per_month: parseInt(max_appointments_per_month ?? '50'),
+        max_sessions: parseInt(max_sessions ?? '2'),
+        features: features ?? null,
+        is_active: true,
+      },
+    });
+    await prisma.adminActivityLog.create({ data: { admin_id: req.user!.id, action: 'plan_created', target_type: 'subscription_plan', target_id: plan.id, notes: name } }).catch(() => {});
+    res.status(201).json({ success: true, data: plan });
+  } catch (err) { next(err); }
+});
+
+// PATCH /admin/plans/:id — update plan fields
+router.patch('/plans/:id', requireRole('admin'), async (req, res, next) => {
+  try {
+    const { name, price_monthly, max_doctors, max_appointments_per_month, max_sessions, features, is_active } = req.body;
+    const plan = await prisma.subscriptionPlan.update({
+      where: { id: req.params.id },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(price_monthly !== undefined && { price_monthly: parseFloat(price_monthly) }),
+        ...(max_doctors !== undefined && { max_doctors: parseInt(max_doctors) }),
+        ...(max_appointments_per_month !== undefined && { max_appointments_per_month: parseInt(max_appointments_per_month) }),
+        ...(max_sessions !== undefined && { max_sessions: parseInt(max_sessions) }),
+        ...(features !== undefined && { features }),
+        ...(is_active !== undefined && { is_active }),
+      },
+    });
+    await prisma.adminActivityLog.create({ data: { admin_id: req.user!.id, action: 'plan_updated', target_type: 'subscription_plan', target_id: plan.id, notes: plan.name } }).catch(() => {});
+    res.json({ success: true, data: plan });
+  } catch (err) { next(err); }
+});
+
+// ─── Sessions ─────────────────────────────────────────────────────────────────
 
 router.post('/sessions/flush', requireRole('admin'), async (_req, res, next) => {
   try {

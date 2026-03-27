@@ -1001,6 +1001,7 @@ function PurchasesTab() {
               medicine_name: m.name,
               mrp: 0,
               gst_rate: m.gst_rate ?? 5,
+              hsn_code: m.hsn_code || '',
             }));
             setSuggestions((p) => ({ ...p, [idx]: catalogItems }));
           }

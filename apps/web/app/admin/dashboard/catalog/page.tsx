@@ -168,7 +168,7 @@ export default function AdminMedicineCatalogPage() {
                   <label className="block text-gray-400 text-xs font-medium mb-1.5">GST Rate (%)</label>
                   <select value={form.gst_rate} onChange={e => setForm(p => ({ ...p, gst_rate: Number(e.target.value) }))}
                     className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-rose-500/50">
-                    {[0, 5, 12, 18].map(r => <option key={r} value={r} className="bg-gray-900">{r}%</option>)}
+                    {[0, 5, 12, 18, 28].map(r => <option key={r} value={r} className="bg-gray-900">{r}%</option>)}
                   </select>
                 </div>
                 <div className="flex items-end pb-1">

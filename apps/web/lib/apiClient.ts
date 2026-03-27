@@ -288,6 +288,10 @@ export const adminApi = {
   exportUsersCsvUrl: (role?: string) => `${apiClient.defaults.baseURL}/admin/users/export-csv${role ? `?role=${role}` : ''}`,
   // Subscriptions
   getSubscriptions: (status?: string) => apiClient.get('/admin/subscriptions', { params: { status } }),
+  // Subscription Plans
+  getPlans: () => apiClient.get('/admin/plans'),
+  createPlan: (data: object) => apiClient.post('/admin/plans', data),
+  updatePlan: (id: string, data: object) => apiClient.patch(`/admin/plans/${id}`, data),
   // Medicine Catalog
   getMedicineCatalog: (q?: string, page?: number) => apiClient.get('/admin/medicine-catalog', { params: { q, page } }),
   createMedicine: (data: object) => apiClient.post('/admin/medicine-catalog', data),
