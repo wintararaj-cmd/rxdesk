@@ -2216,13 +2216,21 @@ export async function getBankbook(userId: string, opts: { from: string; to: stri
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function calculateBalanceBefore(shopId: string, date: Date, methods: string[]) {
-  const [inc, exp, sup, sret, contra] = await Promise.all([
+  const [shop, inc, exp, sup, sret, contra] = await Promise.all([
+    prisma.medicalShop.findUnique({ where: { id: shopId }, select: { opening_cash_balance: true, opening_bank_balance: true } }),
     prisma.incomeEntry.aggregate({ where: { shop_id: shopId, payment_method: { in: methods as any }, entry_date: { lt: date } }, _sum: { amount: true } }),
     prisma.expenseEntry.aggregate({ where: { shop_id: shopId, payment_method: { in: methods as any }, entry_date: { lt: date }, linked_purchase_id: null }, _sum: { amount: true } }),
     prisma.supplierPayment.aggregate({ where: { shop_id: shopId, payment_method: { in: methods as any }, payment_date: { lt: date } }, _sum: { amount: true } }),
     prisma.saleReturn.aggregate({ where: { shop_id: shopId, refund_method: { in: methods as any }, return_date: { lt: date } }, _sum: { total_amount: true } }),
-    prisma.contraEntry.findMany({ where: { shop_id: shopId, entry_date: { lt: date }, OR: [{ from_account: { in: methods } }, { to_account: { in: methods } }] } }),
+    prisma.contraEntry.findMany({ where: { shop_id: shopId, entry_date: { lt: date }, OR: [{ from_account: { in: methods as any } }, { to_account: { in: methods as any } }] } }),
   ]);
+
+  if (!shop) return 0;
+
+  // Determine which opening balance to use
+  let baseBalance = 0;
+  if (methods.includes('cash')) baseBalance += Number(shop.opening_cash_balance);
+  if (methods.some(m => ['upi', 'neft', 'cheque', 'card'].includes(m))) baseBalance += Number(shop.opening_bank_balance);
 
   let contraSum = 0;
   for (const c of contra) {
@@ -2230,7 +2238,7 @@ async function calculateBalanceBefore(shopId: string, date: Date, methods: strin
     if (methods.includes(c.to_account)) contraSum += Number(c.amount);
   }
 
-  return (Number(inc._sum.amount) || 0) - (Number(exp._sum.amount) || 0) - (Number(sup._sum.amount) || 0) - (Number(sret._sum.total_amount) || 0) + contraSum;
+  return baseBalance + (Number(inc._sum.amount) || 0) - (Number(exp._sum.amount) || 0) - (Number(sup._sum.amount) || 0) - (Number(sret._sum.total_amount) || 0) + contraSum;
 }
 
 export async function getAccountingStatus(userId: string) {
