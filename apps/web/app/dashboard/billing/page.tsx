@@ -1410,6 +1410,8 @@ function WalkInSaleTab() {
   const discountRefs = useRef<(HTMLInputElement | null)[]>([]);
   const addItemBtnRef = useRef<HTMLButtonElement | null>(null);
   const globalDiscountRef = useRef<HTMLInputElement | null>(null);
+  const paymentMethodRef = useRef<HTMLDivElement | null>(null);
+  const generateBillBtnRef = useRef<HTMLButtonElement | null>(null);
   const [customerHighlight, setCustomerHighlight] = useState(-1);
   const [suggHighlights, setSuggHighlights] = useState<Record<number, number>>({});
   const [triedToSubmit, setTriedToSubmit] = useState(false);
@@ -2147,6 +2149,13 @@ function WalkInSaleTab() {
               placeholder="0"
               value={globalDiscount}
               onChange={(e) => setGlobalDiscount(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  setPaymentMethod('cash');
+                  paymentMethodRef.current?.focus();
+                }
+              }}
               className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
             />
           </div>
@@ -2155,7 +2164,26 @@ function WalkInSaleTab() {
               <span className="w-6 h-6 bg-violet-100 text-violet-600 rounded-full flex items-center justify-center text-xs font-bold">4</span>
               Payment Method
             </h3>
-            <div className="flex flex-wrap gap-1.5">
+            <div 
+              ref={paymentMethodRef}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                const currentIndex = METHODS.findIndex(m => m.id === paymentMethod);
+                if (e.key === 'ArrowRight') {
+                  e.preventDefault();
+                  const nextIndex = (currentIndex + 1) % METHODS.length;
+                  setPaymentMethod(METHODS[nextIndex].id);
+                } else if (e.key === 'ArrowLeft') {
+                  e.preventDefault();
+                  const prevIndex = (currentIndex - 1 + METHODS.length) % METHODS.length;
+                  setPaymentMethod(METHODS[prevIndex].id);
+                } else if (e.key === 'Enter') {
+                  e.preventDefault();
+                  generateBillBtnRef.current?.focus();
+                }
+              }}
+              className="flex flex-wrap gap-1.5 outline-none focus:ring-2 focus:ring-violet-100 rounded-lg p-1"
+            >
               {METHODS.map((m) => (
                 <button
                   key={m.id}
@@ -2210,8 +2238,15 @@ function WalkInSaleTab() {
         )}
 
         <button
+          ref={generateBillBtnRef}
           onClick={handleCreate}
           disabled={createMutation.isPending || calcSubtotal <= 0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleCreate();
+            }
+          }}
           className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white py-3.5 rounded-xl font-semibold text-sm hover:shadow-lg hover:shadow-violet-500/25 disabled:opacity-50 transition-all duration-200 flex items-center justify-center gap-2"
         >
           {createMutation.isPending ? (
