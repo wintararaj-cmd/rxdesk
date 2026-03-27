@@ -357,3 +357,9 @@ export const patientApi = {
   }) => apiClient.post('/appointments', data),
   cancelAppointment: (id: string) => apiClient.patch(`/appointments/${id}/cancel`),
 };
+
+export const notificationApi = {
+  getAll: () => apiClient.get('/notifications'),
+  readAll: () => apiClient.patch('/notifications/read-all'),
+  markRead: (id: string) => apiClient.patch(`/notifications/${id}/read`),
+};

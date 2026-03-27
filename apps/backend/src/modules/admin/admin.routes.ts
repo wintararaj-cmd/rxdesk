@@ -1,4 +1,4 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import { requireRole } from '../../middleware/auth';
 import prisma from '../../config/database';
 import redis from '../../config/redis';
@@ -89,9 +89,9 @@ router.get('/shops', requireRole('admin'), async (req, res, next) => {
     const shops = await prisma.medicalShop.findMany({
       where: {
         ...(status ? { verification_status: status as any } : {}),
-        ...(q ? { OR: [{ shop_name: { contains: q, mode: 'insensitive' } }, { owner_name: { contains: q, mode: 'insensitive' } }, { city: { contains: q, mode: 'insensitive' } }, { owner: { phone: { contains: q } } }] } : {}),
+        ...(q ? { OR: [{ shop_name: { contains: q, mode: 'insensitive' } }, { city: { contains: q, mode: 'insensitive' } }, { owner: { phone: { contains: q } } }] } : {}),
       },
-      include: { owner: { select: { phone: true } }, subscription: { include: { plan: true } } },
+      include: { owner: { select: { phone: true } }, subscriptions: { include: { plan: true }, take: 1, orderBy: { created_at: 'desc' } } },
       orderBy: { created_at: 'desc' },
     });
     res.json({ success: true, data: shops });
@@ -105,7 +105,7 @@ router.get('/shops/:id', requireRole('admin'), async (req, res, next) => {
       where: { id: req.params.id },
       include: {
         owner: { select: { phone: true, created_at: true, is_active: true } },
-        subscription: { include: { plan: true } },
+        subscriptions: { include: { plan: true }, take: 1, orderBy: { created_at: 'desc' } },
         _count: { select: { purchase_entries: true, suppliers: true } },
       },
     });
@@ -236,7 +236,7 @@ router.get('/subscriptions', requireRole('admin'), async (req, res, next) => {
     else if (status === 'expired') { where.OR = [{ status: 'expired' }, { current_period_end: { lt: now } }]; }
     const subs = await prisma.shopSubscription.findMany({
       where,
-      include: { shop: { select: { id: true, shop_name: true, owner_name: true, city: true, owner: { select: { phone: true } } } }, plan: { select: { id: true, name: true, price_monthly: true } } },
+      include: { shop: { select: { id: true, shop_name: true, city: true, owner: { select: { phone: true } } } }, plan: { select: { id: true, name: true, price_monthly: true } } },
       orderBy: { current_period_end: 'asc' },
     });
     res.json({ success: true, data: subs });
@@ -300,6 +300,16 @@ router.post('/broadcast', requireRole('admin'), async (req, res, next) => {
     if (!title || !body) return res.status(400).json({ success: false, error: 'title and body are required' });
     const users = await prisma.user.findMany({ where: { ...(target_role ? { role: target_role as any } : {}), is_active: true }, select: { id: true } });
     await prisma.notification.createMany({ data: users.map(u => ({ user_id: u.id, title, body, type: 'push', category: 'general', is_read: false })), skipDuplicates: true });
+
+    // Real-time broadcast
+    const io = req.app.get('io');
+    if (io) {
+      if (target_role) {
+        io.to(`role:${target_role}`).emit('new_notification');
+      } else {
+        io.emit('new_notification');
+      }
+    }
     await prisma.adminActivityLog.create({ data: { admin_id: req.user!.id, action: 'broadcast', target_type: 'all', target_id: target_role ?? 'all', notes: `"${title}" â†’ ${users.length} users` } }).catch(() => {});
     res.json({ success: true, data: { sent: users.length }, message: `Notification sent to ${users.length} users` });
   } catch (err) { next(err); }
@@ -316,4 +326,5 @@ router.post('/sessions/flush', requireRole('admin'), async (_req, res, next) => 
 });
 
 export default router;
+
 

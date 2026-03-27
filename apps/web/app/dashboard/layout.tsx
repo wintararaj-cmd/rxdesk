@@ -10,6 +10,7 @@ import { authApi, shopApi } from '../../lib/apiClient';
 import { Shortcut, useKeyboardShortcuts } from '../../hooks/useShortcuts';
 import { ShortcutsHelp, ShortcutItem } from '../../components/dashboard/ShortcutsHelp';
 import { Keyboard } from 'lucide-react';
+import { NotificationBell } from '../../components/dashboard/NotificationBell';
 
 const NAV = [
   {
@@ -263,7 +264,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       />
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">{children}</main>
+      <main className="flex-1 overflow-auto flex flex-col">
+        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-gray-200/50 px-8 py-4 flex items-center justify-between">
+          <h2 className="text-sm font-bold text-gray-800">
+            {NAV.find(n => pathname === n.href || (n.href !== '/dashboard' && pathname.startsWith(n.href)))?.label ?? 'Dashboard'}
+          </h2>
+          <div className="flex items-center gap-4">
+            <NotificationBell />
+            <div className="w-px h-4 bg-gray-200" />
+            <div className="flex flex-col items-end">
+              <span className="text-[11px] font-bold text-violet-600 uppercase tracking-tight">Active Session</span>
+              <span className="text-[10px] text-gray-500 font-mono">{user?.phone}</span>
+            </div>
+          </div>
+        </header>
+
+        <div className="p-8 flex-1">
+          {children}
+        </div>
+      </main>
     </div>
   );
 }

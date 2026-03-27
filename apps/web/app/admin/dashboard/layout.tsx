@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -7,6 +7,7 @@ import { useAuthStore } from '../../../store/authStore';
 import { useConfigStore } from '../../../store/configStore';
 import { useQueryClient } from '@tanstack/react-query';
 import { authApi } from '../../../lib/apiClient';
+import { NotificationBell } from '../../../components/dashboard/NotificationBell';
 
 const NAV = [
   { href: '/admin/dashboard', label: 'Overview', icon: (<svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>) },
@@ -28,6 +29,7 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
   const { financialYear, setFinancialYear, getAvailableFYs } = useConfigStore();
   const qc = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
+
   useEffect(() => {
     if (!accessToken) {
       router.replace('/admin/login');
@@ -154,7 +156,9 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-4">
+              <NotificationBell />
+              <div className="w-px h-4 bg-white/[0.06]" />
               <span className="text-xs bg-rose-600/20 text-rose-400 px-2.5 py-1 rounded-full font-medium border border-rose-500/20">
                 ADMIN
               </span>

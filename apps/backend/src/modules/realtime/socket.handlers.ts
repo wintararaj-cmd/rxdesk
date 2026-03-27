@@ -26,6 +26,10 @@ export function registerSocketHandlers(io: Server): void {
     const user = (socket as Socket & { user: { id: string; role: string } }).user;
     logger.debug(`WS connected: ${user.id} (${user.role})`);
 
+    // Automatically join user-specific and role-specific rooms
+    socket.join(`user:${user.id}`);
+    socket.join(`role:${user.role}`);
+
     // Shop panel joins its room to receive queue updates
     socket.on('join_shop', ({ shop_id }: { shop_id: string }) => {
       socket.join(`shop:${shop_id}`);
