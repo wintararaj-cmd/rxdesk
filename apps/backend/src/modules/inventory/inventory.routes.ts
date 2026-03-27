@@ -498,14 +498,14 @@ router.post('/', requireRole('shop_owner'), async (req, res, next) => {
       if (globalMed) {
         medicine_id = globalMed.id;
         if (!hsn) hsn = globalMed.hsn_code || undefined;
-        if (gst === undefined || gst === 12) gst = Number(globalMed.gst_rate);
+        if (gst === undefined || gst === 12 || gst === 5) gst = Number(globalMed.gst_rate);
       }
     } else if (!hsn || !gst) {
       // If medicine_id is provided, pull HSN/GST if they're missing
       const globalMed = await prisma.medicine.findUnique({ where: { id: medicine_id } });
       if (globalMed) {
         if (!hsn) hsn = globalMed.hsn_code || undefined;
-        if (gst === undefined || gst === 12) gst = Number(globalMed.gst_rate);
+        if (gst === undefined || gst === 12 || gst === 5) gst = Number(globalMed.gst_rate);
       }
     }
 
@@ -541,7 +541,7 @@ router.post('/', requireRole('shop_owner'), async (req, res, next) => {
         shop_medicine_id: shopMed.id,
         medicine_name: data.medicine_name.trim(),
         hsn_code: hsn || undefined,
-        gst_rate: gst ?? 12,
+        gst_rate: gst ?? 5,
         batch_number: data.batch_number,
         expiry_date: data.expiry_date ? new Date(data.expiry_date) : undefined,
         mrp: data.mrp,
@@ -704,7 +704,7 @@ router.post('/import', requireRole('shop_owner'), async (req, res, next) => {
         stock_qty:      Number(row.stock_qty ?? row.stock ?? row.quantity ?? 0),
         purchase_price: row.purchase_price != null ? Number(row.purchase_price) : undefined,
         batch_number:   row.batch_number   ? String(row.batch_number).trim() : undefined,
-        gst_rate:       row.gst_rate       != null ? Number(row.gst_rate)    : 12,
+        gst_rate:       row.gst_rate       != null ? Number(row.gst_rate)    : 5,
         reorder_level:  row.reorder_level  != null ? Number(row.reorder_level) : 10,
         unit:           row.unit           ? String(row.unit).trim()          : 'strip',
         hsn_code:       row.hsn_code       ? String(row.hsn_code).trim()      : undefined,

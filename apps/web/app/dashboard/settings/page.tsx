@@ -26,6 +26,8 @@ interface ShopProfile {
   show_hsn_code: boolean;
   show_batch_no: boolean;
   printer_type: 'thermal' | 'a4';
+  opening_cash_balance: number;
+  opening_bank_balance: number;
   owner?: { phone: string };
 }
 
@@ -196,6 +198,8 @@ export default function SettingsPage() {
       contact_email: shop?.contact_email ?? '',
       gst_type: shop?.gst_type ?? 'unregistered',
       gst_number: shop?.gst_number ?? '',
+      opening_cash_balance: shop?.opening_cash_balance ?? 0,
+      opening_bank_balance: shop?.opening_bank_balance ?? 0,
     };
 
   const updateMutation = useMutation({
@@ -494,6 +498,10 @@ export default function SettingsPage() {
               <Field label="Phone" field="contact_phone" placeholder="Contact number" form={activeForm} onChange={handleChange} />
             </div>
             <Field label="Email" field="contact_email" type="email" placeholder="shop@example.com" form={activeForm} onChange={handleChange} />
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Opening Cash Balance" field="opening_cash_balance" type="number" placeholder="0" form={activeForm} onChange={handleChange} />
+              <Field label="Opening Bank Balance" field="opening_bank_balance" type="number" placeholder="0" form={activeForm} onChange={handleChange} />
+            </div>
 
             {/* GST Settings */}
             <div className="border border-gray-200 rounded-xl p-4 space-y-4">

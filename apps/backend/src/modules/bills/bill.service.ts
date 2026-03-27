@@ -166,7 +166,7 @@ export async function generateBillFromPrescription(
         quantity: extra.quantity,
         discount_type: 'percentage',
         discount_value: 0,
-        gst_rate: isTaxInvoice ? (extra.gst_rate ?? 12) : 0,
+        gst_rate: isTaxInvoice ? (extra.gst_rate ?? 5) : 0,
         line_total: extra.mrp * extra.quantity,
       });
     }
@@ -293,7 +293,7 @@ export async function createManualBill(
           quantity: take,
           discount_type: itemDiscountType,
           discount_value: itemDiscountValue,
-          gst_rate: isTaxInvoice ? (item.gst_rate ?? 12) : 0,
+          gst_rate: isTaxInvoice ? (item.gst_rate ?? 5) : 0,
           line_total: (item.mrp * take) - discAmt,
         });
         remainingQty -= take;
@@ -330,7 +330,7 @@ export async function createManualBill(
           quantity: take,
           discount_type: itemDiscountType,
           discount_value: itemDiscountValue,
-          gst_rate: isTaxInvoice ? (item.gst_rate ?? 12) : 0,
+          gst_rate: isTaxInvoice ? (item.gst_rate ?? 5) : 0,
           line_total: (item.mrp * take) - discAmt,
         });
         remainingQty -= take;
@@ -351,7 +351,7 @@ export async function createManualBill(
         quantity: remainingQty,
         discount_type: itemDiscountType,
         discount_value: itemDiscountValue,
-        gst_rate: isTaxInvoice ? (item.gst_rate ?? 12) : 0,
+        gst_rate: isTaxInvoice ? (item.gst_rate ?? 5) : 0,
         line_total: (item.mrp * remainingQty) - discAmt,
       });
     }

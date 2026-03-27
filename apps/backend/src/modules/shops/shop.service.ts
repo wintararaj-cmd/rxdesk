@@ -22,13 +22,20 @@ export async function registerShop(
     opening_time?: string;
     closing_time?: string;
     working_days?: string[];
+    opening_cash_balance?: number;
+    opening_bank_balance?: number;
   }
 ) {
   const existing = await prisma.medicalShop.findFirst({ where: { owner_user_id: userId } });
   if (existing) throw new AppError(409, 'DUPLICATE_BOOKING', 'You already have a registered shop');
 
   const shop = await prisma.medicalShop.create({
-    data: { owner_user_id: userId, ...data },
+    data: { 
+      owner_user_id: userId, 
+      opening_cash_balance: data.opening_cash_balance ?? 0,
+      opening_bank_balance: data.opening_bank_balance ?? 0,
+      ...data 
+    },
   });
 
   // Update user role to shop_owner
@@ -253,6 +260,8 @@ export async function updateShop(
     show_hsn_code?: boolean;
     show_batch_no?: boolean;
     printer_type?: 'thermal' | 'a4';
+    opening_cash_balance?: number;
+    opening_bank_balance?: number;
   }
 ) {
   const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });
@@ -283,6 +292,8 @@ export async function updateShop(
       ...(data.show_hsn_code !== undefined && { show_hsn_code: data.show_hsn_code }),
       ...(data.show_batch_no !== undefined && { show_batch_no: data.show_batch_no }),
       ...(data.printer_type !== undefined && { printer_type: data.printer_type }),
+      ...(data.opening_cash_balance !== undefined && { opening_cash_balance: data.opening_cash_balance }),
+      ...(data.opening_bank_balance !== undefined && { opening_bank_balance: data.opening_bank_balance }),
     },
   });
 }

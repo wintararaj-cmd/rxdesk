@@ -439,7 +439,7 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
         category: 'medicine_purchase',
         description: `Purchase from ${input.supplier_id ? 'supplier' : 'unregistered supplier'} — ${input.invoice_number ?? pe.id}`,
         amount: totalAmount,
-        payment_method: 'cash',
+        payment_method: 'credit',
         entry_date: new Date(input.received_date ?? input.invoice_date),
         linked_purchase_id: pe.id,
         created_by: userId,

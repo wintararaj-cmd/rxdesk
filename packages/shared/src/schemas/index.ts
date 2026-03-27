@@ -127,6 +127,8 @@ export const createShopSchema = z.object({
   show_hsn_code: z.boolean().default(true),
   show_batch_no: z.boolean().default(true),
   printer_type: z.enum(['thermal', 'a4']).default('thermal'),
+  opening_cash_balance: z.coerce.number().min(0).default(0).optional(),
+  opening_bank_balance: z.coerce.number().min(0).default(0).optional(),
 });
 
 export const updateInvoiceSettingsSchema = invoiceSettingsSchema;

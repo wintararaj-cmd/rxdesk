@@ -132,6 +132,7 @@ enum AccountingPaymentMethod {
   neft
   cheque
   card
+  credit
 }
 
 enum IncomeEntryType {
