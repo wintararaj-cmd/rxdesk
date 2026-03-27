@@ -2128,8 +2128,9 @@ export async function getCashbook(userId: string, opts: { from: string; to: stri
     prisma.saleReturn.findMany({ where: { shop_id: shop.id, refund_method: 'cash', return_date: dateFilter }, orderBy: { return_date: 'asc' } }),
     prisma.contraEntry.findMany({ where: { shop_id: shop.id, entry_date: dateFilter }, orderBy: { entry_date: 'asc' } }),
   ]);
+
   const lines: LedgerLine[] = [];
-  for (const e of income) lines.push({ date: e.entry_date.toISOString().slice(0, 10), type: 'income', narration: `Sales / ${e.entry_type}`, debit: 0, credit: Number(e.amount), method: 'cash' });
+  for (const e of income) lines.push({ date: e.entry_date.toISOString().slice(0, 10), type: 'income', narration: `${e.entry_type === 'sale_income' ? 'Sale' : 'Income'}${e.notes ? ' — ' + e.notes : ''}`, debit: 0, credit: Number(e.amount), method: 'cash' });
   for (const e of expenses) lines.push({ date: e.entry_date.toISOString().slice(0, 10), type: 'expense', narration: `Expense: ${e.category}${e.description ? ' — ' + e.description : ''}`, debit: Number(e.amount), credit: 0, method: 'cash' });
   for (const p of supplierPay) lines.push({ date: p.payment_date.toISOString().slice(0, 10), type: 'supplier_payment', narration: `Supplier Payment${p.supplier ? ' — ' + p.supplier.name : ''}`, debit: Number(p.amount), credit: 0, method: 'cash' });
   for (const r of saleRets) lines.push({ date: r.return_date.toISOString().slice(0, 10), type: 'sale_return', narration: `Sale Return ${r.return_number}${r.customer_name ? ' — ' + r.customer_name : ''}`, debit: Number(r.total_amount), credit: 0, method: 'cash' });
@@ -2147,16 +2148,19 @@ export async function getBankbook(userId: string, opts: { from: string; to: stri
   const shop = await getShopOrThrow(userId);
   const dateFilter = { gte: new Date(opts.from), lte: new Date(opts.to) };
   const bankMethods: any[] = opts.method ? [opts.method] : ['upi', 'neft', 'cheque', 'card'];
-  const [income, expenses, supplierPay, contras] = await Promise.all([
+  const [income, expenses, supplierPay, saleRets, contras] = await Promise.all([
     prisma.incomeEntry.findMany({ where: { shop_id: shop.id, payment_method: { in: bankMethods }, entry_date: dateFilter }, orderBy: { entry_date: 'asc' } }),
     prisma.expenseEntry.findMany({ where: { shop_id: shop.id, payment_method: { in: bankMethods }, entry_date: dateFilter, linked_purchase_id: null }, orderBy: { entry_date: 'asc' } }),
     prisma.supplierPayment.findMany({ where: { shop_id: shop.id, payment_method: { in: bankMethods }, payment_date: dateFilter }, include: { supplier: { select: { name: true } } }, orderBy: { payment_date: 'asc' } }),
+    prisma.saleReturn.findMany({ where: { shop_id: shop.id, refund_method: { in: bankMethods }, return_date: dateFilter }, orderBy: { return_date: 'asc' } }),
     prisma.contraEntry.findMany({ where: { shop_id: shop.id, entry_date: dateFilter }, orderBy: { entry_date: 'asc' } }),
   ]);
+
   const lines: LedgerLine[] = [];
-  for (const e of income) lines.push({ date: e.entry_date.toISOString().slice(0, 10), type: 'income', narration: `Sales / ${e.entry_type}`, debit: 0, credit: Number(e.amount), method: e.payment_method });
+  for (const e of income) lines.push({ date: e.entry_date.toISOString().slice(0, 10), type: 'income', narration: `${e.entry_type === 'sale_income' ? 'Sale' : 'Income'}${e.notes ? ' — ' + e.notes : ''}`, debit: 0, credit: Number(e.amount), method: e.payment_method });
   for (const e of expenses) lines.push({ date: e.entry_date.toISOString().slice(0, 10), type: 'expense', narration: `Expense: ${e.category}${e.description ? ' — ' + e.description : ''}`, debit: Number(e.amount), credit: 0, method: e.payment_method });
   for (const p of supplierPay) lines.push({ date: p.payment_date.toISOString().slice(0, 10), type: 'supplier_payment', narration: `Supplier Payment${p.supplier ? ' — ' + p.supplier.name : ''}`, debit: Number(p.amount), credit: 0, method: p.payment_method });
+  for (const r of saleRets) lines.push({ date: r.return_date.toISOString().slice(0, 10), type: 'sale_return', narration: `Sale Return ${r.return_number}${r.customer_name ? ' — ' + r.customer_name : ''}`, debit: Number(r.total_amount), credit: 0, method: r.refund_method as any });
   for (const c of contras) {
     if (bankMethods.includes(c.from_account)) lines.push({ date: c.entry_date.toISOString().slice(0, 10), type: 'contra', narration: `Contra: ${c.from_account} → ${c.to_account}${c.description ? ' — ' + c.description : ''}`, debit: Number(c.amount), credit: 0, method: String(c.from_account) });
     if (bankMethods.includes(c.to_account)) lines.push({ date: c.entry_date.toISOString().slice(0, 10), type: 'contra', narration: `Contra: ${c.from_account} → ${c.to_account}${c.description ? ' — ' + c.description : ''}`, debit: 0, credit: Number(c.amount), method: String(c.to_account) });
