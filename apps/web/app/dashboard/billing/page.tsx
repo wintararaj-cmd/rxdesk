@@ -163,7 +163,7 @@ function printA4Invoice(bill: BillData, shopData: any) {
     ${shopAddress ? `<p style="color:#4b5563;font-size:13px">${shopAddress}</p>` : ''}
     <div style="font-size:12px;color:#4b5563;margin-top:8px;display:flex;justify-content:center;gap:20px">
       ${shopPhone ? `<span><b>Phone:</b> ${shopPhone}</span>` : ''}
-      ${shopGst && isTax ? `<span><b>GSTIN:</b> ${shopGst}</span>` : ''}
+      ${shopGst && shopData?.gst_type === 'regular' ? `<span><b>GSTIN:</b> ${shopGst}</span>` : ''}
       ${drugLicense ? `<span><b>DL No:</b> ${drugLicense}</span>` : ''}
     </div>
   </div>
@@ -179,6 +179,7 @@ function printA4Invoice(bill: BillData, shopData: any) {
         <div><b>Bill To:</b> ${displayName}</div>
         ${displayPhone ? `<div>Ph: ${displayPhone}</div>` : ''}
         ${customerGstin ? `<div>GSTIN: <b>${customerGstin}</b></div>` : ''}
+        ${customerGstin && bill.billing_state ? `<div>Place of Supply: <b>${bill.billing_state}</b></div>` : ''}
         ${customerAddress ? `<div>Add: ${customerAddress}</div>` : ''}
       </div>
     </div>
@@ -237,6 +238,7 @@ function printA4Invoice(bill: BillData, shopData: any) {
   </div>
 </body></html>`;
 
+
   const w = window.open('', '_blank');
   if (!w) return;
   w.document.write(html);
@@ -276,6 +278,10 @@ function printThermalReceipt(bill: BillData, shopData: any) {
       <td style="text-align:right;padding:2px 0;white-space:nowrap">${cur(Number(it.mrp) * it.quantity)}</td>
     </tr>`
   ).join('');
+  const shopAddress = [shopData?.address_line, shopData?.city].filter(Boolean).join(', ');
+  const shopPhone = shopData?.contact_phone;
+  const shopGst = shopData?.gst_number;
+
   const html = `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>${bill.bill_number}</title>
 <style>
@@ -289,6 +295,9 @@ function printThermalReceipt(bill: BillData, shopData: any) {
   .tot td{border-top:1px solid #000;padding-top:3px;font-weight:bold;font-size:13px}
 </style></head><body>
 <div class="c b" style="font-size:14px">${shopName}</div>
+${shopAddress ? `<div class="c" style="font-size:9px;margin-top:2px">${shopAddress}</div>` : ''}
+${shopPhone ? `<div class="c" style="font-size:9px">Ph: ${shopPhone}</div>` : ''}
+${shopGst && shopData?.gst_type === 'regular' ? `<div class="c" style="font-size:9px">GSTIN: ${shopGst}</div>` : ''}
 <div class="c" style="font-size:9px;margin:2px 0">${date}</div>
 <div class="div"></div>
 <div class="c b" style="font-size:10px;letter-spacing:1px;margin:3px 0">${invoiceLabel}</div>
@@ -296,6 +305,8 @@ function printThermalReceipt(bill: BillData, shopData: any) {
 <div><b>Bill:</b> ${bill.bill_number}</div>
 <div><b>Customer:</b> ${displayName}</div>
 ${bill.customer_phone ? `<div><b>Phone:</b> ${bill.customer_phone}</div>` : ''}
+${customerGstin ? `<div><b>GSTIN:</b> ${customerGstin}</div>` : ''}
+${customerGstin && bill.billing_state ? `<div><b>Place of Supply:</b> ${bill.billing_state}</div>` : ''}
 <div class="div"></div>
 <table>
   <thead><tr>
@@ -323,6 +334,7 @@ ${bill.customer_phone ? `<div><b>Phone:</b> ${bill.customer_phone}</div>` : ''}
 ${shopData?.gst_type === 'composite' ? `<div class="c b" style="margin-top:3px;font-size:8px">Composition taxable person,<br/>not eligible to collect tax on supplies</div>` : ''}
 <div class="c" style="font-size:9px;margin-top:2px">Powered by RxDesk</div>
 </body></html>`;
+
   const w = window.open('', '_blank', 'width=440,height=680');
   if (!w) return;
   w.document.write(html);
@@ -351,6 +363,7 @@ function sendWhatsApp(bill: BillData, shopName = 'Medical Shop', shopData?: any)
   msg += `📅 Date: ${date}\n`;
   msg += `👤 Customer: ${displayName}\n`;
   if (customerGstin) msg += `🆔 GSTIN: ${customerGstin}\n`;
+  if (customerGstin && bill.billing_state) msg += `📍 Place of Supply: ${bill.billing_state}\n`;
   if (bill.customer_phone) msg += `📞 Phone: ${bill.customer_phone}\n`;
   msg += `\n*Items:*\n${itemLines}\n\n`;
   msg += `Subtotal: ${cur(bill.subtotal)}\n`;
