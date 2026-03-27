@@ -40,6 +40,8 @@ app.use(
     origin: [
       env.FRONTEND_URL,
       ...(env.FRONTEND_URL_LAN ? [env.FRONTEND_URL_LAN] : []),
+      'https://rxdesk.in',
+      'https://www.rxdesk.in',
       'http://localhost:3001',
       'http://localhost:3002',
       'http://localhost:19006',
