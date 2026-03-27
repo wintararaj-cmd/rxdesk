@@ -72,7 +72,7 @@ async function bootstrap(): Promise<void> {
     logger.info('Database: Connected');
 
     // Start schedulers
-
+    
     server.listen(env.PORT, () => {
       logger.info(`🚀 RxDesk API running on port ${env.PORT} [${env.NODE_ENV}]`);
       logger.info(`   API  → http://localhost:${env.PORT}/api/v1`);

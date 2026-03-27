@@ -1744,10 +1744,11 @@ export async function getGstSummary(userId: string, month: number, year: number)
 export async function getDailyCashRegister(userId: string, date: string) {
   const shop = await getShopOrThrow(userId);
   const registerDate = new Date(date);
+  registerDate.setHours(0, 0, 0, 0);
   const nextDay = new Date(registerDate);
   nextDay.setDate(nextDay.getDate() + 1);
 
-  const [existing, cashSales, cashExpenses, cashSupplierPaid] = await Promise.all([
+  const [existing, cashSales, cashExpenses, cashSupplierPaid, cashReturns, contras] = await Promise.all([
     prisma.dailyCashRegister.findUnique({ where: { shop_id_register_date: { shop_id: shop.id, register_date: registerDate } } }),
     prisma.incomeEntry.aggregate({
       where: { shop_id: shop.id, payment_method: 'cash', entry_date: { gte: registerDate, lt: nextDay } },
@@ -1761,13 +1762,27 @@ export async function getDailyCashRegister(userId: string, date: string) {
       where: { shop_id: shop.id, payment_method: 'cash', payment_date: { gte: registerDate, lt: nextDay } },
       _sum: { amount: true },
     }),
+    prisma.saleReturn.aggregate({
+      where: { shop_id: shop.id, refund_method: 'cash', return_date: { gte: registerDate, lt: nextDay } },
+      _sum: { total_amount: true },
+    }),
+    prisma.contraEntry.findMany({
+      where: { shop_id: shop.id, entry_date: { gte: registerDate, lt: nextDay }, OR: [{ from_account: 'cash' }, { to_account: 'cash' }] },
+    }),
   ]);
+
+  let contraNet = 0;
+  for (const c of contras) {
+    if (c.from_account === 'cash') contraNet -= Number(c.amount);
+    if (c.to_account === 'cash') contraNet += Number(c.amount);
+  }
 
   const cashSalesTotal = Number(cashSales._sum.amount ?? 0);
   const cashExpensesTotal = Number(cashExpenses._sum.amount ?? 0);
   const cashSupplierTotal = Number(cashSupplierPaid._sum.amount ?? 0);
+  const cashReturnsTotal = Number(cashReturns._sum.total_amount ?? 0);
   const openingBalance = Number(existing?.opening_balance ?? 0);
-  const expectedClosing = openingBalance + cashSalesTotal - cashExpensesTotal - cashSupplierTotal;
+  const expectedClosing = openingBalance + cashSalesTotal - cashExpensesTotal - cashSupplierTotal - cashReturnsTotal + contraNet;
 
   return {
     register_date: date,
@@ -1777,6 +1792,8 @@ export async function getDailyCashRegister(userId: string, date: string) {
       cash_sales_total: cashSalesTotal,
       cash_expenses_total: cashExpensesTotal,
       cash_supplier_paid: cashSupplierTotal,
+      cash_returns_total: cashReturnsTotal,
+      contra_net: contraNet,
       expected_closing_balance: Math.round(expectedClosing * 100) / 100,
     },
   };
@@ -1785,10 +1802,11 @@ export async function getDailyCashRegister(userId: string, date: string) {
 export async function closeCashRegister(userId: string, date: string, actual_closing_bal: number, notes?: string) {
   const shop = await getShopOrThrow(userId);
   const registerDate = new Date(date);
+  registerDate.setHours(0, 0, 0, 0);
   const nextDay = new Date(registerDate);
   nextDay.setDate(nextDay.getDate() + 1);
 
-  const [cashSales, cashExpenses, cashSupplierPaid] = await Promise.all([
+  const [cashSales, cashExpenses, cashSupplierPaid, cashReturns, contras] = await Promise.all([
     prisma.incomeEntry.aggregate({
       where: { shop_id: shop.id, payment_method: 'cash', entry_date: { gte: registerDate, lt: nextDay } },
       _sum: { amount: true },
@@ -1801,20 +1819,36 @@ export async function closeCashRegister(userId: string, date: string, actual_clo
       where: { shop_id: shop.id, payment_method: 'cash', payment_date: { gte: registerDate, lt: nextDay } },
       _sum: { amount: true },
     }),
+    prisma.saleReturn.aggregate({
+      where: { shop_id: shop.id, refund_method: 'cash', return_date: { gte: registerDate, lt: nextDay } },
+      _sum: { total_amount: true },
+    }),
+    prisma.contraEntry.findMany({
+      where: { shop_id: shop.id, entry_date: { gte: registerDate, lt: nextDay }, OR: [{ from_account: 'cash' }, { to_account: 'cash' }] },
+    }),
   ]);
 
   // Get opening balance from previous day's register
   const prevDate = new Date(registerDate);
+  prevDate.setHours(0, 0, 0, 0);
   prevDate.setDate(prevDate.getDate() - 1);
   const prevRegister = await prisma.dailyCashRegister.findUnique({
     where: { shop_id_register_date: { shop_id: shop.id, register_date: prevDate } },
   });
 
   const openingBalance = Number(prevRegister?.actual_closing_bal ?? 0);
+
+  let contraNet = 0;
+  for (const c of contras) {
+    if (c.from_account === 'cash') contraNet -= Number(c.amount);
+    if (c.to_account === 'cash') contraNet += Number(c.amount);
+  }
+
   const cashSalesTotal = Number(cashSales._sum.amount ?? 0);
   const cashExpensesTotal = Number(cashExpenses._sum.amount ?? 0);
   const cashSupplierTotal = Number(cashSupplierPaid._sum.amount ?? 0);
-  const expectedClosing = openingBalance + cashSalesTotal - cashExpensesTotal - cashSupplierTotal;
+  const cashReturnsTotal = Number(cashReturns._sum.total_amount ?? 0);
+  const expectedClosing = openingBalance + cashSalesTotal - cashExpensesTotal - cashSupplierTotal - cashReturnsTotal + contraNet;
   const variance = actual_closing_bal - expectedClosing;
 
   return prisma.dailyCashRegister.upsert({
@@ -1826,6 +1860,8 @@ export async function closeCashRegister(userId: string, date: string, actual_clo
       cash_sales_total: cashSalesTotal,
       cash_expenses_total: cashExpensesTotal,
       cash_supplier_paid: cashSupplierTotal,
+      cash_returns_total: cashReturnsTotal,
+      contra_net: contraNet,
       expected_closing_bal: expectedClosing,
       actual_closing_bal,
       variance,
@@ -2129,6 +2165,8 @@ export async function getCashbook(userId: string, opts: { from: string; to: stri
     prisma.contraEntry.findMany({ where: { shop_id: shop.id, entry_date: dateFilter }, orderBy: { entry_date: 'asc' } }),
   ]);
 
+  const opening_balance = await calculateBalanceBefore(shop.id, new Date(opts.from), ['cash']);
+
   const lines: LedgerLine[] = [];
   for (const e of income) lines.push({ date: e.entry_date.toISOString().slice(0, 10), type: 'income', narration: `${e.entry_type === 'sale_income' ? 'Sale' : 'Income'}${e.notes ? ' — ' + e.notes : ''}`, debit: 0, credit: Number(e.amount), method: 'cash' });
   for (const e of expenses) lines.push({ date: e.entry_date.toISOString().slice(0, 10), type: 'expense', narration: `Expense: ${e.category}${e.description ? ' — ' + e.description : ''}`, debit: Number(e.amount), credit: 0, method: 'cash' });
@@ -2141,7 +2179,7 @@ export async function getCashbook(userId: string, opts: { from: string; to: stri
   lines.sort((a, b) => a.date.localeCompare(b.date));
   const totalDebit = lines.reduce((s, l) => s + l.debit, 0);
   const totalCredit = lines.reduce((s, l) => s + l.credit, 0);
-  return { from: opts.from, to: opts.to, lines, total_debit: Math.round(totalDebit * 100) / 100, total_credit: Math.round(totalCredit * 100) / 100, net: Math.round((totalCredit - totalDebit) * 100) / 100 };
+  return { from: opts.from, to: opts.to, opening_balance, lines, total_debit: Math.round(totalDebit * 100) / 100, total_credit: Math.round(totalCredit * 100) / 100, net: Math.round((totalCredit - totalDebit) * 100) / 100 };
 }
 
 export async function getBankbook(userId: string, opts: { from: string; to: string; method?: string }) {
@@ -2156,6 +2194,8 @@ export async function getBankbook(userId: string, opts: { from: string; to: stri
     prisma.contraEntry.findMany({ where: { shop_id: shop.id, entry_date: dateFilter }, orderBy: { entry_date: 'asc' } }),
   ]);
 
+  const opening_balance = await calculateBalanceBefore(shop.id, new Date(opts.from), bankMethods);
+
   const lines: LedgerLine[] = [];
   for (const e of income) lines.push({ date: e.entry_date.toISOString().slice(0, 10), type: 'income', narration: `${e.entry_type === 'sale_income' ? 'Sale' : 'Income'}${e.notes ? ' — ' + e.notes : ''}`, debit: 0, credit: Number(e.amount), method: e.payment_method });
   for (const e of expenses) lines.push({ date: e.entry_date.toISOString().slice(0, 10), type: 'expense', narration: `Expense: ${e.category}${e.description ? ' — ' + e.description : ''}`, debit: Number(e.amount), credit: 0, method: e.payment_method });
@@ -2168,7 +2208,43 @@ export async function getBankbook(userId: string, opts: { from: string; to: stri
   lines.sort((a, b) => a.date.localeCompare(b.date));
   const totalDebit = lines.reduce((s, l) => s + l.debit, 0);
   const totalCredit = lines.reduce((s, l) => s + l.credit, 0);
-  return { from: opts.from, to: opts.to, lines, total_debit: Math.round(totalDebit * 100) / 100, total_credit: Math.round(totalCredit * 100) / 100, net: Math.round((totalCredit - totalDebit) * 100) / 100 };
+  return { from: opts.from, to: opts.to, opening_balance, lines, total_debit: Math.round(totalDebit * 100) / 100, total_credit: Math.round(totalCredit * 100) / 100, net: Math.round((totalCredit - totalDebit) * 100) / 100 };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Ledger Status & Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function calculateBalanceBefore(shopId: string, date: Date, methods: string[]) {
+  const [inc, exp, sup, sret, contra] = await Promise.all([
+    prisma.incomeEntry.aggregate({ where: { shop_id: shopId, payment_method: { in: methods as any }, entry_date: { lt: date } }, _sum: { amount: true } }),
+    prisma.expenseEntry.aggregate({ where: { shop_id: shopId, payment_method: { in: methods as any }, entry_date: { lt: date }, linked_purchase_id: null }, _sum: { amount: true } }),
+    prisma.supplierPayment.aggregate({ where: { shop_id: shopId, payment_method: { in: methods as any }, payment_date: { lt: date } }, _sum: { amount: true } }),
+    prisma.saleReturn.aggregate({ where: { shop_id: shopId, refund_method: { in: methods as any }, return_date: { lt: date } }, _sum: { total_amount: true } }),
+    prisma.contraEntry.findMany({ where: { shop_id: shopId, entry_date: { lt: date }, OR: [{ from_account: { in: methods } }, { to_account: { in: methods } }] } }),
+  ]);
+
+  let contraSum = 0;
+  for (const c of contra) {
+    if (methods.includes(c.from_account)) contraSum -= Number(c.amount);
+    if (methods.includes(c.to_account)) contraSum += Number(c.amount);
+  }
+
+  return (Number(inc._sum.amount) || 0) - (Number(exp._sum.amount) || 0) - (Number(sup._sum.amount) || 0) - (Number(sret._sum.total_amount) || 0) + contraSum;
+}
+
+export async function getAccountingStatus(userId: string) {
+  const shop = await getShopOrThrow(userId);
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+
+  const [cash, bank] = await Promise.all([
+    calculateBalanceBefore(shop.id, tomorrow, ['cash']),
+    calculateBalanceBefore(shop.id, tomorrow, ['upi', 'neft', 'cheque', 'card']),
+  ]);
+
+  return { cash_balance: cash, bank_balance: bank };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

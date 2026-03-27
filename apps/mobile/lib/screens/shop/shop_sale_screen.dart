@@ -74,6 +74,7 @@ class _ShopSaleScreenState extends State<ShopSaleScreen> {
   void _addItem() {
     final item = _SaleItem(onChanged: _recalc);
     setState(() => _items.add(item));
+    HapticFeedback.lightImpact();
   }
 
   void _removeItem(int index) {
@@ -707,6 +708,9 @@ class _SaleItem {
   List<Map<String, dynamic>> availableBatches = [];
   Timer? _debounce;
 
+  final FocusNode nameFocus = FocusNode();
+  final FocusNode qtyFocus = FocusNode();
+
   _SaleItem({required this.onChanged}) {
     qtyCtrl.addListener(onChanged);
     mrpCtrl.addListener(onChanged);
@@ -758,6 +762,7 @@ class _SaleItem {
 
   void dispose() {
     nameCtrl.dispose(); qtyCtrl.dispose(); mrpCtrl.dispose(); discCtrl.dispose();
+    nameFocus.dispose(); qtyFocus.dispose();
     _debounce?.cancel();
   }
 }
@@ -788,11 +793,22 @@ class _MedicineRowState extends State<_MedicineRow> {
         ]
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Top row: Medicine name and search
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           TextField(
             controller: widget.item.nameCtrl,
-            decoration: const InputDecoration(hintText: 'Medicine name', isDense: true, prefixIcon: Icon(Icons.medication_outlined, size: 18)),
+            focusNode: widget.item.nameFocus,
+            decoration: InputDecoration(
+              hintText: 'Medicine name', 
+              isDense: true, 
+              prefixIcon: const Icon(Icons.medication_outlined, size: 18),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.qr_code_scanner_rounded, size: 18, color: Color(0xFF7C3AED)),
+                onPressed: () {
+                  HapticFeedback.mediumImpact();
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Scanner feature coming soon...')));
+                },
+              ),
+            ),
             onChanged: (q) {
               widget.item.searchMedicine(q, (list) {
                 if (mounted) setState(() => _suggs = list);
@@ -842,7 +858,7 @@ class _MedicineRowState extends State<_MedicineRow> {
 
                     widget.item.onChanged();
                     setState(() => _suggs = []);
-                    FocusScope.of(context).unfocus(); 
+                    widget.item.qtyFocus.requestFocus();
                   },
                 )).toList(),
               ),
@@ -883,6 +899,7 @@ class _MedicineRowState extends State<_MedicineRow> {
             flex: 2,
             child: TextField(
               controller: widget.item.qtyCtrl,
+              focusNode: widget.item.qtyFocus,
               keyboardType: TextInputType.number,
               textAlign: TextAlign.center,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],

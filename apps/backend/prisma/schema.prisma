@@ -893,6 +893,8 @@ model DailyCashRegister {
   cash_sales_total     Decimal   @default(0) @db.Decimal(12, 2)
   cash_expenses_total  Decimal   @default(0) @db.Decimal(12, 2)
   cash_supplier_paid   Decimal   @default(0) @db.Decimal(12, 2)
+  cash_returns_total   Decimal   @default(0) @db.Decimal(12, 2)
+  contra_net           Decimal   @default(0) @db.Decimal(12, 2)
   expected_closing_bal Decimal?  @db.Decimal(12, 2)
   actual_closing_bal   Decimal?  @db.Decimal(12, 2)
   variance             Decimal?  @db.Decimal(12, 2)

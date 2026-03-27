@@ -3473,7 +3473,7 @@ function CashbookTab() {
     queryFn: () => accountingApi.getCashbook(from, to).then((r) => r.data.data),
   });
 
-  let runningBal = 0;
+  let runningBal = data?.opening_balance ?? 0;
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-xl p-4 shadow-sm flex flex-wrap items-end gap-4">
@@ -3484,7 +3484,8 @@ function CashbookTab() {
       </div>
 
       {data && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
+          <StatCard label="Opening Balance" value={fmt(data.opening_balance)} color="bg-gray-50" textColor="text-gray-800" />
           <StatCard label="Total Receipts (In)" value={fmt(data.total_credit)} color="bg-green-50" textColor="text-green-700" />
           <StatCard label="Total Payments (Out)" value={fmt(data.total_debit)} color="bg-red-50" textColor="text-red-600" />
           <StatCard label="Net Cash Flow" value={fmt(data.net)} color={data.net >= 0 ? 'bg-blue-50' : 'bg-orange-50'} textColor={data.net >= 0 ? 'text-blue-700' : 'text-orange-700'} />
@@ -3492,23 +3493,30 @@ function CashbookTab() {
       )}
 
       {isLoading ? <div className="flex justify-center py-12"><div className="w-7 h-7 border-4 border-violet-400 border-t-transparent rounded-full animate-spin" /></div> : data ? (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <table className="w-full text-sm">
-            <thead><tr className="bg-gray-50 text-gray-500 text-xs uppercase">
-              <th className="text-left px-5 py-3">Date</th><th className="text-left px-5 py-3">Narration</th>
-              <th className="text-right px-5 py-3">Debit (Out)</th><th className="text-right px-5 py-3">Credit (In)</th>
-              <th className="text-right px-5 py-3">Balance</th>
+            <thead><tr className="bg-gray-50 text-gray-500 text-[10px] font-black uppercase tracking-widest">
+              <th className="text-left px-5 py-4">Date</th><th className="text-left px-5 py-4">Narration</th>
+              <th className="text-right px-5 py-4">Debit (OUT)</th><th className="text-right px-5 py-4">Credit (IN)</th>
+              <th className="text-right px-5 py-4">Balance</th>
             </tr></thead>
             <tbody className="divide-y divide-gray-50">
+              <tr className="bg-gray-50/50 italic group">
+                <td className="px-5 py-3 text-gray-400 text-[10px] font-bold">{new Date(from).toLocaleDateString('en-IN')}</td>
+                <td className="px-5 py-3 text-gray-400 text-[10px] font-black uppercase tracking-wider">Opening Balance (B/F)</td>
+                <td className="px-5 py-3 text-right text-gray-300">—</td>
+                <td className="px-5 py-3 text-right text-gray-300">—</td>
+                <td className="px-5 py-3 text-right text-gray-900 font-black">{fmt(data.opening_balance)}</td>
+              </tr>
               {(data.lines as any[]).map((line: any, i: number) => {
-                runningBal = runningBal + line.credit - line.debit;
+                runningBal = Math.round((runningBal + line.credit - line.debit) * 100) / 100;
                 return (
-                  <tr key={i} className="hover:bg-gray-50/50">
-                    <td className="px-5 py-2.5 text-gray-500 text-xs whitespace-nowrap">{new Date(line.date).toLocaleDateString('en-IN')}</td>
-                    <td className="px-5 py-2.5 text-gray-700 text-xs">{line.narration}</td>
-                    <td className="px-5 py-2.5 text-right text-red-500 text-sm font-medium">{line.debit > 0 ? fmt(line.debit) : '—'}</td>
-                    <td className="px-5 py-2.5 text-right text-green-600 text-sm font-medium">{line.credit > 0 ? fmt(line.credit) : '—'}</td>
-                    <td className={`px-5 py-2.5 text-right text-sm font-semibold ${runningBal >= 0 ? 'text-gray-800' : 'text-red-600'}`}>{fmt(runningBal)}</td>
+                  <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-5 py-3 text-gray-500 text-[10px] font-bold whitespace-nowrap">{new Date(line.date).toLocaleDateString('en-IN')}</td>
+                    <td className="px-5 py-3 text-gray-700 text-xs font-semibold">{line.narration}</td>
+                    <td className="px-5 py-3 text-right text-red-600 text-sm font-black">{line.debit > 0 ? fmt(line.debit) : '—'}</td>
+                    <td className="px-5 py-3 text-right text-emerald-600 text-sm font-black">{line.credit > 0 ? fmt(line.credit) : '—'}</td>
+                    <td className={`px-5 py-3 text-right text-sm font-black ${runningBal >= 0 ? 'text-gray-900' : 'text-rose-600'}`}>{fmt(runningBal)}</td>
                   </tr>
                 );
               })}
@@ -3543,69 +3551,82 @@ function BankbookTab() {
   });
 
   const methodBadge: Record<string, string> = {
-    upi: 'bg-purple-50 text-purple-700', neft: 'bg-blue-50 text-blue-700',
-    cheque: 'bg-gray-100 text-gray-700', card: 'bg-indigo-50 text-indigo-700',
+    upi: 'bg-purple-100/50 text-purple-700', neft: 'bg-blue-100/50 text-blue-700',
+    cheque: 'bg-gray-100/80 text-gray-700', card: 'bg-indigo-100/50 text-indigo-700',
   };
 
-  let runningBal = 0;
+  let runningBal = data?.opening_balance ?? 0;
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl p-4 shadow-sm flex flex-wrap items-end gap-4">
-        <div><label className="text-xs text-gray-500 block mb-1">From</label>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400" /></div>
-        <div><label className="text-xs text-gray-500 block mb-1">To</label>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400" /></div>
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">Method</label>
-          <select value={method} onChange={(e) => setMethod(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-400">
-            <option value="">All Bank</option>
-            <option value="upi">UPI</option><option value="neft">NEFT</option>
-            <option value="cheque">Cheque</option><option value="card">Card</option>
+      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-wrap items-end gap-4">
+        <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">From Date</label>
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="border border-gray-100 bg-gray-50/50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" /></div>
+        <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">To Date</label>
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="border border-gray-100 bg-gray-50/50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" /></div>
+        <div className="w-44">
+          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Filter Method</label>
+          <select value={method} onChange={(e) => setMethod(e.target.value)} className="w-full border border-gray-100 bg-gray-50/50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 font-bold text-gray-700">
+            <option value="">All Bank Accounts</option>
+            <option value="upi">UPI (GPay/PhonePe)</option>
+            <option value="neft">NEFT/RTGS</option>
+            <option value="cheque">Cheque Clearings</option>
+            <option value="card">Card Payments</option>
           </select>
         </div>
       </div>
 
       {data && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
+          <StatCard label="Opening Balance" value={fmt(data.opening_balance)} color="bg-gray-50" textColor="text-gray-800" />
           <StatCard label="Total Receipts (In)" value={fmt(data.total_credit)} color="bg-green-50" textColor="text-green-700" />
           <StatCard label="Total Payments (Out)" value={fmt(data.total_debit)} color="bg-red-50" textColor="text-red-600" />
           <StatCard label="Net Bank Flow" value={fmt(data.net)} color={data.net >= 0 ? 'bg-blue-50' : 'bg-orange-50'} textColor={data.net >= 0 ? 'text-blue-700' : 'text-orange-700'} />
         </div>
       )}
 
-      {isLoading ? <div className="flex justify-center py-12"><div className="w-7 h-7 border-4 border-violet-400 border-t-transparent rounded-full animate-spin" /></div> : data ? (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      {isLoading ? <div className="flex justify-center py-12"><div className="w-7 h-7 border-4 border-emerald-400 border-t-transparent rounded-full animate-spin" /></div> : data ? (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <table className="w-full text-sm">
-            <thead><tr className="bg-gray-50 text-gray-500 text-xs uppercase">
-              <th className="text-left px-5 py-3">Date</th><th className="text-left px-5 py-3">Method</th>
-              <th className="text-left px-5 py-3">Narration</th><th className="text-right px-5 py-3">Debit (Out)</th>
-              <th className="text-right px-5 py-3">Credit (In)</th><th className="text-right px-5 py-3">Balance</th>
+            <thead><tr className="bg-gray-50 text-gray-500 text-[10px] font-black uppercase tracking-widest">
+              <th className="text-left px-5 py-4">Date</th>
+              <th className="text-left px-5 py-4">Method</th>
+              <th className="text-left px-5 py-4">Narration</th>
+              <th className="text-right px-5 py-4">Debit (OUT)</th>
+              <th className="text-right px-5 py-4">Credit (IN)</th>
+              <th className="text-right px-5 py-4">Balance</th>
             </tr></thead>
             <tbody className="divide-y divide-gray-50">
+              <tr className="bg-gray-50/50 italic group">
+                <td className="px-5 py-3 text-gray-400 text-[10px] font-bold">{new Date(from).toLocaleDateString('en-IN')}</td>
+                <td className="px-5 py-3 text-gray-400 text-[10px] font-black uppercase tracking-wider" colSpan={2}>Opening Balance (B/F)</td>
+                <td className="px-5 py-3 text-right text-gray-300">—</td>
+                <td className="px-5 py-3 text-right text-gray-300">—</td>
+                <td className="px-5 py-3 text-right text-gray-900 font-black">{fmt(data.opening_balance)}</td>
+              </tr>
               {(data.lines as any[]).map((line: any, i: number) => {
-                runningBal = runningBal + line.credit - line.debit;
+                runningBal = Math.round((runningBal + line.credit - line.debit) * 100) / 100;
                 return (
-                  <tr key={i} className="hover:bg-gray-50/50">
-                    <td className="px-5 py-2.5 text-gray-500 text-xs whitespace-nowrap">{new Date(line.date).toLocaleDateString('en-IN')}</td>
-                    <td className="px-5 py-2.5"><span className={`px-2 py-0.5 rounded-full text-xs uppercase ${methodBadge[line.method] ?? 'bg-gray-50 text-gray-600'}`}>{line.method}</span></td>
-                    <td className="px-5 py-2.5 text-gray-700 text-xs">{line.narration}</td>
-                    <td className="px-5 py-2.5 text-right text-red-500 text-sm font-medium">{line.debit > 0 ? fmt(line.debit) : '—'}</td>
-                    <td className="px-5 py-2.5 text-right text-green-600 text-sm font-medium">{line.credit > 0 ? fmt(line.credit) : '—'}</td>
-                    <td className={`px-5 py-2.5 text-right text-sm font-semibold ${runningBal >= 0 ? 'text-gray-800' : 'text-red-600'}`}>{fmt(runningBal)}</td>
+                  <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-5 py-3 text-gray-500 text-[10px] font-bold whitespace-nowrap">{new Date(line.date).toLocaleDateString('en-IN')}</td>
+                    <td className="px-5 py-3"><span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${methodBadge[line.method] ?? 'bg-gray-100 text-gray-400'}`}>{line.method}</span></td>
+                    <td className="px-5 py-3 text-gray-700 text-xs font-semibold">{line.narration}</td>
+                    <td className="px-5 py-3 text-right text-red-600 text-sm font-black">{line.debit > 0 ? fmt(line.debit) : '—'}</td>
+                    <td className="px-5 py-3 text-right text-emerald-600 text-sm font-black">{line.credit > 0 ? fmt(line.credit) : '—'}</td>
+                    <td className={`px-5 py-3 text-right text-sm font-black ${runningBal >= 0 ? 'text-gray-900' : 'text-rose-600'}`}>{fmt(runningBal)}</td>
                   </tr>
                 );
               })}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-gray-200 bg-gray-50">
-                <td colSpan={3} className="px-5 py-3 font-bold text-gray-700">Total</td>
-                <td className="px-5 py-3 text-right font-bold text-red-600">{fmt(data.total_debit)}</td>
-                <td className="px-5 py-3 text-right font-bold text-green-600">{fmt(data.total_credit)}</td>
-                <td className="px-5 py-3 text-right font-bold text-gray-800">{fmt(data.net)}</td>
+              <tr className="border-t-2 border-gray-100 bg-gray-50 pb-2">
+                <td colSpan={3} className="px-5 py-4 font-black text-gray-900 uppercase tracking-widest text-[10px]">Total for filtered period</td>
+                <td className="px-5 py-4 text-right font-black text-red-600">{fmt(data.total_debit)}</td>
+                <td className="px-5 py-4 text-right font-black text-emerald-600">{fmt(data.total_credit)}</td>
+                <td className="px-5 py-4 text-right font-black text-gray-900">{fmt(data.net)}</td>
               </tr>
             </tfoot>
           </table>
-          {!data.lines.length && <p className="text-center text-gray-400 py-10 text-sm">No bank transactions in this period</p>}
+          {!data.lines.length && <p className="text-center text-gray-400 py-12 text-[10px] font-black uppercase tracking-widest">No bank transactions found in this range</p>}
         </div>
       ) : null}
     </div>
@@ -3747,6 +3768,12 @@ export default function AccountingPage() {
   const { data: shopRes } = useQuery({ queryKey: ['shop-profile'], queryFn: () => shopApi.getMyShop() });
   const shop = shopRes?.data?.data;
 
+  const { data: statusRes, isLoading: statLoading } = useQuery({
+    queryKey: ['accounting-status'],
+    queryFn: () => accountingApi.getStatus().then(r => r.data.data),
+  });
+  const accStatus = statusRes;
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="print:hidden space-y-6">
@@ -3763,7 +3790,16 @@ export default function AccountingPage() {
               </div>
               <div>
                 <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Cash Balance</p>
-                <p className="text-lg font-black text-gray-900">₹45,230</p>
+                <p className="text-lg font-black text-gray-900">{statLoading ? '...' : fmt(accStatus?.cash_balance ?? 0)}</p>
+              </div>
+            </div>
+            <div className="px-4 py-2 bg-white rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Bank Balance</p>
+                <p className="text-lg font-black text-gray-900">{statLoading ? '...' : fmt(accStatus?.bank_balance ?? 0)}</p>
               </div>
             </div>
           </div>

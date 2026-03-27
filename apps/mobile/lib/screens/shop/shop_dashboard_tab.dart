@@ -2,6 +2,8 @@
 
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import 'medicine_finder_screen.dart';
+import 'nearby_shops_screen.dart';
 
 class ShopDashboardTab extends StatefulWidget {
   const ShopDashboardTab({
@@ -73,18 +75,50 @@ class _ShopDashboardTabState extends State<ShopDashboardTab> {
                 style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13)),
             ]),
           ),
+          
+          if (lowStock > 0 || (d['critical_expiry_count'] ?? 0) > 0 || (d['outstanding_count'] ?? 0) > 0) ...[
+            const SizedBox(height: 16),
+            if (lowStock > 0)
+              _AlertBanner(
+                icon: Icons.warning_amber_rounded,
+                text: '$lowStock items are below reorder level',
+                color: const Color(0xFFD97706),
+                bg: const Color(0xFFFEF3C7),
+              ),
+            if ((d['critical_expiry_count'] ?? 0) > 0) ...[
+              const SizedBox(height: 8),
+              _AlertBanner(
+                icon: Icons.event_busy_rounded,
+                text: '${d['critical_expiry_count']} items expiring within 30 days!',
+                color: const Color(0xFFDC2626),
+                bg: const Color(0xFFFEE2E2),
+              ),
+            ],
+            if ((d['outstanding_count'] ?? 0) > 0) ...[
+              const SizedBox(height: 8),
+              _AlertBanner(
+                icon: Icons.account_balance_wallet_outlined,
+                text: '₹${d['total_outstanding']} outstanding from ${d['outstanding_count']} customers',
+                color: const Color(0xFF2563EB),
+                bg: const Color(0xFFDBEAFE),
+              ),
+            ],
+          ],
+
           const SizedBox(height: 20),
           const _SectionTitle('Overview'),
           const SizedBox(height: 12),
           GridView.count(
             shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
             crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12,
-            childAspectRatio: 1.6,
+            childAspectRatio: 1.5,
             children: [
+              _StatCard('Today Revenue', '₹${_fmt(todaySales)}', Icons.currency_rupee, const Color(0xFF059669), const Color(0xFFD1FAE5)),
               _StatCard('Today Bills', '$todayBills', Icons.receipt_long, const Color(0xFF7C3AED), const Color(0xFFEDE9FE)),
-              _StatCard('Today Sales', '₹${_fmt(todaySales)}', Icons.currency_rupee, const Color(0xFF059669), const Color(0xFFD1FAE5)),
-              _StatCard('Low Stock', '$lowStock', Icons.warning_amber_rounded, const Color(0xFFD97706), const Color(0xFFFEF3C7)),
-              _StatCard('Total Items', '$inventory', Icons.inventory_2_outlined, const Color(0xFF2563EB), const Color(0xFFDBEAFE)),
+              _StatCard('Expiring Soon', '${d['expiring_count'] ?? 0}', Icons.history_toggle_off, const Color(0xFFD97706), const Color(0xFFFEF3C7)),
+              _StatCard('Credit Dues', '₹${_fmt(d['total_outstanding'] ?? 0)}', Icons.account_balance_wallet, const Color(0xFF2563EB), const Color(0xFFDBEAFE)),
+              _StatCard('Low Stock', '$lowStock', Icons.inventory_2_outlined, const Color(0xFF6B7280), const Color(0xFFF3F4F6)),
+              _StatCard('Total Items', '$inventory', Icons.layers_outlined, const Color(0xFF6B7280), const Color(0xFFF3F4F6)),
             ],
           ),
           const SizedBox(height: 24),
@@ -103,6 +137,24 @@ class _ShopDashboardTabState extends State<ShopDashboardTab> {
              label: 'Today\'s Appointments',
              color: const Color(0xFF2563EB),
              onTap: widget.onAppointmentsTap,
+           ),
+           const SizedBox(height: 10),
+           _QuickAction(
+             icon: Icons.biotech_rounded,
+             label: 'Medicine Finder & Composition',
+             color: const Color(0xFFF43F5E), // rose-500
+             onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const MedicineFinderScreen()));
+             },
+           ),
+           const SizedBox(height: 10),
+           _QuickAction(
+             icon: Icons.near_me_rounded,
+             label: 'Nearby Shops & Network',
+             color: const Color(0xFF8B5CF6), // violet-500
+             onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const NearbyShopsScreen()));
+             },
            ),
            const SizedBox(height: 10),
            _QuickAction(
@@ -195,6 +247,26 @@ class _QuickAction extends StatelessWidget {
           const Icon(Icons.chevron_right, color: Color(0xFFD1D5DB)),
         ]),
       ),
+    );
+  }
+}
+
+class _AlertBanner extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color color, bg;
+  const _AlertBanner({required this.icon, required this.text, required this.color, required this.bg});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withOpacity(0.2))),
+      child: Row(children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(width: 12),
+        Expanded(child: Text(text, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w600))),
+      ]),
     );
   }
 }

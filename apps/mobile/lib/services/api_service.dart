@@ -278,6 +278,23 @@ class ApiService {
     final r = await http.get(uri, headers: await _headers(auth: false));
     return _decode(r);
   }
+
+  // ── NEW TOOLS ────────────────────────────────────────────────────────────
+  static Future<Map<String, dynamic>> searchComposition(String q) async {
+    final uri = Uri.parse('$_base/medicines/composition-search').replace(queryParameters: {'q': q});
+    final r = await http.get(uri, headers: await _headers());
+    return _decode(r);
+  }
+
+  static Future<List<dynamic>> getNearbyShops({double? lat, double? lng, double radius = 5}) async {
+    final params = <String, String>{'radius': radius.toString()};
+    if (lat != null) params['lat'] = lat.toString();
+    if (lng != null) params['lng'] = lng.toString();
+    
+    final uri = Uri.parse('$_base/shops/nearby').replace(queryParameters: params);
+    final r = await http.get(uri, headers: await _headers(auth: false));
+    return (_decode(r)['data'] as List?) ?? [];
+  }
 }
 
 class ApiException implements Exception {

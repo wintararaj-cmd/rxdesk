@@ -415,6 +415,13 @@ router.post('/contra-entries', shopAuth, async (req, res, next) => {
 
 // ─── Book Reports (Cashbook / Bankbook) ───────────────────────────────────────────────
 
+router.get('/status', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.getAccountingStatus(req.user!.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.get('/reports/cashbook', shopAuth, async (req, res, next) => {
   try {
     const now = new Date();
