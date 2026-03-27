@@ -2244,7 +2244,12 @@ export async function getAccountingStatus(userId: string) {
     calculateBalanceBefore(shop.id, tomorrow, ['upi', 'neft', 'cheque', 'card']),
   ]);
 
-  return { cash_balance: cash, bank_balance: bank };
+  return {
+    cash_balance: cash,
+    bank_balance: bank,
+    opening_cash_balance: Number(shop.opening_cash_balance),
+    opening_bank_balance: Number(shop.opening_bank_balance),
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3168,6 +3173,17 @@ export async function updateContraEntry(userId: string, id: string, data: any) {
       entry_date: data.entry_date ? new Date(data.entry_date) : undefined,
       description: data.description,
       reference_no: data.reference_no,
+    },
+  });
+}
+
+export async function updateOpeningBalances(userId: string, data: { cash: number; bank: number }) {
+  const shop = await getShopOrThrow(userId);
+  return await prisma.medicalShop.update({
+    where: { id: shop.id },
+    data: {
+      opening_cash_balance: data.cash,
+      opening_bank_balance: data.bank,
     },
   });
 }

@@ -242,6 +242,7 @@ export const accountingApi = {
 
   // Books
   getStatus: () => apiClient.get('/accounting/status'),
+  updateOpeningBalances: (data: { cash: number; bank: number }) => apiClient.put('/accounting/settings/opening-balances', data),
   getCashbook: (from: string, to: string) =>
     apiClient.get('/accounting/reports/cashbook', { params: { from, to } }),
   getBankbook: (from: string, to: string, method?: string) =>

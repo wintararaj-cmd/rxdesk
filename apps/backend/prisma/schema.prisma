@@ -296,6 +296,9 @@ model MedicalShop {
   working_days        String[]
   is_active           Boolean            @default(true)
   verification_status VerificationStatus @default(pending)
+  // Opening Balances
+  opening_cash_balance Decimal           @default(0) @db.Decimal(12, 2)
+  opening_bank_balance Decimal           @default(0) @db.Decimal(12, 2)
   // Invoice Settings
   show_hsn_code       Boolean            @default(true)
   show_batch_no       Boolean            @default(true)

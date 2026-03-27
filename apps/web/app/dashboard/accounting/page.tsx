@@ -3640,6 +3640,39 @@ function SettingsTab() {
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const { data: accStatus, isLoading: statLoading } = useQuery({
+    queryKey: ['accounting-status-settings'],
+    queryFn: () => accountingApi.getStatus().then(r => r.data.data),
+  });
+
+  const [openingCash, setOpeningCash] = useState<string>('0');
+  const [openingBank, setOpeningBank] = useState<string>('0');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (accStatus) {
+      setOpeningCash(String(accStatus.opening_cash_balance));
+      setOpeningBank(String(accStatus.opening_bank_balance));
+    }
+  }, [accStatus]);
+
+  const handleSaveOpening = async () => {
+    setIsSaving(true);
+    try {
+      await accountingApi.updateOpeningBalances({
+        cash: Number(openingCash || 0),
+        bank: Number(openingBank || 0)
+      });
+      alert('Opening balances updated successfully!');
+      qc.invalidateQueries({ queryKey: ['accounting-status'] });
+      qc.invalidateQueries({ queryKey: ['accounting-status-settings'] });
+    } catch (err) {
+      alert('Failed to update opening balances');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const { data: backups, refetch: refetchBackups } = useQuery<any>({
     queryKey: ['web-backups'],
     queryFn: () => accountingApi.getBackupList().then(r => r.data.data),
@@ -3719,6 +3752,55 @@ function SettingsTab() {
             className="w-full bg-rose-500 hover:bg-rose-600 text-white py-4 rounded-3xl text-sm font-black uppercase tracking-widest shadow-lg shadow-rose-100 transition-all hover:scale-[1.02] active:scale-95 mt-auto"
           >
             Upload & Restore
+          </button>
+        </div>
+
+        {/* Opening Balances Card */}
+        <div className="bg-white rounded-[2.5rem] p-10 border border-gray-100 shadow-xl shadow-gray-200/50 flex flex-col items-start gap-6 md:col-span-2">
+          <div className="w-14 h-14 bg-violet-50 rounded-2xl flex items-center justify-center text-violet-600 shadow-sm">
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="w-full">
+            <h3 className="text-xl font-black text-gray-900 tracking-tight mb-1">Set Opening Balances</h3>
+            <p className="text-sm text-gray-500 font-medium leading-relaxed mb-6">Enter your starting liquidity (Cash and Bank) when you first joined RxDesk.</p>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Opening Cash</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-gray-400">₹</span>
+                  <input 
+                    type="number"
+                    value={openingCash}
+                    onChange={(e) => setOpeningCash(e.target.value)}
+                    className="w-full bg-gray-50 border-none rounded-2xl pl-8 pr-4 py-4 text-lg font-black text-gray-900 focus:ring-2 focus:ring-violet-400 transition-all"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Opening Bank</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-gray-400">₹</span>
+                  <input 
+                    type="number"
+                    value={openingBank}
+                    onChange={(e) => setOpeningBank(e.target.value)}
+                    className="w-full bg-gray-50 border-none rounded-2xl pl-8 pr-4 py-4 text-lg font-black text-gray-900 focus:ring-2 focus:ring-violet-400 transition-all"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={handleSaveOpening}
+            disabled={isSaving}
+            className="w-full bg-violet-600 hover:bg-violet-700 disabled:bg-gray-300 text-white py-4 rounded-3xl text-sm font-black uppercase tracking-widest shadow-lg shadow-violet-100 transition-all hover:scale-[1.01] active:scale-95"
+          >
+            {isSaving ? 'Saving Changes...' : 'Update Starting Balances'}
           </button>
         </div>
       </div>

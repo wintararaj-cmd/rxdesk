@@ -422,6 +422,14 @@ router.get('/status', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.put('/settings/opening-balances', shopAuth, async (req, res, next) => {
+  try {
+    const { cash, bank } = req.body;
+    const data = await service.updateOpeningBalances(req.user!.id, { cash, bank });
+    res.json({ success: true, data, message: 'Opening balances updated' });
+  } catch (err) { next(err); }
+});
+
 router.get('/reports/cashbook', shopAuth, async (req, res, next) => {
   try {
     const now = new Date();
