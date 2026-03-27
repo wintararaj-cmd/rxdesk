@@ -12,6 +12,9 @@ interface SubscriptionPlan {
   id: string;
   name: string;
   price_monthly: number;
+  price_quarterly?: number | null;
+  price_halfyearly?: number | null;
+  price_yearly?: number | null;
   max_doctors: number;
   max_appointments_per_month: number;
   max_sessions: number;
@@ -157,6 +160,35 @@ export default function PlansPage() {
                       className="w-full bg-white/[0.03] border border-white/10 rounded-xl pl-10 pr-4 py-2 text-white text-xl font-black"
                     />
                   </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[8px] text-gray-500 font-bold uppercase mb-1">Quarterly (qly)</label>
+                      <input 
+                        type="number" 
+                        value={editForm.price_quarterly ?? ''}
+                        onChange={e => setEditForm({...editForm, price_quarterly: e.target.value ? Number(e.target.value) : null})}
+                        className="w-full bg-white/[0.03] border border-white/10 rounded-lg px-2 py-1.5 text-white text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[8px] text-gray-500 font-bold uppercase mb-1">Half-Yearly (hly)</label>
+                      <input 
+                        type="number" 
+                        value={editForm.price_halfyearly ?? ''}
+                        onChange={e => setEditForm({...editForm, price_halfyearly: e.target.value ? Number(e.target.value) : null})}
+                        className="w-full bg-white/[0.03] border border-white/10 rounded-lg px-2 py-1.5 text-white text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[8px] text-gray-500 font-bold uppercase mb-1">Yearly (yly)</label>
+                      <input 
+                        type="number" 
+                        value={editForm.price_yearly ?? ''}
+                        onChange={e => setEditForm({...editForm, price_yearly: e.target.value ? Number(e.target.value) : null})}
+                        className="w-full bg-white/[0.03] border border-white/10 rounded-lg px-2 py-1.5 text-white text-xs"
+                      />
+                    </div>
+                  </div>
                   <div className="mt-4">
                     <label className="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1.5">Features (comma separated)</label>
                     <textarea 
@@ -174,6 +206,13 @@ export default function PlansPage() {
                     <span className="text-3xl font-black text-white">₹{plan.price_monthly}</span>
                     <span className="text-gray-500 text-sm font-medium">/month</span>
                   </div>
+                  {(plan.price_quarterly || plan.price_halfyearly || plan.price_yearly) && (
+                    <div className="mt-2 text-[10px] text-gray-500 space-y-1">
+                      {plan.price_quarterly && <div>Qly: <span className="text-white font-bold">₹{plan.price_quarterly}</span></div>}
+                      {plan.price_halfyearly && <div>Hly: <span className="text-white font-bold">₹{plan.price_halfyearly}</span></div>}
+                      {plan.price_yearly && <div>Yearly: <span className="text-white font-bold text-rose-400">₹{plan.price_yearly}</span></div>}
+                    </div>
+                  )}
                   {plan.features && Array.isArray(plan.features) && plan.features.length > 0 && (
                     <div className="mt-4 flex flex-wrap gap-1.5">
                       {plan.features.slice(0, 3).map((f, i) => (
@@ -291,7 +330,7 @@ export default function PlansPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">Monthly Price (â‚¹)</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">Monthly Price (₹)</label>
                   <input 
                     required
                     type="number" 
@@ -308,6 +347,27 @@ export default function PlansPage() {
                     placeholder="1"
                     onChange={e => setEditForm({...editForm, max_doctors: Number(e.target.value)})}
                     className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-rose-500/50 transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">Discounted Prices (Optional)</label>
+                <div className="grid grid-cols-3 gap-3">
+                  <input 
+                    type="number" placeholder="Qly"
+                    onChange={e => setEditForm({...editForm, price_quarterly: e.target.value ? Number(e.target.value) : null})}
+                    className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2.5 text-white text-xs outline-none focus:border-rose-500/50"
+                  />
+                  <input 
+                    type="number" placeholder="Hly"
+                    onChange={e => setEditForm({...editForm, price_halfyearly: e.target.value ? Number(e.target.value) : null})}
+                    className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2.5 text-white text-xs outline-none focus:border-rose-500/50"
+                  />
+                  <input 
+                    type="number" placeholder="Yearly"
+                    onChange={e => setEditForm({...editForm, price_yearly: e.target.value ? Number(e.target.value) : null})}
+                    className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2.5 text-white text-xs outline-none focus:border-rose-500/50"
                   />
                 </div>
               </div>

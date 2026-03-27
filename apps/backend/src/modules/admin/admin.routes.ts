@@ -333,7 +333,10 @@ router.get('/plans', requireRole('admin'), async (_req, res, next) => {
 // POST /admin/plans — create a new plan
 router.post('/plans', requireRole('admin'), async (req, res, next) => {
   try {
-    const { name, price_monthly, max_doctors, max_appointments_per_month, max_sessions, features } = req.body;
+    const { 
+      name, price_monthly, price_quarterly, price_halfyearly, price_yearly,
+      max_doctors, max_appointments_per_month, max_sessions, features 
+    } = req.body;
     if (!name || price_monthly === undefined) {
       return res.status(400).json({ success: false, error: { message: 'name and price_monthly are required' } });
     }
@@ -341,6 +344,9 @@ router.post('/plans', requireRole('admin'), async (req, res, next) => {
       data: {
         name,
         price_monthly: parseFloat(price_monthly),
+        price_quarterly: price_quarterly ? parseFloat(price_quarterly) : null,
+        price_halfyearly: price_halfyearly ? parseFloat(price_halfyearly) : null,
+        price_yearly: price_yearly ? parseFloat(price_yearly) : null,
         max_doctors: parseInt(max_doctors ?? '1'),
         max_appointments_per_month: parseInt(max_appointments_per_month ?? '50'),
         max_sessions: parseInt(max_sessions ?? '2'),
@@ -356,12 +362,18 @@ router.post('/plans', requireRole('admin'), async (req, res, next) => {
 // PATCH /admin/plans/:id — update plan fields
 router.patch('/plans/:id', requireRole('admin'), async (req, res, next) => {
   try {
-    const { name, price_monthly, max_doctors, max_appointments_per_month, max_sessions, features, is_active } = req.body;
+    const { 
+      name, price_monthly, price_quarterly, price_halfyearly, price_yearly, 
+      max_doctors, max_appointments_per_month, max_sessions, features, is_active 
+    } = req.body;
     const plan = await prisma.subscriptionPlan.update({
       where: { id: req.params.id },
       data: {
         ...(name !== undefined && { name }),
         ...(price_monthly !== undefined && { price_monthly: parseFloat(price_monthly) }),
+        ...(price_quarterly !== undefined && { price_quarterly: price_quarterly ? parseFloat(price_quarterly) : null }),
+        ...(price_halfyearly !== undefined && { price_halfyearly: price_halfyearly ? parseFloat(price_halfyearly) : null }),
+        ...(price_yearly !== undefined && { price_yearly: price_yearly ? parseFloat(price_yearly) : null }),
         ...(max_doctors !== undefined && { max_doctors: parseInt(max_doctors) }),
         ...(max_appointments_per_month !== undefined && { max_appointments_per_month: parseInt(max_appointments_per_month) }),
         ...(max_sessions !== undefined && { max_sessions: parseInt(max_sessions) }),

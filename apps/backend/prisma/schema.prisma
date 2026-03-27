@@ -597,6 +597,9 @@ model SubscriptionPlan {
   id                         String   @id @default(uuid())
   name                       String   @unique
   price_monthly              Decimal  @db.Decimal(10, 2)
+  price_quarterly            Decimal? @db.Decimal(10, 2)
+  price_halfyearly           Decimal? @db.Decimal(10, 2)
+  price_yearly               Decimal? @db.Decimal(10, 2)
   max_doctors                Int      @default(1)
   max_appointments_per_month Int      @default(50)
   max_sessions               Int      @default(2)
