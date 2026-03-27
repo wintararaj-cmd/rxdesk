@@ -1754,7 +1754,7 @@ export async function getDailyCashRegister(userId: string, date: string) {
       _sum: { amount: true },
     }),
     prisma.expenseEntry.aggregate({
-      where: { shop_id: shop.id, payment_method: 'cash', entry_date: { gte: registerDate, lt: nextDay } },
+      where: { shop_id: shop.id, payment_method: 'cash', entry_date: { gte: registerDate, lt: nextDay }, linked_purchase_id: null },
       _sum: { amount: true },
     }),
     prisma.supplierPayment.aggregate({
@@ -2123,7 +2123,7 @@ export async function getCashbook(userId: string, opts: { from: string; to: stri
   const dateFilter = { gte: new Date(opts.from), lte: new Date(opts.to) };
   const [income, expenses, supplierPay, saleRets, contras] = await Promise.all([
     prisma.incomeEntry.findMany({ where: { shop_id: shop.id, payment_method: 'cash', entry_date: dateFilter }, orderBy: { entry_date: 'asc' } }),
-    prisma.expenseEntry.findMany({ where: { shop_id: shop.id, payment_method: 'cash', entry_date: dateFilter }, orderBy: { entry_date: 'asc' } }),
+    prisma.expenseEntry.findMany({ where: { shop_id: shop.id, payment_method: 'cash', entry_date: dateFilter, linked_purchase_id: null }, orderBy: { entry_date: 'asc' } }),
     prisma.supplierPayment.findMany({ where: { shop_id: shop.id, payment_method: 'cash', payment_date: dateFilter }, include: { supplier: { select: { name: true } } }, orderBy: { payment_date: 'asc' } }),
     prisma.saleReturn.findMany({ where: { shop_id: shop.id, refund_method: 'cash', return_date: dateFilter }, orderBy: { return_date: 'asc' } }),
     prisma.contraEntry.findMany({ where: { shop_id: shop.id, entry_date: dateFilter }, orderBy: { entry_date: 'asc' } }),
@@ -2149,7 +2149,7 @@ export async function getBankbook(userId: string, opts: { from: string; to: stri
   const bankMethods: any[] = opts.method ? [opts.method] : ['upi', 'neft', 'cheque', 'card'];
   const [income, expenses, supplierPay, contras] = await Promise.all([
     prisma.incomeEntry.findMany({ where: { shop_id: shop.id, payment_method: { in: bankMethods }, entry_date: dateFilter }, orderBy: { entry_date: 'asc' } }),
-    prisma.expenseEntry.findMany({ where: { shop_id: shop.id, payment_method: { in: bankMethods }, entry_date: dateFilter }, orderBy: { entry_date: 'asc' } }),
+    prisma.expenseEntry.findMany({ where: { shop_id: shop.id, payment_method: { in: bankMethods }, entry_date: dateFilter, linked_purchase_id: null }, orderBy: { entry_date: 'asc' } }),
     prisma.supplierPayment.findMany({ where: { shop_id: shop.id, payment_method: { in: bankMethods }, payment_date: dateFilter }, include: { supplier: { select: { name: true } } }, orderBy: { payment_date: 'asc' } }),
     prisma.contraEntry.findMany({ where: { shop_id: shop.id, entry_date: dateFilter }, orderBy: { entry_date: 'asc' } }),
   ]);
