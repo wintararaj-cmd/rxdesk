@@ -2,12 +2,11 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { adminApi } from '../../../lib/apiClient';
+import { adminApi } from '../../../../lib/apiClient';
 import { 
   Package, Plus, Edit2, Check, X, Shield, 
   Users, Calendar, Monitor, IndianRupee, Save
 } from 'lucide-react';
-import { toast } from 'react-hot-toast';
 
 interface SubscriptionPlan {
   id: string;
@@ -37,9 +36,9 @@ export default function PlansPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-plans'] });
       setEditingId(null);
-      toast.success('Plan updated successfully');
+      alert('Plan updated successfully');
     },
-    onError: () => toast.error('Failed to update plan'),
+    onError: () => alert('Failed to update plan'),
   });
 
   const createMutation = useMutation({
@@ -48,9 +47,9 @@ export default function PlansPage() {
       qc.invalidateQueries({ queryKey: ['admin-plans'] });
       setShowAddModal(false);
       setEditForm({});
-      toast.success('New plan created');
+      alert('Plan created successfully');
     },
-    onError: () => toast.error('Failed to create plan'),
+    onError: () => alert('Failed to create plan'),
   });
 
   const handleEdit = (plan: SubscriptionPlan) => {
