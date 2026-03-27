@@ -304,6 +304,8 @@ export const adminApi = {
     apiClient.post('/admin/broadcast', data),
   // Sessions
   flushSessions: () => apiClient.post('/admin/sessions/flush'),
+  // Recharges
+  getRechargeReport: () => apiClient.get('/admin/recharges/report'),
 };
 
 export const bannerApi = {

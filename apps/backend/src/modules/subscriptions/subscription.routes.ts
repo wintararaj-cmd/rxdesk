@@ -82,6 +82,26 @@ router.post('/subscribe', requireRole('shop_owner'), async (req, res, next) => {
               current_period_end: new Date(Date.now() + rechargeDurationMs),
             },
           });
+      
+      // Record the direct payment
+      let monthlyPrice = Number(plan.price_monthly);
+      if (period === '3' && plan.price_quarterly) monthlyPrice = Number(plan.price_quarterly);
+      if (period === '6' && plan.price_halfyearly) monthlyPrice = Number(plan.price_halfyearly);
+      if (period === '12' && plan.price_yearly) monthlyPrice = Number(plan.price_yearly);
+
+      await prisma.subscriptionPayment.create({
+        data: {
+          shop_id: shop.id,
+          plan_id: plan.id,
+          plan_name: plan.name,
+          amount: monthlyPrice * months,
+          period_months: months,
+          payment_method: 'dev_bypass',
+          payment_status: 'captured',
+          transaction_id: `DEV_${crypto.randomBytes(4).toString('hex').toUpperCase()}`,
+        }
+      }).catch(e => logger.error('Failed to create dev payment record', e));
+
       res.json({ success: true, data: { dev_mode: true, subscription: devSub }, message: `Subscription activated (${months} month(s) - dev mode)` });
       return;
     }
@@ -100,10 +120,13 @@ router.post('/subscribe', requireRole('shop_owner'), async (req, res, next) => {
         if (period === '6') { rzpPeriod = 'monthly'; rzpInterval = 6; }
         if (period === '12') { rzpPeriod = 'yearly'; rzpInterval = 1; }
         
-        // Let's offer a small discount for higher plans if desired, or flat multiply
-        // We'll flat multiply for simplicity to match standard DB price
-        const baseAmount = Math.round(Number(plan.price_monthly) * 100);
-        const totalAmount = baseAmount * months;
+        // Calculate dynamic pricing
+        let monthlyPrice = Number(plan.price_monthly);
+        if (period === '3' && plan.price_quarterly) monthlyPrice = Number(plan.price_quarterly);
+        if (period === '6' && plan.price_halfyearly) monthlyPrice = Number(plan.price_halfyearly);
+        if (period === '12' && plan.price_yearly) monthlyPrice = Number(plan.price_yearly);
+
+        const totalAmount = Math.round(monthlyPrice * months * 100);
         let planDesc = `RxDesk ${plan.name} plan`;
         if (months > 1) planDesc += ` (${months} Months Recharge)`;
 
@@ -234,6 +257,23 @@ router.post('/webhook', async (req, res) => {
           },
         });
         logger.info(`Subscription activated/charged: ${sub.id}`);
+
+        // Record the payment in our tracking table
+        if (sub.notes?.rxdesk_shop_id) {
+          const rawAmount = sub.notes?.amount_total || (event.payload?.payment?.entity?.amount / 100) || 0;
+          await prisma.subscriptionPayment.create({
+            data: {
+              shop_id: sub.notes.rxdesk_shop_id,
+              plan_id: sub.notes.rxdesk_plan_id,
+              plan_name: sub.notes.plan_name || 'RxDesk Plan',
+              amount: rawAmount,
+              period_months: parseInt(sub.notes.period_months || '1'),
+              payment_method: 'razorpay',
+              transaction_id: event.payload?.payment?.entity?.id || sub.id,
+              payment_status: 'captured',
+            }
+          }).catch(e => logger.error('Failed to record webhook payment', e));
+        }
         break;
       }
 

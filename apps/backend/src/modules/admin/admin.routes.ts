@@ -396,6 +396,34 @@ router.post('/sessions/flush', requireRole('admin'), async (_req, res, next) => 
   } catch (err) { next(err); }
 });
 
+// ─── Recharges ────────────────────────────────────────────────────────────────
+
+router.get('/recharges/report', requireRole('admin'), async (_req, res, next) => {
+  try {
+    const payments = await prisma.subscriptionPayment.findMany({
+      include: {
+        shop: { select: { shop_name: true, contact_phone: true } },
+        plan: { select: { name: true } }
+      },
+      orderBy: { created_at: 'desc' },
+    });
+    
+    const summary = await prisma.subscriptionPayment.aggregate({
+      _sum: { amount: true },
+      _count: { id: true }
+    });
+
+    res.json({ 
+      success: true, 
+      data: {
+        payments,
+        total_collected: summary._sum.amount || 0,
+        total_count: summary._count.id
+      }
+    });
+  } catch (err) { next(err); }
+});
+
 export default router;
 
 

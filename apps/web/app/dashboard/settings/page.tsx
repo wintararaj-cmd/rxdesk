@@ -40,6 +40,9 @@ interface Plan {
   id: string;
   name: string;
   price_monthly: number;
+  price_quarterly?: number | null;
+  price_halfyearly?: number | null;
+  price_yearly?: number | null;
   max_doctors: number;
   max_appointments_per_month: number;
   max_sessions: number;
@@ -388,27 +391,12 @@ export default function SettingsPage() {
 
               {/* Pricing Rules Helper */}
               {(() => {
-                const getPricePerMonth = (planName: string, period: string) => {
+                const getPricePerMonth = (plan: Plan, period: string) => {
                   const p = period.toString();
-                  if (planName === 'Basic') {
-                    if (p === '1') return 799;
-                    if (p === '3') return 699;
-                    if (p === '6') return 599;
-                    if (p === '12') return 499;
-                  }
-                  if (planName === 'Standard') {
-                    if (p === '1') return 1299;
-                    if (p === '3') return 1199;
-                    if (p === '6') return 1099;
-                    if (p === '12') return 999;
-                  }
-                  if (planName === 'Premium') {
-                    if (p === '1') return 2299;
-                    if (p === '3') return 2199;
-                    if (p === '6') return 2099;
-                    if (p === '12') return 1999;
-                  }
-                  return 0;
+                  if (p === '3' && plan.price_quarterly) return plan.price_quarterly;
+                  if (p === '6' && plan.price_halfyearly) return plan.price_halfyearly;
+                  if (p === '12' && plan.price_yearly) return plan.price_yearly;
+                  return plan.price_monthly;
                 };
 
                 return (
@@ -422,7 +410,7 @@ export default function SettingsPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {plans.map((plan) => {
                           const months = Number(selectedPeriod);
-                          const pricePerMonth = getPricePerMonth(plan.name, selectedPeriod) || (Number(plan.price_monthly));
+                          const pricePerMonth = getPricePerMonth(plan, selectedPeriod);
                           const totalAmount = pricePerMonth * months;
                           return (
                             <div key={plan.id} className="border border-gray-200 rounded-xl p-4 flex flex-col justify-between">

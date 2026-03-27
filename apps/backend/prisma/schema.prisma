@@ -326,6 +326,7 @@ model MedicalShop {
   purchase_returns    PurchaseReturn[]
   contra_entries      ContraEntry[]
   shop_medicines      ShopMedicine[]
+  recharges           SubscriptionPayment[]
 
   @@map("medical_shops")
 }
@@ -609,6 +610,7 @@ model SubscriptionPlan {
 
   // Relations
   subscriptions ShopSubscription[]
+  recharges     SubscriptionPayment[]
 
   @@map("subscription_plans")
 }
@@ -1025,5 +1027,25 @@ model AdminActivityLog {
   @@index([admin_id])
   @@index([created_at])
   @@map("admin_activity_logs")
+}
+
+model SubscriptionPayment {
+  id             String   @id @default(uuid())
+  shop_id        String
+  plan_id        String
+  plan_name      String
+  amount         Decimal  @db.Decimal(10, 2)
+  period_months  Int
+  payment_method String   @default("manual")
+  transaction_id String?  @unique
+  payment_status String   @default("captured")
+  created_at     DateTime @default(now())
+
+  shop MedicalShop      @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  plan SubscriptionPlan @relation(fields: [plan_id], references: [id])
+
+  @@index([shop_id])
+  @@index([created_at])
+  @@map("subscription_payments")
 }
 
