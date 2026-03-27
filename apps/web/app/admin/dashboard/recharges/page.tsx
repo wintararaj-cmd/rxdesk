@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '../../../../lib/apiClient';
-import { IndianRupee, Calendar, Shop, CreditCard, Filter } from 'lucide-react';
+import { IndianRupee, Calendar, Store, CreditCard, Filter } from 'lucide-react';
 
 interface Payment {
   id: string;
