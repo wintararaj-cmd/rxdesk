@@ -223,6 +223,40 @@ export async function seedMedicineCatalog(): Promise<void> {
   }
 
   console.log(`   ✅ ${created} created, ${updated} already existed (refreshed)`);
+
+  // ─── Broad GST 2.0 (2026) Migration ──────────────────────────────────────────
+  // This handles custom medicines and old inventory batches that aren't in the standard seed
+  console.log('📦 Applying broad GST 2.0 (2026) compliance to all records...');
+
+  const globalFix = await prisma.medicine.updateMany({
+    where: { gst_rate: 12 },
+    data: { gst_rate: 5 }
+  });
+  if (globalFix.count > 0) console.log(`   ✅ Updated ${globalFix.count} custom medicines in global catalog (12% -> 5%)`);
+
+  const inventoryFix = await prisma.shopInventory.updateMany({
+    where: { gst_rate: 12 },
+    data: { gst_rate: 5 }
+  });
+  if (inventoryFix.count > 0) console.log(`   ✅ Updated ${inventoryFix.count} existing shop inventory batches (12% -> 5%)`);
+
+  const purchaseFix = await prisma.purchaseItem.updateMany({
+    where: { gst_rate: 12 },
+    data: { gst_rate: 5 }
+  });
+  if (purchaseFix.count > 0) console.log(`   ✅ Updated ${purchaseFix.count} historical purchase items (12% -> 5%)`);
+
+  // Categorize Vitamins/Supplements to 18% automatically if not already set
+  await prisma.medicine.updateMany({
+    where: {
+      gst_rate: { not: 18 },
+      OR: [
+        { name: { contains: 'vitamin', mode: 'insensitive' } },
+        { name: { contains: 'multivitamin', mode: 'insensitive' } },
+      ]
+    },
+    data: { gst_rate: 18 }
+  });
 }
 
 // ─── Standalone entrypoint ────────────────────────────────────────────────────
