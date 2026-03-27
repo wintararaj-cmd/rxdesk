@@ -180,15 +180,27 @@ export async function getTodayDashboard(userId: string) {
   const totalInventory = allStock.length;
 
   // 4. Expiring soon (90 days)
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() + 90);
-  const expiringCount = await prisma.shopInventory.count({
-    where: {
-      shop_id: shop.id,
-      expiry_date: { not: null, lte: cutoff, gte: new Date() },
-      stock_qty: { gt: 0 },
-    },
-  });
+  const cutoff90 = new Date();
+  cutoff90.setDate(cutoff90.getDate() + 90);
+  const cutoff30 = new Date();
+  cutoff30.setDate(cutoff30.getDate() + 30);
+
+  const [expiringCount, criticalExpiryCount] = await Promise.all([
+    prisma.shopInventory.count({
+      where: {
+        shop_id: shop.id,
+        expiry_date: { not: null, lte: cutoff90, gte: new Date() },
+        stock_qty: { gt: 0 },
+      },
+    }),
+    prisma.shopInventory.count({
+      where: {
+        shop_id: shop.id,
+        expiry_date: { not: null, lte: cutoff30, gte: new Date() },
+        stock_qty: { gt: 0 },
+      },
+    }),
+  ]);
 
   // 5. Customer Outstanding
   const outstandingResult = await prisma.creditCustomer.aggregate({
@@ -209,6 +221,7 @@ export async function getTodayDashboard(userId: string) {
     pending_bills: pendingBillsCount, // Used by web
     low_stock_count: lowStockCount, // Used by web
     expiring_count: expiringCount, // New field for dashboard
+    critical_expiry_count: criticalExpiryCount, // For banner alert
     outstanding_count: outstandingResult._count.id, // For alert
     total_outstanding: Number(outstandingResult._sum.total_outstanding || 0), // For display
     total_inventory: totalInventory, // Used by mobile

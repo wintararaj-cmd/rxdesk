@@ -35,6 +35,7 @@ interface Dashboard {
   pending_bills: number;
   low_stock_count: number;
   expiring_count: number;
+  critical_expiry_count: number;
   outstanding_count: number;
   total_outstanding: number;
 }
@@ -205,6 +206,29 @@ export default function DashboardPage() {
           Live
         </span>
       </div>
+
+      {/* Expiry Alert Banner (within 30 days) */}
+      {dashboard && dashboard.critical_expiry_count > 0 && (
+        <div className="mb-7 bg-rose-50 border border-rose-100 rounded-3xl p-5 flex items-center justify-between animate-in slide-in-from-top-4 duration-500 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-rose-100 rounded-2xl flex items-center justify-center text-rose-600 shadow-inner">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
+            </div>
+            <div>
+              <h4 className="text-rose-900 font-black tracking-tight">Expiry Alert</h4>
+              <p className="text-rose-600/70 text-xs font-medium uppercase tracking-widest">{dashboard.critical_expiry_count} medicine(s) are expiring within 30 days.</p>
+            </div>
+          </div>
+          <Link 
+            href="/dashboard/inventory" 
+            className="bg-rose-600 text-white px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-rose-700 transition-colors shadow-lg shadow-rose-100"
+          >
+            Review Stock
+          </Link>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="flex gap-3 mb-7">

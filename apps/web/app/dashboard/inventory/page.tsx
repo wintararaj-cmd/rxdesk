@@ -202,16 +202,27 @@ function InventoryMasterRow({ item, onEdit }: { item: MasterInventoryItem; onEdi
                         <th className="px-3 py-2 text-left text-gray-500 font-bold uppercase tracking-tighter text-right">Stock</th>
                         <th className="px-3 py-2 text-left text-gray-500 font-bold uppercase tracking-tighter text-right">MRP</th>
                         <th className="px-3 py-2 text-left text-gray-500 font-bold uppercase tracking-tighter text-right">Purchase Price</th>
+                        <th className="px-3 py-2 text-left text-gray-500 font-bold uppercase tracking-tighter text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {batches.filter(b => b.stock_qty !== 0).map((batch) => (
                         <tr key={batch.id} className="hover:bg-violet-50/30">
-                          <td className="px-3 py-2 font-mono text-gray-700 font-medium">{batch.batch_number || 'No Batch'}</td>
+                          <td className="px-3 py-2 font-mono text-gray-700 font-medium tracking-tight">
+                            {batch.batch_number || 'No Batch'}
+                          </td>
                           <td className="px-3 py-2 text-gray-500">{batch.expiry_date ? new Date(batch.expiry_date).toLocaleDateString('en-IN') : 'No Expiry'}</td>
                           <td className="px-3 py-2 text-right font-bold text-gray-900">{batch.stock_qty}</td>
-                          <td className="px-3 py-2 text-right text-gray-600">₹{Number(batch.mrp).toFixed(2)}</td>
+                          <td className="px-3 py-2 text-right text-gray-600 font-medium">₹{Number(batch.mrp).toFixed(2)}</td>
                           <td className="px-3 py-2 text-right text-gray-400">₹{Number(batch.purchase_price).toFixed(2)}</td>
+                          <td className="px-3 py-2 text-right">
+                            <button
+                              onClick={() => onEdit(batch as any)}
+                              className="text-[10px] font-black uppercase text-violet-600 hover:text-violet-800 bg-violet-50 px-2 py-1 rounded"
+                            >
+                              Edit
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -606,8 +617,8 @@ export default function InventoryPage() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className={criticalItems.length > 0 ? 'bg-red-100/50' : 'bg-amber-100/50'}>
-                    {['Medicine', 'Batch', 'Expiry', 'Days Left', 'Qty', 'MRP'].map((h) => (
-                      <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase text-[10px] tracking-wide">{h}</th>
+                    {['Medicine', 'Batch', 'Expiry', 'Days Left', 'Qty', 'MRP', 'Action'].map((h, idx) => (
+                      <th key={h} className={`px-3 py-2 text-left font-semibold text-gray-500 uppercase text-[10px] tracking-wide ${idx > 3 ? 'text-right' : ''} ${h === 'Action' ? 'pr-4' : ''}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -632,6 +643,14 @@ export default function InventoryPage() {
                         </td>
                         <td className="px-3 py-2.5 font-semibold text-gray-700">{item.stock_qty}</td>
                         <td className="px-3 py-2.5 text-gray-600">₹{Number(item.mrp).toFixed(2)}</td>
+                        <td className="px-3 py-2.5 text-right">
+                          <button
+                            onClick={() => openEdit(item as any)}
+                            className="text-[10px] font-black uppercase text-violet-600 hover:text-violet-800 bg-white border border-violet-100 px-2.5 py-1.5 rounded-lg shadow-sm transition-all"
+                          >
+                            Manage
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
