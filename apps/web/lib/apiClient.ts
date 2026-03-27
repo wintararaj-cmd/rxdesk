@@ -267,14 +267,38 @@ export const doctorApi = {
 
 export const adminApi = {
   getAnalytics: () => apiClient.get('/admin/analytics'),
-  getDoctors: (status?: string) => apiClient.get('/admin/doctors', { params: status ? { status } : undefined }),
+  // Doctors
+  getDoctors: (status?: string, q?: string) => apiClient.get('/admin/doctors', { params: { status, q } }),
   verifyDoctor: (id: string, status: 'approved' | 'rejected', rejection_reason?: string) =>
     apiClient.patch(`/admin/doctors/${id}/verify`, { status, rejection_reason }),
-  getShops: (status?: string) => apiClient.get('/admin/shops', { params: status ? { status } : undefined }),
+  bulkActionDoctors: (ids: string[], status: 'approved' | 'rejected') =>
+    apiClient.post('/admin/doctors/bulk-action', { ids, status }),
+  // Shops
+  getShops: (status?: string, q?: string) => apiClient.get('/admin/shops', { params: { status, q } }),
+  getShopDetail: (id: string) => apiClient.get(`/admin/shops/${id}`),
   verifyShop: (id: string, status: 'approved' | 'rejected', rejection_reason?: string) =>
     apiClient.patch(`/admin/shops/${id}/verify`, { status, rejection_reason }),
-  getUsers: (role?: string) => apiClient.get('/admin/users', { params: role ? { role } : undefined }),
-  rechargeShop: (id: string, data: { plan_id: string; months: number }) => apiClient.post(`/admin/shops/${id}/recharge`, data),
+  bulkActionShops: (ids: string[], status: 'approved' | 'rejected') =>
+    apiClient.post('/admin/shops/bulk-action', { ids, status }),
+  rechargeShop: (id: string, data: { plan_id: string; months: number }) =>
+    apiClient.post(`/admin/shops/${id}/recharge`, data),
+  // Users
+  getUsers: (role?: string, q?: string) => apiClient.get('/admin/users', { params: { role, q } }),
+  toggleUserActive: (id: string) => apiClient.patch(`/admin/users/${id}/toggle-active`),
+  exportUsersCsvUrl: (role?: string) => `${apiClient.defaults.baseURL}/admin/users/export-csv${role ? `?role=${role}` : ''}`,
+  // Subscriptions
+  getSubscriptions: (status?: string) => apiClient.get('/admin/subscriptions', { params: { status } }),
+  // Medicine Catalog
+  getMedicineCatalog: (q?: string, page?: number) => apiClient.get('/admin/medicine-catalog', { params: { q, page } }),
+  createMedicine: (data: object) => apiClient.post('/admin/medicine-catalog', data),
+  updateMedicine: (id: string, data: object) => apiClient.put(`/admin/medicine-catalog/${id}`, data),
+  deleteMedicine: (id: string) => apiClient.delete(`/admin/medicine-catalog/${id}`),
+  // Activity Log
+  getActivityLog: (page?: number) => apiClient.get('/admin/activity-log', { params: { page } }),
+  // Broadcast
+  broadcast: (data: { title: string; body: string; target_role?: string }) =>
+    apiClient.post('/admin/broadcast', data),
+  // Sessions
   flushSessions: () => apiClient.post('/admin/sessions/flush'),
 };
 
