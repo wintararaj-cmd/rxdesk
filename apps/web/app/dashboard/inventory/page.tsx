@@ -239,7 +239,7 @@ function InventoryMasterRow({ item, onEdit }: { item: MasterInventoryItem; onEdi
 
 export default function InventoryPage() {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<'stock' | 'catalog' | 'finder' | 'reports' | 'nearby'>('stock');
+  const [tab, setTab] = useState<'stock' | 'catalog' | 'finder' | 'reports' | 'nearby' | 'orders'>('stock');
   const [finderQuery, setFinderQuery] = useState('');
   const [finderInput, setFinderInput] = useState('');
   const finderDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -527,6 +527,8 @@ export default function InventoryPage() {
               ? (catalogPagination ? `${catalogPagination.total.toLocaleString()} medicines in catalog` : '…')
               : tab === 'nearby'
               ? 'Search medicine availability across nearby shops'
+              : tab === 'orders'
+              ? 'Auto-generated purchase orders from low-stock items'
               : 'Find alternatives by composition'}
           </p>
         </div>
@@ -693,12 +695,19 @@ export default function InventoryPage() {
         >
           📍 Nearby Shops
         </button>
+        <button
+          onClick={() => setTab('orders')}
+          className={`px-5 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${tab === 'orders' ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          🛒 Auto Order
+        </button>
       </div>
 
       {/* ── FINDER TAB ───────────────────────────────────────────── */}
       {tab === 'finder' && <MedicineFinder />}
       {tab === 'reports' && <StockSupplierReport />}
       {tab === 'nearby' && <NearbyAvailability />}
+      {tab === 'orders' && <AutoPurchaseOrders />}
 
       {/* ── CATALOG TAB ─────────────────────────────────────────── */}
       {tab === 'catalog' && (
@@ -1002,6 +1011,291 @@ export default function InventoryPage() {
         </table>
       </div>
       </>)}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Auto Purchase Orders — generate supplier-wise reorder suggestions
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface POItem {
+  shop_medicine_id: string;
+  medicine_name: string;
+  unit: string;
+  hsn_code: string | null;
+  current_stock: number;
+  reorder_level: number;
+  suggested_qty: number;
+  last_purchase_price: number | null;
+  last_mrp: number | null;
+  estimated_cost: number;
+}
+
+interface POSupplierGroup {
+  supplier_id: string;
+  supplier_name: string;
+  supplier_phone: string | null;
+  supplier_city: string | null;
+  items: POItem[];
+  total_estimated_cost: number;
+}
+
+interface POData {
+  suppliers: POSupplierGroup[];
+  unassigned: POItem[];
+  total_items: number;
+  total_estimated_cost: number;
+}
+
+function AutoPurchaseOrders() {
+  const { data, isLoading } = useQuery<POData>({
+    queryKey: ['purchase-order-suggestions'],
+    queryFn: () => inventoryApi.purchaseOrderSuggestions().then(r => r.data.data),
+    staleTime: 60_000,
+  });
+
+  const [expandedSupplier, setExpandedSupplier] = useState<string | null>(null);
+  const [qtyOverrides, setQtyOverrides] = useState<Record<string, number>>({});
+
+  const getQty = (item: POItem) => qtyOverrides[item.shop_medicine_id] ?? item.suggested_qty;
+  const getCost = (item: POItem) => {
+    const qty = getQty(item);
+    return item.last_purchase_price ? qty * item.last_purchase_price : 0;
+  };
+
+  const exportSupplierOrder = (group: POSupplierGroup) => {
+    const header = 'Medicine Name,Unit,Current Stock,Order Qty,Last Purchase Price,Estimated Cost';
+    const rows = group.items.map(i => {
+      const qty = getQty(i);
+      const cost = i.last_purchase_price ? qty * i.last_purchase_price : 0;
+      return `"${i.medicine_name}",${i.unit},${i.current_stock},${qty},${i.last_purchase_price ?? ''},${cost.toFixed(2)}`;
+    });
+    const csv = [header, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `PurchaseOrder_${group.supplier_name.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <div className="w-8 h-8 border-3 border-violet-200 border-t-violet-600 rounded-full animate-spin" />
+        <p className="text-sm text-gray-400 font-medium">Analyzing stock levels...</p>
+      </div>
+    );
+  }
+
+  if (!data || data.total_items === 0) {
+    return (
+      <div className="text-center py-20">
+        <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <p className="text-lg font-bold text-gray-700 mb-1">All stock levels are healthy!</p>
+        <p className="text-sm text-gray-400">No purchase orders needed right now. All items are above reorder levels.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Summary banner */}
+      <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-6 shadow-xl shadow-violet-200">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-white font-black text-xl tracking-tight mb-1">Auto Purchase Order</h2>
+            <p className="text-violet-200 text-sm font-medium">
+              {data.total_items} medicine(s) are below reorder level — grouped by last known supplier
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-white/60 text-[10px] font-black uppercase tracking-widest">Est. Total Cost</p>
+            <p className="text-white text-2xl font-black">
+              ₹{(() => {
+                const total = data.suppliers.reduce((s, g) =>
+                  s + g.items.reduce((s2, i) => s2 + getCost(i), 0), 0
+                ) + data.unassigned.reduce((s, i) => s + getCost(i), 0);
+                return total.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+              })()}
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-4 mt-4">
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-2 text-center">
+            <p className="text-white text-lg font-black">{data.suppliers.length}</p>
+            <p className="text-violet-200 text-[10px] font-bold uppercase tracking-widest">Suppliers</p>
+          </div>
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-2 text-center">
+            <p className="text-white text-lg font-black">{data.total_items}</p>
+            <p className="text-violet-200 text-[10px] font-bold uppercase tracking-widest">Items</p>
+          </div>
+          {data.unassigned.length > 0 && (
+            <div className="bg-amber-400/20 backdrop-blur-sm rounded-xl px-4 py-2 text-center">
+              <p className="text-amber-200 text-lg font-black">{data.unassigned.length}</p>
+              <p className="text-amber-200 text-[10px] font-bold uppercase tracking-widest">No Supplier</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Supplier-wise order cards */}
+      {data.suppliers.map((group) => {
+        const isExpanded = expandedSupplier === group.supplier_id;
+        const groupTotal = group.items.reduce((s, i) => s + getCost(i), 0);
+
+        return (
+          <div key={group.supplier_id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            {/* Supplier header */}
+            <div
+              className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-gray-50/50 transition-colors"
+              onClick={() => setExpandedSupplier(isExpanded ? null : group.supplier_id)}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center text-violet-600 font-black text-sm">
+                  {group.supplier_name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="font-bold text-gray-900">{group.supplier_name}</p>
+                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                    {group.supplier_phone && <span>📞 {group.supplier_phone}</span>}
+                    {group.supplier_city && <span>📍 {group.supplier_city}</span>}
+                    <span className="bg-violet-50 text-violet-600 px-2 py-0.5 rounded-full font-bold">{group.items.length} item(s)</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Order Value</p>
+                  <p className="text-lg font-black text-gray-900">₹{groupTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                </div>
+                <svg className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Expanded items table */}
+            {isExpanded && (
+              <div className="border-t border-gray-100">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-gray-50/80 border-b border-gray-100">
+                      {['Medicine', 'Unit', 'Current Stock', 'Reorder Level', 'Order Qty', 'Last Price', 'Est. Cost'].map(h => (
+                        <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {group.items.map((item) => (
+                      <tr key={item.shop_medicine_id} className="hover:bg-violet-50/30 transition-colors">
+                        <td className="px-4 py-3">
+                          <p className="font-bold text-gray-900 text-sm">{item.medicine_name}</p>
+                          {item.hsn_code && <p className="text-[10px] text-gray-400">HSN: {item.hsn_code}</p>}
+                        </td>
+                        <td className="px-4 py-3 text-gray-500 uppercase text-[10px] font-bold">{item.unit}</td>
+                        <td className="px-4 py-3">
+                          <span className={`font-bold ${item.current_stock === 0 ? 'text-red-600' : 'text-amber-600'}`}>
+                            {item.current_stock}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-gray-500">{item.reorder_level}</td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="number"
+                            min={1}
+                            value={getQty(item)}
+                            onChange={(e) => setQtyOverrides(prev => ({
+                              ...prev,
+                              [item.shop_medicine_id]: Math.max(1, Number(e.target.value) || 1),
+                            }))}
+                            className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm text-center font-bold text-violet-700 focus:border-violet-400 focus:ring-2 focus:ring-violet-100 outline-none"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 font-medium">
+                          {item.last_purchase_price ? `₹${item.last_purchase_price.toFixed(2)}` : <span className="text-gray-300 italic">N/A</span>}
+                        </td>
+                        <td className="px-4 py-3 font-bold text-gray-900">
+                          {getCost(item) > 0 ? `₹${getCost(item).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-violet-50/50 border-t border-violet-100">
+                      <td colSpan={6} className="px-4 py-3 text-right text-xs font-black text-violet-600 uppercase tracking-widest">
+                        Supplier Total
+                      </td>
+                      <td className="px-4 py-3 font-black text-violet-700 text-sm">
+                        ₹{groupTotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+                <div className="px-5 py-3 bg-gray-50/50 border-t border-gray-100 flex justify-end gap-2">
+                  <button
+                    onClick={() => exportSupplierOrder(group)}
+                    className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-emerald-700 transition-colors shadow-sm"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                    Export as CSV
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Unassigned items (no supplier history) */}
+      {data.unassigned.length > 0 && (
+        <div className="bg-white rounded-2xl border border-amber-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 bg-amber-50/50">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600 text-lg">
+                ❓
+              </div>
+              <div>
+                <p className="font-bold text-gray-900">No Supplier Linked</p>
+                <p className="text-xs text-amber-600 font-medium">
+                  {data.unassigned.length} item(s) without purchase history — assign a supplier manually
+                </p>
+              </div>
+            </div>
+          </div>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-gray-50/80 border-b border-gray-100">
+                {['Medicine', 'Unit', 'Current Stock', 'Reorder Level', 'Suggested Qty'].map(h => (
+                  <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {data.unassigned.map((item) => (
+                <tr key={item.shop_medicine_id} className="hover:bg-amber-50/30">
+                  <td className="px-4 py-3 font-bold text-gray-900 text-sm">{item.medicine_name}</td>
+                  <td className="px-4 py-3 text-gray-500 uppercase text-[10px] font-bold">{item.unit}</td>
+                  <td className="px-4 py-3">
+                    <span className={`font-bold ${item.current_stock === 0 ? 'text-red-600' : 'text-amber-600'}`}>
+                      {item.current_stock}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500">{item.reorder_level}</td>
+                  <td className="px-4 py-3 font-bold text-gray-700">{item.suggested_qty}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

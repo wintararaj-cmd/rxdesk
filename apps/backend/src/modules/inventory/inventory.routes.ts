@@ -204,6 +204,149 @@ router.get('/master/:id/batches', requireRole('shop_owner'), async (req, res, ne
   } catch (err) { next(err); }
 });
 
+// GET /inventory/purchase-order-suggestions  — auto-generate purchase orders from low stock
+router.get('/purchase-order-suggestions', requireRole('shop_owner'), async (req, res, next) => {
+  try {
+    const shop = await getShopByUser(req.user!.id);
+
+    // 1. Get all low-stock medicines (total stock <= reorder level)
+    const lowStockItems = await prisma.$queryRaw<any[]>`
+      SELECT 
+        sm.id as shop_medicine_id,
+        sm.medicine_name,
+        sm.unit,
+        sm.reorder_level,
+        sm.hsn_code,
+        COALESCE(SUM(si.stock_qty), 0) as current_stock,
+        MAX(si.mrp) as last_mrp,
+        MAX(si.purchase_price) as last_purchase_price
+      FROM shop_medicines sm
+      LEFT JOIN shop_inventory si ON si.shop_medicine_id = sm.id
+      WHERE sm.shop_id = ${shop.id}
+        AND sm.is_active = true
+      GROUP BY sm.id, sm.medicine_name, sm.unit, sm.reorder_level, sm.hsn_code
+      HAVING COALESCE(SUM(si.stock_qty), 0) <= sm.reorder_level
+      ORDER BY COALESCE(SUM(si.stock_qty), 0) ASC
+    `;
+
+    if (lowStockItems.length === 0) {
+      return res.json({ success: true, data: { suppliers: [], unassigned: [], total_items: 0 } });
+    }
+
+    // 2. For each low-stock item, find the last supplier from purchase history
+    const medicineNames = lowStockItems.map(i => i.medicine_name);
+
+    const supplierHistory = await prisma.$queryRaw<any[]>`
+      SELECT DISTINCT ON (pi.medicine_name)
+        pi.medicine_name,
+        s.id as supplier_id,
+        s.name as supplier_name,
+        s.phone as supplier_phone,
+        s.city as supplier_city,
+        pe.invoice_date as last_purchase_date,
+        pi.purchase_price as last_purchase_price,
+        pi.mrp as last_mrp,
+        pi.quantity as last_order_qty
+      FROM purchase_items pi
+      JOIN purchase_entries pe ON pi.purchase_id = pe.id
+      LEFT JOIN suppliers s ON pe.supplier_id = s.id
+      WHERE pe.shop_id = ${shop.id}
+        AND pi.medicine_name = ANY(${medicineNames}::text[])
+        AND s.id IS NOT NULL
+        AND s.is_active = true
+      ORDER BY pi.medicine_name, pe.invoice_date DESC
+    `;
+
+    // Build lookup: medicine_name -> supplier info
+    const supplierMap = new Map<string, any>();
+    for (const sh of supplierHistory) {
+      supplierMap.set(sh.medicine_name.toLowerCase(), sh);
+    }
+
+    // 3. Build order suggestions
+    type OrderItem = {
+      shop_medicine_id: string;
+      medicine_name: string;
+      unit: string;
+      hsn_code: string | null;
+      current_stock: number;
+      reorder_level: number;
+      suggested_qty: number;
+      last_purchase_price: number | null;
+      last_mrp: number | null;
+      estimated_cost: number;
+    };
+
+    type SupplierGroup = {
+      supplier_id: string;
+      supplier_name: string;
+      supplier_phone: string | null;
+      supplier_city: string | null;
+      items: OrderItem[];
+      total_estimated_cost: number;
+    };
+
+    const supplierGroups = new Map<string, SupplierGroup>();
+    const unassigned: OrderItem[] = [];
+
+    for (const item of lowStockItems) {
+      const currentStock = Number(item.current_stock);
+      const reorderLevel = Number(item.reorder_level);
+      // Suggest ordering at least 2x the reorder level minus current stock
+      const suggestedQty = Math.max(reorderLevel * 2 - currentStock, reorderLevel);
+
+      const history = supplierMap.get(item.medicine_name.toLowerCase());
+      const purchasePrice = history ? Number(history.last_purchase_price) : (item.last_purchase_price ? Number(item.last_purchase_price) : null);
+      const mrp = history ? Number(history.last_mrp) : (item.last_mrp ? Number(item.last_mrp) : null);
+
+      const orderItem: OrderItem = {
+        shop_medicine_id: item.shop_medicine_id,
+        medicine_name: item.medicine_name,
+        unit: item.unit || 'strip',
+        hsn_code: item.hsn_code,
+        current_stock: currentStock,
+        reorder_level: reorderLevel,
+        suggested_qty: suggestedQty,
+        last_purchase_price: purchasePrice,
+        last_mrp: mrp,
+        estimated_cost: purchasePrice ? suggestedQty * purchasePrice : 0,
+      };
+
+      if (history?.supplier_id) {
+        const sid = history.supplier_id;
+        if (!supplierGroups.has(sid)) {
+          supplierGroups.set(sid, {
+            supplier_id: sid,
+            supplier_name: history.supplier_name || 'Unknown',
+            supplier_phone: history.supplier_phone,
+            supplier_city: history.supplier_city,
+            items: [],
+            total_estimated_cost: 0,
+          });
+        }
+        const group = supplierGroups.get(sid)!;
+        group.items.push(orderItem);
+        group.total_estimated_cost += orderItem.estimated_cost;
+      } else {
+        unassigned.push(orderItem);
+      }
+    }
+
+    const suppliers = Array.from(supplierGroups.values())
+      .sort((a, b) => b.items.length - a.items.length);
+
+    res.json({
+      success: true,
+      data: {
+        suppliers,
+        unassigned,
+        total_items: lowStockItems.length,
+        total_estimated_cost: suppliers.reduce((s, g) => s + g.total_estimated_cost, 0) + unassigned.reduce((s, i) => s + i.estimated_cost, 0),
+      },
+    });
+  } catch (err) { next(err); }
+});
+
 // GET /inventory/low-stock
 router.get('/low-stock', requireRole('shop_owner'), async (req, res, next) => {
   try {
