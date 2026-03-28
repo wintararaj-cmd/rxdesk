@@ -237,9 +237,11 @@ function InventoryMasterRow({ item, onEdit }: { item: MasterInventoryItem; onEdi
   );
 }
 
+import InventoryInsights from './InventoryInsights';
+
 export default function InventoryPage() {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<'stock' | 'catalog' | 'finder' | 'reports' | 'nearby' | 'orders'>('stock');
+  const [tab, setTab] = useState<'stock' | 'catalog' | 'finder' | 'reports' | 'nearby' | 'orders' | 'insights'>('stock');
   const [finderQuery, setFinderQuery] = useState('');
   const [finderInput, setFinderInput] = useState('');
   const finderDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -529,6 +531,8 @@ export default function InventoryPage() {
               ? 'Search medicine availability across nearby shops'
               : tab === 'orders'
               ? 'Auto-generated purchase orders from low-stock items'
+              : tab === 'insights'
+              ? 'AI-Powered Insights to optimize inventory and reduce dead stock'
               : 'Find alternatives by composition'}
           </p>
         </div>
@@ -701,6 +705,12 @@ export default function InventoryPage() {
         >
           🛒 Auto Order
         </button>
+        <button
+          onClick={() => setTab('insights')}
+          className={`px-5 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${tab === 'insights' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          🧠 Insights
+        </button>
       </div>
 
       {/* ── FINDER TAB ───────────────────────────────────────────── */}
@@ -708,6 +718,7 @@ export default function InventoryPage() {
       {tab === 'reports' && <StockSupplierReport />}
       {tab === 'nearby' && <NearbyAvailability />}
       {tab === 'orders' && <AutoPurchaseOrders />}
+      {tab === 'insights' && <InventoryInsights />}
 
       {/* ── CATALOG TAB ─────────────────────────────────────────── */}
       {tab === 'catalog' && (

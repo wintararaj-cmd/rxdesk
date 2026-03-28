@@ -129,6 +129,9 @@ export const inventoryApi = {
     apiClient.get('/inventory/reports/expiry-excel', { params: { days }, responseType: 'blob' }),
   stockSupplierReport: (q?: string) => apiClient.get('/inventory/reports/batch-supplier', { params: { q } }),
   purchaseOrderSuggestions: () => apiClient.get('/inventory/purchase-order-suggestions'),
+  // Insights
+  getDeadStock: () => apiClient.get('/inventory/insights/dead-stock'),
+  getPredictiveOrders: () => apiClient.get('/inventory/insights/predictive-orders'),
 };
 
 export const billApi = {
