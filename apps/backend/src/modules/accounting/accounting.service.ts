@@ -3196,5 +3196,51 @@ export async function updateOpeningBalances(userId: string, data: { cash: number
   });
 }
 
+export async function generateGstr3bExcel(userId: string, month: number, year: number) {
+  const summary = await getGstSummary(userId, month, year);
 
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet(`GSTR-3B_${month}_${year}`);
 
+  sheet.columns = [
+    { header: 'Particulars', key: 'particulars', width: 40 },
+    { header: 'Taxable Value', key: 'taxable', width: 20 },
+    { header: 'Integrated Tax (IGST)', key: 'igst', width: 20 },
+    { header: 'Central Tax (CGST)', key: 'cgst', width: 20 },
+    { header: 'State/UT Tax (SGST)', key: 'sgst', width: 20 },
+  ];
+
+  sheet.addRow({
+    particulars: '3.1 Details of Outward Supplies (Sales)',
+    taxable: summary.outward_supplies.taxable_value,
+    igst: summary.outward_supplies.gst_collected.igst,
+    cgst: summary.outward_supplies.gst_collected.cgst,
+    sgst: summary.outward_supplies.gst_collected.sgst,
+  });
+
+  sheet.addRow({});
+
+  sheet.addRow({
+    particulars: '4. Eligible ITC (Purchases)',
+    taxable: '', // Not generally reported in 3B summary Table 4
+    igst: 0,
+    cgst: summary.inward_supplies.itc_available.cgst,
+    sgst: summary.inward_supplies.itc_available.sgst,
+  });
+
+  sheet.addRow({});
+
+  sheet.addRow({
+    particulars: 'Net Tax Payable',
+    taxable: '',
+    igst: 0,
+    cgst: Math.max(0, summary.outward_supplies.gst_collected.cgst - summary.inward_supplies.itc_available.cgst),
+    sgst: Math.max(0, summary.outward_supplies.gst_collected.sgst - summary.inward_supplies.itc_available.sgst),
+  });
+
+  // Make header bold
+  sheet.getRow(1).font = { bold: true };
+  sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+
+  return workbook.xlsx.writeBuffer();
+}

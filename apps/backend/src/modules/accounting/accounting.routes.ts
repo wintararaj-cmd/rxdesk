@@ -299,6 +299,17 @@ router.get('/reports/gstr2-excel', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/reports/gstr3b-excel', shopAuth, async (req, res, next) => {
+  try {
+    const month = req.query.month ? Number(req.query.month) : new Date().getMonth() + 1;
+    const year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
+    const buffer = await service.generateGstr3bExcel(req.user!.id, month, year);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=GSTR3B_${month}_${year}.xlsx`);
+    res.send(buffer);
+  } catch (err) { next(err); }
+});
+
 // GET /accounting/reports/payment-split?from=YYYY-MM-DD&to=YYYY-MM-DD
 router.get('/reports/payment-split', shopAuth, async (req, res, next) => {
   try {
@@ -505,6 +516,19 @@ router.get('/reports/gstr2-excel', shopAuth, async (req, res, next) => {
     const buffer = await service.generateGstr2Excel(req.user!.id, month, year);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=GSTR2_${month}_${year}.xlsx`);
+    res.send(buffer);
+  } catch (err) { next(err); }
+});
+
+router.get('/reports/gstr3b-excel', shopAuth, async (req, res, next) => {
+  try {
+    const month = parseInt(req.query.month as string);
+    const year = parseInt(req.query.year as string);
+    if (!month || !year) return res.status(400).json({ success: false, message: 'Month and year are required' });
+
+    const buffer = await service.generateGstr3bExcel(req.user!.id, month, year);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=GSTR3B_${month}_${year}.xlsx`);
     res.send(buffer);
   } catch (err) { next(err); }
 });

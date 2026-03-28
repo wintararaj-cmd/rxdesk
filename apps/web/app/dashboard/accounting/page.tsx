@@ -2627,6 +2627,24 @@ function GSTTab() {
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             GSTR-2A (Purchase)
           </button>
+          <button
+            onClick={async () => {
+              try {
+                const res = await accountingApi.getGstr3bExcel(month, year);
+                const url = window.URL.createObjectURL(new Blob([res.data]));
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', `GSTR3B_${month}_${year}.xlsx`);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+              } catch (err) { alert('Failed to download GSTR-3B'); }
+            }}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-100 hover:scale-[1.02] active:scale-95 transition-all"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            GSTR-3B (Summary)
+          </button>
         </div>
       </div>
 
@@ -3650,17 +3668,12 @@ function SettingsTab() {
   const [openingCash, setOpeningCash] = useState<string>('0');
   const [openingBank, setOpeningBank] = useState<string>('0');
   const [isSaving, setIsSaving] = useState(false);
-  const [backupConfig, setBackupConfig] = useState(() => {
-    // Distribute default load by randomizing off-peak backup time (00:00 - 05:59)
-    const randomHour = Math.floor(Math.random() * 6);
-    const randomMin = Math.floor(Math.random() * 60);
-    return {
-      agentPath: 'C:\\\\RxDesk_BackupAgent',
-      backupPath: 'Documents\\\\RxDesk_Backups',
-      scheduleTime: `${String(randomHour).padStart(2, '0')}:${String(randomMin).padStart(2, '0')}`,
-      runOnLogoff: false
-    };
-  });
+  const [backupConfig, setBackupConfig] = useState(() => ({
+    agentPath: 'C:\\RxDesk_BackupAgent',
+    backupPath: 'Documents\\RxDesk_Backups',
+    scheduleTime: '02:00',
+    runOnLogoff: false
+  }));
 
   useEffect(() => {
     if (accStatus) {
@@ -3983,7 +3996,7 @@ if __name__ == "__main__":
 
                  <button
                    onClick={() => {
-                     const installerPath = backupConfig.agentPath.replace(/\\/g, '\\\\');
+                     const installerPath = backupConfig.agentPath;
                      const apiKey = shop?.backup_api_key ?? "YOUR_API_KEY_HERE";
                      const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'https://backend.rxdesk.in/api/v1');
                      
@@ -4053,11 +4066,11 @@ python -m pip install requests --quiet >nul 2>&1
 
 echo [*] Scheduling daily task at %ST_TIME%...
 schtasks /delete /tn "RxDesk_Daily_Backup" /f >nul 2>&1
-schtasks /create /tn "RxDesk_Daily_Backup" /tr "python %INSTALL_PATH%\\backup_agent.py" /sc daily /st %ST_TIME% /f
+schtasks /create /tn "RxDesk_Daily_Backup" /tr "python \"%INSTALL_PATH%\\backup_agent.py\"" /sc daily /st %ST_TIME% /f
 
 if "${backupConfig.runOnLogoff}"=="true" (
     echo [*] Scheduling logoff trigger...
-    schtasks /create /tn "RxDesk_Logoff_Backup" /tr "python %INSTALL_PATH%\\backup_agent.py" /sc onlogon /f
+    schtasks /create /tn "RxDesk_Logoff_Backup" /tr "python \"%INSTALL_PATH%\\backup_agent.py\"" /sc onlogon /f
 )
 
 echo.
