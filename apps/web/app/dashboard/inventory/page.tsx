@@ -532,7 +532,7 @@ export default function InventoryPage() {
               : tab === 'orders'
               ? 'Auto-generated purchase orders from low-stock items'
               : tab === 'insights'
-              ? 'AI-Powered Insights to optimize inventory and reduce dead stock'
+              ? 'Smart Stock Insights to optimize inventory and reduce dead stock'
               : 'Find alternatives by composition'}
           </p>
         </div>

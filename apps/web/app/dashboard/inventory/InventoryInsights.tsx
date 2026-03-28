@@ -34,7 +34,7 @@ export default function InventoryInsights() {
              🧠
           </div>
           <div>
-            <h2 className="text-white font-black text-2xl tracking-tight leading-tight">AI Insights & Engagement</h2>
+            <h2 className="text-white font-black text-2xl tracking-tight leading-tight">Smart Stock Insights</h2>
             <p className="text-indigo-200 text-sm font-medium mt-1">
               Optimize your working capital and engage patients automatically with refill reminders tailored to chronic medication usage.
             </p>
