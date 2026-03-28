@@ -3925,7 +3925,7 @@ if __name__ == "__main__":
                    onClick={() => {
                      const installerPath = "C:\\\\RxDesk_BackupAgent";
                      const apiKey = shop?.backup_api_key ?? "YOUR_API_KEY_HERE";
-                     const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'https://backend.rxdesk.in').replace('/v1', '');
+                     const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'https://backend.rxdesk.in/api/v1');
                      
                      const batContent = `@echo off
 TITLE RxDesk Backup Agent Installer
@@ -3956,7 +3956,7 @@ echo. >> "%INSTALL_PATH%\\backup_agent.py"
 echo def run(): >> "%INSTALL_PATH%\\backup_agent.py"
 echo     if not os.path.exists(BACKUP_DIR): os.makedirs(BACKUP_DIR) >> "%INSTALL_PATH%\\backup_agent.py"
 echo     try: >> "%INSTALL_PATH%\\backup_agent.py"
-echo         r = requests.get(f"{BASE_URL}/api/v1/accounting/agent-backup", headers={'x-api-key': API_KEY}) >> "%INSTALL_PATH%\\backup_agent.py"
+echo         r = requests.get(f"{BASE_URL}/accounting/agent-backup", headers={'x-api-key': API_KEY}) >> "%INSTALL_PATH%\\backup_agent.py"
 echo         r.raise_for_status() >> "%INSTALL_PATH%\\backup_agent.py"
 echo         data = r.json() >> "%INSTALL_PATH%\\backup_agent.py"
 echo         if data.get('success'): >> "%INSTALL_PATH%\\backup_agent.py"
