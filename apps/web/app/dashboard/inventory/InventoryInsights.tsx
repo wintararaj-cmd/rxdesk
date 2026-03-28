@@ -1,15 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
-import { inventoryInsightsApi } from '../../../lib/apiClient';
+import { inventoryApi } from '../../../lib/apiClient';
 
 export default function InventoryInsights() {
   const { data: deadStockRes, isLoading: loadingDeadStock } = useQuery({
     queryKey: ['insights', 'dead-stock'],
-    queryFn: () => inventoryInsightsApi.getDeadStock().then((res) => res.data.data),
+    queryFn: () => inventoryApi.getDeadStock().then((res) => res.data.data),
   });
 
   const { data: predictiveRes, isLoading: loadingPredictive } = useQuery({
     queryKey: ['insights', 'predictive-orders'],
-    queryFn: () => inventoryInsightsApi.getPredictiveOrders().then((res) => res.data.data),
+    queryFn: () => inventoryApi.getPredictiveOrders().then((res) => res.data.data),
   });
 
   return (
