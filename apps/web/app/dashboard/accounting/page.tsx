@@ -3650,6 +3650,17 @@ function SettingsTab() {
   const [openingCash, setOpeningCash] = useState<string>('0');
   const [openingBank, setOpeningBank] = useState<string>('0');
   const [isSaving, setIsSaving] = useState(false);
+  const [backupConfig, setBackupConfig] = useState(() => {
+    // Distribute default load by randomizing off-peak backup time (00:00 - 05:59)
+    const randomHour = Math.floor(Math.random() * 6);
+    const randomMin = Math.floor(Math.random() * 60);
+    return {
+      agentPath: 'C:\\\\RxDesk_BackupAgent',
+      backupPath: 'Documents\\\\RxDesk_Backups',
+      scheduleTime: `${String(randomHour).padStart(2, '0')}:${String(randomMin).padStart(2, '0')}`,
+      runOnLogoff: false
+    };
+  });
 
   useEffect(() => {
     if (accStatus) {
@@ -3808,14 +3819,63 @@ function SettingsTab() {
 
         {/* Automated Local Backup Agent Card */}
         <div className="bg-white rounded-[2.5rem] p-10 border border-gray-100 shadow-xl shadow-gray-200/50 flex flex-col items-start gap-6 md:col-span-2">
-          <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm">
-            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
-            </svg>
+        <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
+          <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" />
+          </svg>
+        </div>
+        <div className="flex-1 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-xl font-bold text-gray-900 leading-tight">Automated Local Backup Agent</h3>
+              <p className="text-sm text-gray-500 mt-1 font-medium italic">Keep your data on your premise, instantly synced & secure.</p>
+            </div>
           </div>
-          <div className="w-full">
-            <h3 className="text-xl font-black text-gray-900 tracking-tight mb-1">Automated Local Backup Agent</h3>
-            <p className="text-sm text-gray-500 font-medium leading-relaxed mb-6">Setup a Python script on your personal computer to automatically download backups of your shop's data every day. It keeps only the last 3 backups locally for safety.</p>
+
+          <div className="bg-indigo-50/40 p-5 rounded-3xl space-y-4 border border-indigo-100">
+            <h4 className="text-xs font-black uppercase tracking-widest text-indigo-600 flex items-center gap-2">
+              Configuration Settings
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Installation Directory</label>
+                <input 
+                  type="text" 
+                  value={backupConfig.agentPath} 
+                  onChange={(e) => setBackupConfig({ ...backupConfig, agentPath: e.target.value })}
+                  className="w-full text-xs font-mono bg-white border border-indigo-50 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Backup Storage Directory</label>
+                <input 
+                  type="text" 
+                  value={backupConfig.backupPath} 
+                  onChange={(e) => setBackupConfig({ ...backupConfig, backupPath: e.target.value })}
+                  className="w-full text-xs font-mono bg-white border border-indigo-50 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Auto-Backup Schedule</label>
+                <input 
+                  type="time" 
+                  value={backupConfig.scheduleTime} 
+                  onChange={(e) => setBackupConfig({ ...backupConfig, scheduleTime: e.target.value })}
+                  className="w-full text-xs font-mono bg-white border border-indigo-50 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
+                />
+              </div>
+              <div className="flex items-center gap-3 px-1 pt-4">
+                <input 
+                  type="checkbox" 
+                  id="runOnLogoff"
+                  checked={backupConfig.runOnLogoff} 
+                  onChange={(e) => setBackupConfig({ ...backupConfig, runOnLogoff: e.target.checked })}
+                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <label htmlFor="runOnLogoff" className="text-[10px] font-bold text-gray-500 uppercase cursor-pointer select-none">Run during shutdown/logoff</label>
+              </div>
+            </div>
+          </div>
             
             <div className="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 mb-6">
               <div className="flex items-center justify-between mb-4">
@@ -3923,14 +3983,22 @@ if __name__ == "__main__":
 
                  <button
                    onClick={() => {
-                     const installerPath = "C:\\\\RxDesk_BackupAgent";
+                     const installerPath = backupConfig.agentPath.replace(/\\/g, '\\\\');
                      const apiKey = shop?.backup_api_key ?? "YOUR_API_KEY_HERE";
                      const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'https://backend.rxdesk.in/api/v1');
                      
+                     let backupDirPath = "";
+                     if (backupConfig.backupPath.includes('Documents')) {
+                        backupDirPath = `os.path.join(os.path.expanduser('~'), '${backupConfig.backupPath.replace(/\\/g, '/')}')`;
+                     } else {
+                        backupDirPath = `'${backupConfig.backupPath.replace(/\\/g, '\\\\')}'`;
+                     }
+
                      const batContent = `@echo off
 TITLE RxDesk Backup Agent Installer
 SET "INSTALL_PATH=${installerPath}"
 SET "API_KEY=${apiKey}"
+SET "ST_TIME=${backupConfig.scheduleTime}"
 
 echo ----------------------------------------------------
 echo         RxDesk Backup Agent Installer
@@ -3950,7 +4018,7 @@ echo from datetime import datetime >> "%INSTALL_PATH%\\backup_agent.py"
 echo. >> "%INSTALL_PATH%\\backup_agent.py"
 echo API_KEY = "%API_KEY%" >> "%INSTALL_PATH%\\backup_agent.py"
 echo BASE_URL = "${baseUrl}" >> "%INSTALL_PATH%\\backup_agent.py"
-echo BACKUP_DIR = os.path.join(os.path.expanduser('~'), 'Documents', 'RxDesk_Backups') >> "%INSTALL_PATH%\\backup_agent.py"
+echo BACKUP_DIR = ${backupDirPath} >> "%INSTALL_PATH%\\backup_agent.py"
 echo KEEP_FILES = 3 >> "%INSTALL_PATH%\\backup_agent.py"
 echo. >> "%INSTALL_PATH%\\backup_agent.py"
 echo def run(): >> "%INSTALL_PATH%\\backup_agent.py"
@@ -3981,16 +4049,24 @@ if %ERRORLEVEL% neq 0 (
 )
 
 echo [*] Installing dependencies...
-python -m pip install requests --quiet
+python -m pip install requests --quiet >nul 2>&1
 
-echo [*] Scheduling daily task at 2:00 AM...
-schtasks /create /tn "RxDesk_Daily_Backup" /tr "python %INSTALL_PATH%\\backup_agent.py" /sc daily /st 02:00 /f
+echo [*] Scheduling daily task at %ST_TIME%...
+schtasks /delete /tn "RxDesk_Daily_Backup" /f >nul 2>&1
+schtasks /create /tn "RxDesk_Daily_Backup" /tr "python %INSTALL_PATH%\\backup_agent.py" /sc daily /st %ST_TIME% /f
+
+if "${backupConfig.runOnLogoff}"=="true" (
+    echo [*] Scheduling logoff trigger...
+    schtasks /create /tn "RxDesk_Logoff_Backup" /tr "python %INSTALL_PATH%\\backup_agent.py" /sc onlogon /f
+)
 
 echo.
 echo ----------------------------------------------------
 echo [SUCCESS] Agent installed and Task Scheduled!
-echo Backups will be saved to your Documents folder.
 echo ----------------------------------------------------
+echo [OK] Script: %INSTALL_PATH%\\backup_agent.py
+echo [OK] Scheduled: Daily at %ST_TIME%
+echo.
 pause
 `;
                      const blob = new Blob([batContent], { type: 'application/x-bat' });
