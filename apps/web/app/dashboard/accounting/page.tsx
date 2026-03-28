@@ -3803,6 +3803,217 @@ function SettingsTab() {
             {isSaving ? 'Saving Changes...' : 'Update Starting Balances'}
           </button>
         </div>
+
+        {/* Automated Local Backup Agent Card */}
+        <div className="bg-white rounded-[2.5rem] p-10 border border-gray-100 shadow-xl shadow-gray-200/50 flex flex-col items-start gap-6 md:col-span-2">
+          <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm">
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
+            </svg>
+          </div>
+          <div className="w-full">
+            <h3 className="text-xl font-black text-gray-900 tracking-tight mb-1">Automated Local Backup Agent</h3>
+            <p className="text-sm text-gray-500 font-medium leading-relaxed mb-6">Setup a Python script on your personal computer to automatically download backups of your shop's data every day. It keeps only the last 3 backups locally for safety.</p>
+            
+            <div className="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Agent API Key</p>
+                  <p className="text-sm font-mono font-bold text-gray-800 tracking-wider mt-1 px-1 bg-white/60 py-1.5 rounded-lg border border-indigo-50 inline-block overflow-hidden max-w-sm truncate whitespace-nowrap">
+                    {shop?.backup_api_key ?? 'No key generated yet'}
+                  </p>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (confirm('Regenerating will invalidate the old key on your agent. Proceed?')) {
+                      try {
+                        const res = await shopApi.generateBackupApiKey();
+                        qc.setQueryData(['shop-profile'], (old: any) => ({
+                          ...old,
+                          data: { ...old.data, backup_api_key: res.data.data.backup_api_key }
+                        }));
+                        alert('New API Key generated successfully!');
+                        qc.invalidateQueries({ queryKey: ['shop-profile'] });
+                      } catch (err) {
+                        alert('Generation failed');
+                      }
+                    }
+                  }}
+                  className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                  title="Generate/Refresh Key"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+                </button>
+              </div>
+              <p className="text-[10px] text-indigo-400 font-bold leading-relaxed px-1">
+                <span className="text-indigo-600">IMPORTANT:</span> Use this key in your local agent script for authentication. It doesn't count as a session and won't log you out from other devices.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                 <button
+                   onClick={() => {
+                     const pyScript = `import requests
+import json
+import time
+import os
+from datetime import datetime
+
+# --- CONFIGURATION ---
+API_KEY = "${shop?.backup_api_key ?? 'YOUR_API_KEY_HERE'}"
+BASE_URL = "${(process.env.NEXT_PUBLIC_API_URL || 'https://backend.rxdesk.in').replace('/v1', '')}"
+BACKUP_DIR = os.path.join(os.path.expanduser('~'), 'Documents', 'RxDesk_Backups')
+KEEP_FILES = 3
+
+def perform_backup():
+    print(f"[{datetime.now()}] Starting automated backup...")
+    if not os.path.exists(BACKUP_DIR): os.makedirs(BACKUP_DIR)
+    
+    headers = {'x-api-key': API_KEY}
+    try:
+        r = requests.get(f"{BASE_URL}/api/v1/accounting/agent-backup", headers=headers)
+        r.raise_for_status()
+        data = r.json()
+        
+        if data.get('success'):
+            shop_name = data.get('shop_name', 'shop').replace(' ', '_').lower()
+            filename = f"{shop_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            filepath = os.path.join(BACKUP_DIR, filename)
+            
+            with open(filepath, 'w') as f:
+                json.dump(data['data'], f, indent=2)
+            
+            print(f"[{datetime.now()}] Backup successful: {filename}")
+            prune_backups()
+        else:
+            print(f"[{datetime.now()}] ERROR: {data.get('error')}")
+    except Exception as e:
+        print(f"[{datetime.now()}] FATAL: {str(e)}")
+
+def prune_backups():
+    files = [os.path.join(BACKUP_DIR, f) for f in os.listdir(BACKUP_DIR) if f.endswith('.json')]
+    files.sort(key=os.path.getmtime, reverse=True)
+    if len(files) > KEEP_FILES:
+        for f in files[KEEP_FILES:]:
+            os.remove(f)
+            print(f"[{datetime.now()}] Pruned old backup: {os.path.basename(f)}")
+
+if __name__ == "__main__":
+    if API_KEY == "YOUR_API_KEY_HERE":
+        print("ERROR: Please set your Backup API Key first.")
+    else:
+        perform_backup()
+`;
+                     const blob = new Blob([pyScript], { type: 'text/x-python' });
+                     const url = window.URL.createObjectURL(blob);
+                     const a = document.createElement('a');
+                     a.href = url;
+                     a.download = 'rxdesk_backup_agent.py';
+                     a.click();
+                     window.URL.revokeObjectURL(url);
+                   }}
+                   className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-50 border-2 border-indigo-100 text-indigo-600 p-4 rounded-3xl text-xs font-black uppercase tracking-widest transition-all shadow-sm"
+                 >
+                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                   Get Py Script
+                 </button>
+
+                 <button
+                   onClick={() => {
+                     const installerPath = "C:\\\\RxDesk_BackupAgent";
+                     const apiKey = shop?.backup_api_key ?? "YOUR_API_KEY_HERE";
+                     const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'https://backend.rxdesk.in').replace('/v1', '');
+                     
+                     const batContent = `@echo off
+TITLE RxDesk Backup Agent Installer
+SET "INSTALL_PATH=${installerPath}"
+SET "API_KEY=${apiKey}"
+
+echo ----------------------------------------------------
+echo         RxDesk Backup Agent Installer
+echo ----------------------------------------------------
+echo [*] Target Directory: %INSTALL_PATH%
+
+if not exist "%INSTALL_PATH%" (
+    echo [*] Creating directory...
+    mkdir "%INSTALL_PATH%"
+)
+
+echo [*] Creating backup script...
+(
+echo import requests
+echo import json
+echo import os
+echo from datetime import datetime
+echo.
+echo API_KEY = "%API_KEY%"
+echo BASE_URL = "${baseUrl}"
+echo BACKUP_DIR = os.path.join(os.path.expanduser('~'), 'Documents', 'RxDesk_Backups')
+echo KEEP_FILES = 3
+echo.
+echo def run():
+echo     if not os.path.exists(BACKUP_DIR^): os.makedirs(BACKUP_DIR^)
+echo     try:
+echo         r = requests.get(f"{BASE_URL}/api/v1/accounting/agent-backup", headers={'x-api-key': API_KEY}^)
+echo         r.raise_for_status(^)
+echo         data = r.json(^)
+echo         if data.get('success'^):
+echo             shop_name = data.get('shop_name', 'shop'^).replace(' ', '_'^).lower(^)
+echo             fname = f"{shop_name}_{datetime.now(^).strftime('%%Y%%m%%d'^)}.json"
+echo             with open(os.path.join(BACKUP_DIR, fname^), 'w'^) as f: json.dump(data['data'], f, indent=2^)
+echo             print("Backup successful."^)
+echo             files = [os.path.join(BACKUP_DIR, f^) for f in os.listdir(BACKUP_DIR^) if f.endswith('.json')]
+echo             files.sort(key=os.path.getmtime, reverse=True^)
+echo             for f in files[KEEP_FILES:]: os.remove(f^)
+echo         else: print("Error: " + data.get('error'^)^)
+echo     except Exception as e: print("Fatal: " + str(e^)^)
+echo.
+echo if __name__ == "__main__": run(^)
+) > "%INSTALL_PATH%\\backup_agent.py"
+
+echo [*] Checking for Python...
+python --version >nul 2>&1
+if %%ERRORLEVEL%% neq 0 (
+    echo [!] Python not found! Please install Python 3.x from python.org
+    pause
+    exit
+)
+
+echo [*] Installing dependencies...
+python -m pip install requests --quiet
+
+echo [*] Scheduling daily task at 2:00 AM...
+schtasks /create /tn "RxDesk_Daily_Backup" /tr "python %INSTALL_PATH%\\backup_agent.py" /sc daily /st 02:00 /f
+
+echo.
+echo ----------------------------------------------------
+echo [SUCCESS] Agent installed and Task Scheduled!
+echo Backups will be saved to your Documents folder.
+echo ----------------------------------------------------
+pause
+`;
+                     const blob = new Blob([batContent], { type: 'application/x-bat' });
+                     const url = window.URL.createObjectURL(blob);
+                     const a = document.createElement('a');
+                     a.href = url;
+                     a.download = 'rxdesk_setup.bat';
+                     a.click();
+                     window.URL.revokeObjectURL(url);
+                   }}
+                   className="w-full flex items-center justify-center gap-3 bg-indigo-600 hover:bg-slate-900 text-white p-4 rounded-3xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-100"
+                 >
+                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                   One-Click Installer (Windows)
+                 </button>
+               </div>
+               <p className="text-[10px] text-gray-400 font-bold uppercase text-center mt-2">Installer automatically creates a Windows Task for daily 2AM backups.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+          </div>
+        </div>
       </div>
 
       {/* Server Backups */}

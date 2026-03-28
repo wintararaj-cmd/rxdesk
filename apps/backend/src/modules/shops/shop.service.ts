@@ -298,6 +298,21 @@ export async function updateShop(
   });
 }
 
+export async function generateBackupApiKey(userId: string) {
+  const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });
+  if (!shop) throw new AppError(404, 'NOT_FOUND', 'Shop not found');
+  
+  // Create a 32 character random token
+  const token = require('crypto').randomBytes(16).toString('hex');
+  
+  await prisma.medicalShop.update({
+    where: { id: shop.id },
+    data: { backup_api_key: token }
+  });
+  
+  return token;
+}
+
 export async function getShopAnalytics(userId: string, days = 30) {
   const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });
   if (!shop) throw new AppError(404, 'NOT_FOUND', 'Shop not found');

@@ -87,6 +87,7 @@ export const shopApi = {
   updateProfile: (data: object) => apiClient.put('/shops/me', data),
   search: (params: { q?: string; city?: string; pin_code?: string }) =>
     apiClient.get('/shops/search', { params }),
+  generateBackupApiKey: () => apiClient.post('/shops/me/backup-key'),
 };
 
 export const subscriptionApi = {

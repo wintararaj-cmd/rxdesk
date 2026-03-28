@@ -56,6 +56,14 @@ router.patch('/me', requireRole('shop_owner'), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// POST /shops/me/backup-key (generate agent api key)
+router.post('/me/backup-key', requireRole('shop_owner'), async (req, res, next) => {
+  try {
+    const key = await service.generateBackupApiKey(req.user!.id);
+    res.json({ success: true, data: { backup_api_key: key }, message: 'Backup API key generated' });
+  } catch (err) { next(err); }
+});
+
 // GET /shops/me/analytics?days=30  (web dashboard reports)
 router.get('/me/analytics', requireRole('shop_owner'), async (req, res, next) => {
   try {

@@ -551,5 +551,32 @@ router.put('/contra-entries/:id', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-export default router;
+// ─── External Agent Backup ───────────────────────────────────────────────────────
 
+router.get('/agent-backup', async (req, res, next) => {
+  try {
+    const apiKey = req.headers['x-api-key'];
+    if (!apiKey || typeof apiKey !== 'string') {
+      return res.status(401).json({ success: false, error: 'API key is missing' });
+    }
+    
+    // Import prisma directly to check the key since this isn't in accounting service
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    const shop = await prisma.medicalShop.findUnique({
+      where: { backup_api_key: apiKey },
+      select: { owner_user_id: true, id: true, shop_name: true }
+    });
+    
+    if (!shop) {
+      return res.status(403).json({ success: false, error: 'Invalid API key' });
+    }
+
+    const data = await service.exportAccountingData(shop.owner_user_id);
+    
+    res.json({ success: true, shop_name: shop.shop_name, data });
+  } catch (err) { next(err); }
+});
+
+export default router;
