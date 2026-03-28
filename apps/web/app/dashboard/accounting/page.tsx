@@ -3951,7 +3951,7 @@ echo from datetime import datetime
 echo.
 echo API_KEY = "%API_KEY%"
 echo BASE_URL = "${baseUrl}"
-echo BACKUP_DIR = os.path.join(os.path.expanduser('~'), 'Documents', 'RxDesk_Backups')
+echo BACKUP_DIR = os.path.join(os.path.expanduser('~'^), 'Documents', 'RxDesk_Backups'^)
 echo KEEP_FILES = 3
 echo.
 echo def run():
