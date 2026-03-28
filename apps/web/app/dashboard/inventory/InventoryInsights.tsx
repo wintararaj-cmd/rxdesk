@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { inventoryInsightsApi } from '../../../../lib/apiClient';
+import { inventoryInsightsApi } from '../../../lib/apiClient';
 
 export default function InventoryInsights() {
   const { data: deadStockRes, isLoading: loadingDeadStock } = useQuery({
@@ -113,21 +113,21 @@ export default function InventoryInsights() {
                  </thead>
                  <tbody className="divide-y divide-gray-50">
                     {predictiveRes?.map((item: any, i: number) => {
-                      const shortageBg = item.currentStock === 0 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700';
+                      const shortageBg = item.current_stock === 0 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700';
                       return (
                         <tr key={i} className="hover:bg-indigo-50/40 transition-colors">
                           <td className="px-5 py-3">
                             <p className="font-bold text-gray-800">{item.medicine_name}</p>
-                            <p className="text-[10px] text-gray-400 mt-1 uppercase font-bold tracking-tight">Requires: {item.requiredStockForNextMonth} / mo</p>
+                            <p className="text-[10px] text-gray-400 mt-1 uppercase font-bold tracking-tight">Requires: {item.monthly_run_rate} / mo</p>
                           </td>
                           <td className="px-5 py-3 text-right">
-                            <span className={`px-2 py-0.5 rounded font-black text-xs ${item.currentStock < item.requiredStockForNextMonth ? shortageBg : 'text-gray-600'}`}>
-                              {item.currentStock}
+                            <span className={`px-2 py-0.5 rounded font-black text-xs ${item.current_stock < item.monthly_run_rate ? shortageBg : 'text-gray-600'}`}>
+                              {item.current_stock}
                             </span>
                           </td>
                           <td className="px-5 py-3 text-right">
                             <p className="font-black text-indigo-700 bg-indigo-50 inline-block px-2.5 py-1 rounded-lg shadow-inner">
-                              +{item.suggestedOrderQty}
+                              +{item.suggested_order_qty}
                             </p>
                           </td>
                         </tr>
