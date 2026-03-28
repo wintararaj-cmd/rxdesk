@@ -63,7 +63,6 @@ router.delete('/:id', requireRole('doctor'), async (req: any, res, next) => {
     const userId = req.user!.id;
     const result = await TemplateService.deleteTemplate(req.params.id, userId);
     res.json({
-      success: true,
       message: 'Template deleted successfully',
       ...result,
     });

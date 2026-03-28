@@ -258,6 +258,22 @@ class ApiService {
     await http.delete(Uri.parse('$_base/prescriptions/$id'), headers: await _headers());
   }
 
+  // ── TEMPLATES ────────────────────────────────────────────────────────────
+  static Future<List<dynamic>> getDoctorTemplates() async {
+    final r = await http.get(Uri.parse('$_base/prescriptions/templates'), headers: await _headers());
+    return (_decode(r)['data'] as List?) ?? [];
+  }
+
+  static Future<Map<String, dynamic>> createDoctorTemplate(Map<String, dynamic> payload) async {
+    final r = await http.post(Uri.parse('$_base/prescriptions/templates'),
+        headers: await _headers(), body: jsonEncode(payload));
+    return _decode(r);
+  }
+
+  static Future<void> deleteDoctorTemplate(String id) async {
+    await http.delete(Uri.parse('$_base/prescriptions/templates/$id'), headers: await _headers());
+  }
+
   static Future<List<dynamic>> searchPatients(String q) async {
     final uri = Uri.parse('$_base/patients/search').replace(queryParameters: {'q': q});
     final r = await http.get(uri, headers: await _headers());

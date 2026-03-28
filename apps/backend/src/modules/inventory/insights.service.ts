@@ -10,7 +10,7 @@ export async function getDeadStock(shopId: string, monthsThreshold: number = 3) 
     select: { id: true, medicine_name: true, batch_number: true, stock_qty: true, purchase_price: true, updated_at: true },
   });
 
-  const deadStock = [];
+  const deadStock: any[] = [];
   for (const item of inventoryItems) {
     // Check if it has been sold since the cutoff date
     const recentSale = await prisma.billItem.findFirst({
@@ -52,7 +52,7 @@ export async function getPredictiveOrderingDetails(shopId: string) {
     }
   });
 
-  const suggestions = [];
+  const suggestions: any[] = [];
   for (const sale of salesData) {
     if (!sale._sum.quantity || sale._sum.quantity <= 0) continue;
 
