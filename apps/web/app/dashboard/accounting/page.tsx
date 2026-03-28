@@ -4010,11 +4010,9 @@ pause
                <p className="text-[10px] text-gray-400 font-bold uppercase text-center mt-2">Installer automatically creates a Windows Task for daily 2AM backups.</p>
             </div>
           </div>
-        </div>
+
       </div>
-          </div>
-        </div>
-      </div>
+    </div>
 
       {/* Server Backups */}
       <div className="bg-gray-50/50 rounded-[2.5rem] p-8 border border-gray-100">
