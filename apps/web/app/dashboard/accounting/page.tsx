@@ -3974,7 +3974,7 @@ echo if __name__ == "__main__": run() >> "%INSTALL_PATH%\\backup_agent.py"
 
 echo [*] Checking for Python...
 python --version >nul 2>&1
-if %%ERRORLEVEL%% neq 0 (
+if %ERRORLEVEL% neq 0 (
     echo [!] Python not found! Please install Python 3.x from python.org
     pause
     exit
