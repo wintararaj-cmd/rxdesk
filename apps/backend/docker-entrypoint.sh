@@ -1,8 +1,8 @@
 #!/bin/sh
 set -e
 
-echo "▶ Running database migrations…"
-npx prisma migrate deploy
+echo "▶ Synchronizing database schema…"
+npx prisma db push --accept-data-loss
 
 echo "▶ Seeding database (medicine catalog + plans + admin)…"
 node dist-seed/prisma/seed.js

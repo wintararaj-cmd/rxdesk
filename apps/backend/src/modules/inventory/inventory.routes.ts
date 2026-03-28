@@ -6,8 +6,12 @@ import { addInventoryItemSchema, updateInventorySchema } from '@rxdesk/shared';
 import prisma from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import logger from '../../utils/logger';
+import insightsRoutes from './insights.routes';
 
 const router = Router();
+
+// Mount insights
+router.use('/insights', insightsRoutes);
 
 async function getShopByUser(userId: string) {
   const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });

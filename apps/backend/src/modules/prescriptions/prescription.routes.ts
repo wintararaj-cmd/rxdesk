@@ -13,7 +13,12 @@ setInterval(() => {
   for (const [key, val] of devPdfCache) if (val.expiresAt < now) devPdfCache.delete(key);
 }, 5 * 60 * 1000).unref();
 
+import templateRoutes from './template.routes';
+
 const router = Router();
+
+// Mount templates sub-route
+router.use('/templates', templateRoutes);
 
 // POST /prescriptions  — doctor issues prescription
 router.post('/', requireRole('doctor'), async (req, res, next) => {

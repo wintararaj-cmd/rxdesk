@@ -270,6 +270,7 @@ model Doctor {
   verifier      User?           @relation("VerifiedByAdmin", fields: [verified_by], references: [id])
   chambers      DoctorChamber[]
   prescriptions Prescription[]
+  templates     DoctorTemplate[]
 
   @@map("doctors")
 }
@@ -482,6 +483,7 @@ model Medicine {
   prescription_items PrescriptionItem[]
   purchase_items     PurchaseItem[]
   shop_medicines     ShopMedicine[]
+  template_items     DoctorTemplateItem[]
 
   @@map("medicines")
 }
@@ -691,6 +693,42 @@ model Banner {
   updated_at DateTime @updatedAt
 
   @@map("banners")
+}
+
+model DoctorTemplate {
+  id              String   @id @default(uuid())
+  doctor_id       String
+  template_name   String
+  diagnosis       String
+  advice          String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  doctor          Doctor               @relation(fields: [doctor_id], references: [id], onDelete: Cascade)
+  items           DoctorTemplateItem[]
+
+  @@index([doctor_id])
+  @@map("doctor_templates")
+}
+
+model DoctorTemplateItem {
+  id              String   @id @default(uuid())
+  template_id     String
+  medicine_id     String?
+  medicine_name   String
+  dosage          String?
+  frequency       String?
+  duration        String?
+  instructions    String?
+  quantity        Int      @default(1)
+  sort_order      Int      @default(0)
+
+  template        DoctorTemplate @relation(fields: [template_id], references: [id], onDelete: Cascade)
+  medicine        Medicine?      @relation(fields: [medicine_id], references: [id])
+
+  @@index([template_id])
+  @@index([medicine_id])
+  @@map("doctor_template_items")
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
