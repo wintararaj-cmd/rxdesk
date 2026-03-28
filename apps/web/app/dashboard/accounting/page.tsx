@@ -3639,6 +3639,8 @@ function BankbookTab() {
 function SettingsTab() {
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { data: shopRes } = useQuery({ queryKey: ['shop-profile'], queryFn: () => shopApi.getMyShop() });
+  const shop = shopRes?.data?.data;
 
   const { data: accStatus, isLoading: statLoading } = useQuery({
     queryKey: ['accounting-status-settings'],
