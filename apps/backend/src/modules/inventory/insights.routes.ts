@@ -41,4 +41,22 @@ router.get('/predictive-orders', requireRole('shop_owner'), async (req: any, res
   } catch (err) { next(err); }
 });
 
+/**
+ * @route   GET /api/v1/inventory/insights/refill-reminders
+ * @desc    Get upcoming medicine refill reminders for patients
+ * @access  Private (Shop Owner)
+ */
+router.get('/refill-reminders', requireRole('shop_owner'), async (req: any, res, next) => {
+  try {
+    const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: req.user!.id } });
+    if (!shop) throw new Error('Shop not found');
+
+    const reminders = await InsightsService.getRefillReminders(shop.id);
+    res.json({
+      success: true,
+      data: reminders,
+    });
+  } catch (err) { next(err); }
+});
+
 export default router;

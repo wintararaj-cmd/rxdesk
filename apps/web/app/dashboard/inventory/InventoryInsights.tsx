@@ -12,6 +12,18 @@ export default function InventoryInsights() {
     queryFn: () => inventoryApi.getPredictiveOrders().then((res) => res.data.data),
   });
 
+  const { data: refillRes, isLoading: loadingRefill } = useQuery({
+    queryKey: ['insights', 'refill-reminders'],
+    queryFn: () => inventoryApi.getRefillReminders().then((res) => res.data.data),
+  });
+
+  const sendWhatsApp = (phone: string, customerName: string, medicineName: string) => {
+    const formattedPhone = phone.replace(/\D/g, '');
+    const cleanPhone = formattedPhone.startsWith('91') || formattedPhone.length > 10 ? formattedPhone : `91${formattedPhone}`;
+    const text = encodeURIComponent(`Hello ${customerName}, your medicine (${medicineName}) might be running low soon. Would you like to place a refill order from our shop? Reply to confirm.`);
+    window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Header section */}
@@ -22,9 +34,9 @@ export default function InventoryInsights() {
              🧠
           </div>
           <div>
-            <h2 className="text-white font-black text-2xl tracking-tight leading-tight">AI-Powered Insights</h2>
+            <h2 className="text-white font-black text-2xl tracking-tight leading-tight">AI Insights & Engagement</h2>
             <p className="text-indigo-200 text-sm font-medium mt-1">
-              Optimize your working capital with smart stock analysis & predictive ordering based on historical sales run-rates.
+              Optimize your working capital and engage patients automatically with refill reminders tailored to chronic medication usage.
             </p>
           </div>
         </div>
@@ -129,6 +141,85 @@ export default function InventoryInsights() {
                             <p className="font-black text-indigo-700 bg-indigo-50 inline-block px-2.5 py-1 rounded-lg shadow-inner">
                               +{item.suggested_order_qty}
                             </p>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                 </tbody>
+               </table>
+            )}
+          </div>
+        </div>
+
+        {/* Patient Refill Reminders Panel */}
+        <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm overflow-hidden flex flex-col xl:col-span-2">
+          <div className="px-6 py-5 border-b border-emerald-50 bg-emerald-50/30 flex items-center justify-between">
+             <div className="flex items-center gap-3">
+               <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-xl shadow-sm border border-emerald-200">
+                 📱
+               </div>
+               <div>
+                 <h3 className="font-black text-gray-900 tracking-tight text-lg">Patient Refill Reminders (WhatsApp)</h3>
+                 <p className="text-xs text-emerald-600 font-bold uppercase tracking-widest mt-0.5">Engage chronic patients & increase sales</p>
+               </div>
+             </div>
+             {refillRes && refillRes.length > 0 && (
+               <div className="bg-emerald-600 text-white px-3 py-1 rounded-lg text-sm font-black shadow-md shadow-emerald-200">
+                 {refillRes.length} Reminders
+               </div>
+             )}
+          </div>
+          
+          <div className="p-0 flex-1 overflow-auto max-h-[500px]">
+            {loadingRefill ? (
+              <div className="p-10 text-center text-gray-400 font-medium">Scanning past bills for upcoming refills...</div>
+            ) : refillRes?.length === 0 ? (
+              <div className="p-10 text-center text-gray-500 font-medium">No upcoming refill reminders found for the next 7 days.</div>
+            ) : (
+               <table className="w-full text-sm">
+                 <thead className="bg-gray-50/80 sticky top-0 z-10">
+                   <tr>
+                     <th className="px-5 py-3 text-left font-black text-gray-400 text-[10px] uppercase tracking-widest border-b border-gray-100">Patient Details</th>
+                     <th className="px-5 py-3 text-left font-black text-gray-400 text-[10px] uppercase tracking-widest border-b border-gray-100">Medicine Bought</th>
+                     <th className="px-5 py-3 text-left font-black text-gray-400 text-[10px] uppercase tracking-widest border-b border-gray-100">Status</th>
+                     <th className="px-5 py-3 text-right font-black text-gray-400 text-[10px] uppercase tracking-widest border-b border-gray-100">Action</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-gray-50">
+                    {refillRes?.map((item: any) => {
+                      const isOverdue = item.days_remaining < 0;
+                      return (
+                        <tr key={item.id} className="hover:bg-emerald-50/20 transition-colors">
+                          <td className="px-5 py-3">
+                            <p className="font-bold text-gray-800">{item.customer_name}</p>
+                            <p className="text-xs text-gray-500 font-medium">📱 {item.customer_phone}</p>
+                          </td>
+                          <td className="px-5 py-3">
+                            <p className="font-bold text-gray-700">{item.medicine_name}</p>
+                            <p className="text-xs text-gray-400 mt-1 uppercase font-bold">Qty: {item.last_quantity} {item.unit}</p>
+                          </td>
+                          <td className="px-5 py-3">
+                            {isOverdue ? (
+                              <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-black text-[10px] uppercase">
+                                Ran out {Math.abs(item.days_remaining)} days ago
+                              </span>
+                            ) : item.days_remaining === 0 ? (
+                              <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded font-black text-[10px] uppercase">
+                                Runs out TODAY
+                              </span>
+                            ) : (
+                              <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-black text-[10px] uppercase">
+                                Runs out in {item.days_remaining} day(s)
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-5 py-3 text-right">
+                            <button
+                              onClick={() => sendWhatsApp(item.customer_phone, item.customer_name, item.medicine_name)}
+                              className="text-xs font-bold uppercase tracking-widest bg-[#25D366] text-white hover:bg-[#1da851] py-2 px-4 rounded-xl shadow-md transition-all active:scale-95"
+                            >
+                              Send WhatsApp
+                            </button>
                           </td>
                         </tr>
                       );

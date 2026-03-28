@@ -132,6 +132,7 @@ export const inventoryApi = {
   // Insights
   getDeadStock: () => apiClient.get('/inventory/insights/dead-stock'),
   getPredictiveOrders: () => apiClient.get('/inventory/insights/predictive-orders'),
+  getRefillReminders: () => apiClient.get('/inventory/insights/refill-reminders'),
 };
 
 export const billApi = {
