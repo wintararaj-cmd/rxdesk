@@ -3943,36 +3943,34 @@ if not exist "%INSTALL_PATH%" (
 )
 
 echo [*] Creating backup script...
-(
-echo import requests
-echo import json
-echo import os
-echo from datetime import datetime
-echo.
-echo API_KEY = "%API_KEY%"
-echo BASE_URL = "${baseUrl}"
-echo BACKUP_DIR = os.path.join(os.path.expanduser('~'^), 'Documents', 'RxDesk_Backups'^)
-echo KEEP_FILES = 3
-echo.
-echo def run():
-echo     if not os.path.exists(BACKUP_DIR^): os.makedirs(BACKUP_DIR^)
-echo     try:
-echo         r = requests.get(f"{BASE_URL}/api/v1/accounting/agent-backup", headers={'x-api-key': API_KEY}^)
-echo         r.raise_for_status(^)
-echo         data = r.json(^)
-echo         if data.get('success'^):
-echo             shop_name = data.get('shop_name', 'shop'^).replace(' ', '_'^).lower(^)
-echo             fname = f"{shop_name}_{datetime.now(^).strftime('%%Y%%m%%d'^)}.json"
-echo             with open(os.path.join(BACKUP_DIR, fname^), 'w'^) as f: json.dump(data['data'], f, indent=2^)
-echo             print("Backup successful."^)
-echo             files = [os.path.join(BACKUP_DIR, f^) for f in os.listdir(BACKUP_DIR^) if f.endswith('.json')]
-echo             files.sort(key=os.path.getmtime, reverse=True^)
-echo             for f in files[KEEP_FILES:]: os.remove(f^)
-echo         else: print("Error: " + data.get('error'^)^)
-echo     except Exception as e: print("Fatal: " + str(e^)^)
-echo.
-echo if __name__ == "__main__": run(^)
-) > "%INSTALL_PATH%\\backup_agent.py"
+echo import requests > "%INSTALL_PATH%\\backup_agent.py"
+echo import json >> "%INSTALL_PATH%\\backup_agent.py"
+echo import os >> "%INSTALL_PATH%\\backup_agent.py"
+echo from datetime import datetime >> "%INSTALL_PATH%\\backup_agent.py"
+echo. >> "%INSTALL_PATH%\\backup_agent.py"
+echo API_KEY = "%API_KEY%" >> "%INSTALL_PATH%\\backup_agent.py"
+echo BASE_URL = "${baseUrl}" >> "%INSTALL_PATH%\\backup_agent.py"
+echo BACKUP_DIR = os.path.join(os.path.expanduser('~'), 'Documents', 'RxDesk_Backups') >> "%INSTALL_PATH%\\backup_agent.py"
+echo KEEP_FILES = 3 >> "%INSTALL_PATH%\\backup_agent.py"
+echo. >> "%INSTALL_PATH%\\backup_agent.py"
+echo def run(): >> "%INSTALL_PATH%\\backup_agent.py"
+echo     if not os.path.exists(BACKUP_DIR): os.makedirs(BACKUP_DIR) >> "%INSTALL_PATH%\\backup_agent.py"
+echo     try: >> "%INSTALL_PATH%\\backup_agent.py"
+echo         r = requests.get(f"{BASE_URL}/api/v1/accounting/agent-backup", headers={'x-api-key': API_KEY}) >> "%INSTALL_PATH%\\backup_agent.py"
+echo         r.raise_for_status() >> "%INSTALL_PATH%\\backup_agent.py"
+echo         data = r.json() >> "%INSTALL_PATH%\\backup_agent.py"
+echo         if data.get('success'): >> "%INSTALL_PATH%\\backup_agent.py"
+echo             shop_name = data.get('shop_name', 'shop').replace(' ', '_').lower() >> "%INSTALL_PATH%\\backup_agent.py"
+echo             fname = f"{shop_name}_{datetime.now().strftime('%%Y%%m%%d')}.json" >> "%INSTALL_PATH%\\backup_agent.py"
+echo             with open(os.path.join(BACKUP_DIR, fname), 'w') as f: json.dump(data['data'], f, indent=2) >> "%INSTALL_PATH%\\backup_agent.py"
+echo             print("Backup successful.") >> "%INSTALL_PATH%\\backup_agent.py"
+echo             files = [os.path.join(BACKUP_DIR, f) for f in os.listdir(BACKUP_DIR) if f.endswith('.json')] >> "%INSTALL_PATH%\\backup_agent.py"
+echo             files.sort(key=os.path.getmtime, reverse=True) >> "%INSTALL_PATH%\\backup_agent.py"
+echo             for f in files[KEEP_FILES:]: os.remove(f) >> "%INSTALL_PATH%\\backup_agent.py"
+echo         else: print("Error: " + data.get('error')) >> "%INSTALL_PATH%\\backup_agent.py"
+echo     except Exception as e: print("Fatal: " + str(e)) >> "%INSTALL_PATH%\\backup_agent.py"
+echo. >> "%INSTALL_PATH%\\backup_agent.py"
+echo if __name__ == "__main__": run() >> "%INSTALL_PATH%\\backup_agent.py"
 
 echo [*] Checking for Python...
 python --version >nul 2>&1
