@@ -4017,6 +4017,16 @@ function SettingsTab() {
                   <p className="text-sm font-mono font-bold text-gray-800 tracking-wider mt-1 px-1 bg-white/60 py-1.5 rounded-lg border border-indigo-50 inline-block overflow-hidden max-w-sm truncate whitespace-nowrap">
                     {shop?.backup_api_key ?? 'No key generated yet'}
                   </p>
+                  
+                  {shop?.last_backup_system && (
+                    <div className="mt-2.5 flex items-center gap-2 bg-indigo-50/50 p-2 rounded-xl border border-indigo-50/50">
+                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(129,140,248,0.5)]" />
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-indigo-400 leading-none">Last Active System</p>
+                        <p className="text-[11px] font-bold text-indigo-700 mt-0.5">{shop.last_backup_system} • {new Date(shop.last_backup_at).toLocaleString()}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <button
                   onClick={async () => {
@@ -4053,6 +4063,7 @@ function SettingsTab() {
 import json
 import time
 import os
+import socket
 from datetime import datetime
 
 # --- CONFIGURATION ---
@@ -4065,7 +4076,10 @@ def perform_backup():
     print(f"[{datetime.now()}] Starting automated backup...")
     if not os.path.exists(BACKUP_DIR): os.makedirs(BACKUP_DIR)
     
-    headers = {'x-api-key': API_KEY}
+    headers = {
+        'x-api-key': API_KEY,
+        'x-system-name': socket.gethostname()
+    }
     try:
         r = requests.get(f"{BASE_URL}/api/v1/accounting/agent-backup", headers=headers)
         r.raise_for_status()
@@ -4147,6 +4161,7 @@ echo [*] Creating backup script...
 echo import requests > "%INSTALL_PATH%\\backup_agent.py"
 echo import json >> "%INSTALL_PATH%\\backup_agent.py"
 echo import os >> "%INSTALL_PATH%\\backup_agent.py"
+echo import socket >> "%INSTALL_PATH%\\backup_agent.py"
 echo from datetime import datetime >> "%INSTALL_PATH%\\backup_agent.py"
 echo. >> "%INSTALL_PATH%\\backup_agent.py"
 echo API_KEY = "%API_KEY%" >> "%INSTALL_PATH%\\backup_agent.py"
@@ -4157,7 +4172,8 @@ echo. >> "%INSTALL_PATH%\\backup_agent.py"
 echo def run(): >> "%INSTALL_PATH%\\backup_agent.py"
 echo     if not os.path.exists(BACKUP_DIR): os.makedirs(BACKUP_DIR) >> "%INSTALL_PATH%\\backup_agent.py"
 echo     try: >> "%INSTALL_PATH%\\backup_agent.py"
-echo         r = requests.get(f"{BASE_URL}/accounting/agent-backup", headers={'x-api-key': API_KEY}) >> "%INSTALL_PATH%\\backup_agent.py"
+echo         headers = {'x-api-key': API_KEY, 'x-system-name': socket.gethostname()} >> "%INSTALL_PATH%\\backup_agent.py"
+echo         r = requests.get(f"{BASE_URL}/accounting/agent-backup", headers=headers) >> "%INSTALL_PATH%\\backup_agent.py"
 echo         r.raise_for_status() >> "%INSTALL_PATH%\\backup_agent.py"
 echo         data = r.json() >> "%INSTALL_PATH%\\backup_agent.py"
 echo         if data.get('success'): >> "%INSTALL_PATH%\\backup_agent.py"

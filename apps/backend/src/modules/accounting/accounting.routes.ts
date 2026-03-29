@@ -597,6 +597,15 @@ router.get('/agent-backup', async (req, res, next) => {
       return res.status(403).json({ success: false, error: 'Invalid API key' });
     }
 
+    const systemName = req.headers['x-system-name'] || 'Unknown System';
+    await prisma.medicalShop.update({
+      where: { id: shop.id },
+      data: { 
+        last_backup_system: String(systemName),
+        last_backup_at: new Date()
+      }
+    });
+
     const data = await service.exportAccountingData(shop.owner_user_id);
     
     res.json({ success: true, shop_name: shop.shop_name, data });

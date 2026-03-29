@@ -310,6 +310,8 @@ model MedicalShop {
   backup_time         String?
   backup_path         String?            @default("/rxdesk")
   backup_api_key      String?            @unique
+  last_backup_system  String?
+  last_backup_at      DateTime?
   created_at          DateTime           @default(now())
   updated_at          DateTime           @updatedAt
 
