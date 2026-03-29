@@ -3123,6 +3123,47 @@ export async function generateGstr2Excel(userId: string, month: number, year: nu
     }
   }
 
+  // 6. ITCR Sheet
+  const itcrSheet = workbook.addWorksheet('itcr');
+  itcrSheet.columns = [
+    { key: 'A', width: 5 },
+    { key: 'B', width: 45 },
+    { key: 'C', width: 25 },
+    { key: 'D', width: 25 },
+    { key: 'E', width: 30 },
+    { key: 'F', width: 25 },
+  ];
+
+  itcrSheet.getCell('F1').value = 'HELP';
+
+  const itcrRow2 = itcrSheet.addRow([
+    '', '', 
+    'Total ITC Integrated Tax Amount', 
+    'Total Central Tax Amount', 
+    'Total ITC State/UT Tax Amount', 
+    'Total ITC Cess Amount'
+  ]);
+  itcrRow2.font = { bold: true };
+
+  const itcrRow3 = itcrSheet.addRow([
+    '', '',
+    '0.00', '0.00', '0.00', '0.00'
+  ]);
+
+  const itcrRow4 = itcrSheet.addRow([
+    '',
+    'To be added or reduced from output liability',
+    'ITC Integrated Tax Amount',
+    'ITC Central Tax Amount',
+    'ITC State/UT Tax Amount',
+    'ITC Cess Amount'
+  ]);
+  itcrRow4.font = { bold: true };
+
+  // Add default rows for template compliance
+  itcrSheet.addRow(['', 'To be added', '0.00', '0.00', '0.00', '0.00']);
+  itcrSheet.addRow(['', 'To be reduced', '0.00', '0.00', '0.00', '0.00']);
+
   return workbook.xlsx.writeBuffer();
 }
 
