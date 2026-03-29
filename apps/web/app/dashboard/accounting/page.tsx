@@ -3952,6 +3952,16 @@ function SettingsTab() {
             <div>
               <h3 className="text-xl font-bold text-gray-900 leading-tight">Automated Local Backup Agent</h3>
               <p className="text-sm text-gray-500 mt-1 font-medium italic">Keep your data on your premise, instantly synced & secure.</p>
+              
+              <div className="mt-3 bg-amber-50 border-l-4 border-amber-400 p-3 rounded-2xl flex items-start gap-3 shadow-sm">
+                <div className="w-5 h-5 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 shrink-0 mt-0.5">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-amber-800 uppercase tracking-widest leading-none mb-1">Single Instance Required</p>
+                  <p className="text-[11px] text-amber-700 font-medium leading-tight">Install this agent on <b>ONLY ONE</b> computer (e.g., Primary Billing System). Multiple installations will cause redundant server load and backup conflicts.</p>
+                </div>
+              </div>
             </div>
           </div>
 
