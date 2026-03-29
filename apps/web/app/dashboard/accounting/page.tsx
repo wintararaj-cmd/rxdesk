@@ -980,7 +980,7 @@ function PurchasesTab() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const { data: suppliersData } = useQuery<{ id: string; name: string }[]>({
+  const { data: suppliersData } = useQuery<Supplier[]>({
     queryKey: ['web-suppliers'],
     queryFn: () => accountingApi.listSuppliers().then((r) => r.data.data),
   });
@@ -1155,18 +1155,21 @@ function PurchasesTab() {
     }, 100);
   };
 
+  const selectedSupplier = (suppliersData ?? []).find(s => s.id === supplierId);
+  const isUnregistered = !supplierId || !selectedSupplier?.gstin && !selectedSupplier?.gst_number;
+
   // Live totals
   const lineTotal = (it: PIItem) => {
     const qty = Number(it.quantity) || 0;
     const pp = Number(it.purchase_price) || 0;
     const disc = Number(it.discount_pct) || 0;
-    const gst = Number(it.gst_rate) || 0;
+    const gst = isUnregistered ? 0 : (Number(it.gst_rate) || 0);
     const base = qty * pp;
     const afterDisc = base * (1 - disc / 100);
     return afterDisc * (1 + gst / 100);
   };
   const calcSubtotal = piItems.reduce((s, it) => s + (Number(it.quantity) || 0) * (Number(it.purchase_price) || 0), 0);
-  const calcGst = piItems.reduce((s, it) => {
+  const calcGst = isUnregistered ? 0 : piItems.reduce((s, it) => {
     const base = (Number(it.quantity) || 0) * (Number(it.purchase_price) || 0) * (1 - (Number(it.discount_pct) || 0) / 100);
     return s + base * ((Number(it.gst_rate) || 0) / 100);
   }, 0);
@@ -1439,9 +1442,13 @@ function PurchasesTab() {
                         className="w-full border border-gray-200 rounded-xl px-1 h-10 text-sm text-center text-emerald-600 font-bold outline-none focus:border-emerald-500 shadow-sm" />
                     </div>
                     <div>
-                      <select ref={(el) => { piGstRefs.current[idx] = el; }} value={item.gst_rate} onChange={(e) => updatePiItem(idx, 'gst_rate', e.target.value)}
-                        className="w-full border border-gray-200 rounded-xl px-1 h-10 text-xs text-gray-900 outline-none focus:border-violet-500 bg-white font-semibold shadow-sm">
-                        {GST_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
+                      <select 
+                        ref={(el) => { piGstRefs.current[idx] = el; }} 
+                        value={isUnregistered ? '0' : item.gst_rate} 
+                        onChange={(e) => updatePiItem(idx, 'gst_rate', e.target.value)}
+                        disabled={isUnregistered}
+                        className={`w-full border border-gray-200 rounded-xl px-1 h-10 text-xs text-gray-900 outline-none focus:border-violet-500 font-semibold shadow-sm ${isUnregistered ? 'bg-gray-100 text-gray-400 opacity-75' : 'bg-white'}`}>
+                        {isUnregistered ? <option value="0">0%</option> : GST_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
                       </select>
                     </div>
                     <div className="pt-2.5 text-right font-black text-gray-900 text-sm font-mono truncate">
@@ -1487,7 +1494,9 @@ function PurchasesTab() {
               </div>
               <div>
                 <p className="text-[10px] uppercase font-bold text-violet-400 tracking-wider mb-1">GST Amount</p>
-                <p className="text-lg font-black text-violet-900">+{fmt(calcGst)}</p>
+                <p className={`text-lg font-black ${isUnregistered ? 'text-gray-400' : 'text-violet-900'}`}>
+                  {isUnregistered ? '+₹0' : `+${fmt(calcGst)}`}
+                </p>
               </div>
               <div className="px-6 border-l border-violet-100">
                 <p className="text-[10px] uppercase font-bold text-violet-400 tracking-wider mb-1">Net Invoice Total</p>
