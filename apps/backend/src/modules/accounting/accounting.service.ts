@@ -122,7 +122,7 @@ export async function getSupplierWithLedger(userId: string, supplierId: string) 
     include: {
       purchases: {
         orderBy: { invoice_date: 'desc' },
-        take: 20,
+        take: 50,
         select: {
           id: true, invoice_number: true, invoice_date: true,
           total_amount: true, amount_paid: true, payment_status: true,
@@ -130,15 +130,15 @@ export async function getSupplierWithLedger(userId: string, supplierId: string) 
       },
       payments: {
         orderBy: { payment_date: 'desc' },
-        take: 30,
+        take: 50,
         select: {
           id: true, amount: true, payment_method: true,
-          payment_date: true, reference_no: true,
+          payment_date: true, reference_no: true, notes: true,
         },
       },
       purchase_returns: {
         orderBy: { return_date: 'desc' },
-        take: 20,
+        take: 50,
         select: {
           id: true, return_number: true, return_date: true,
           total_amount: true, reason: true,
@@ -167,12 +167,41 @@ export async function getSupplierWithLedger(userId: string, supplierId: string) 
   const paid = Number(totalPaid._sum.amount ?? 0);
   const returned = Number(totalReturned._sum.total_amount ?? 0);
 
+  // Unified ledger list
+  const unifiedLedger = [
+    ...(supplier.purchases ?? []).map(p => ({
+      id: p.id,
+      date: p.invoice_date,
+      note: `Invoice ${p.invoice_number || 'N/A'}`,
+      amount: Number(p.total_amount),
+      type: 'purchase'
+    })),
+    ...(supplier.payments ?? []).map(p => ({
+      id: p.id,
+      date: p.payment_date,
+      note: p.notes || `Payment (${p.payment_method})`,
+      amount: Number(p.amount),
+      type: 'payment'
+    })),
+    ...(supplier.purchase_returns ?? []).map(r => ({
+      id: r.id,
+      date: r.return_date,
+      note: `Return ${r.return_number || 'N/A'} - ${r.reason || ''}`,
+      amount: Number(r.total_amount),
+      type: 'return'
+    }))
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
   return {
-    ...supplier,
-    total_purchases: purchased,
-    total_paid: paid,
-    total_returned: returned,
-    outstanding: purchased - paid - returned,
+    id: supplier.id,
+    name: supplier.name,
+    summary: {
+      total_purchased: purchased,
+      total_paid: paid,
+      total_returned: returned,
+      outstanding: purchased - paid - returned,
+    },
+    ledger: unifiedLedger,
   };
 }
 

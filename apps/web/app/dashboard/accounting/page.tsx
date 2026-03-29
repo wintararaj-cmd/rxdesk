@@ -663,6 +663,11 @@ function SuppliersTab({ shopGstType }: { shopGstType?: string }) {
   const [openingBalance, setOpeningBalance] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showPaymentForm, setShowPaymentForm] = useState<string | null>(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payMethod, setPayMethod] = useState('cash');
+  const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
+  const [payNote, setPayNote] = useState('');
   const supplierImportRef = useRef<HTMLInputElement>(null);
 
   const { data, isLoading } = useQuery<Supplier[]>({
@@ -731,6 +736,19 @@ function SuppliersTab({ shopGstType }: { shopGstType?: string }) {
       alert('Suppliers imported successfully!');
     },
     onError: (err: any) => alert(err.response?.data?.error?.message || 'Import failed'),
+  });
+
+  const recordPaymentMutation = useMutation({
+    mutationFn: (payload: any) => accountingApi.recordSupplierPayment(payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['web-suppliers'] });
+      qc.invalidateQueries({ queryKey: ['web-supplier-ledger'] });
+      setShowPaymentForm(null);
+      setPayAmount('');
+      setPayNote('');
+      alert('Payment recorded successfully');
+    },
+    onError: (err: any) => alert(err.response?.data?.message || 'Failed to record payment')
   });
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -899,7 +917,7 @@ function SuppliersTab({ shopGstType }: { shopGstType?: string }) {
                   {expandedId === s.id && ledger && (
                     <tr key={`${s.id}-ledger`}>
                       <td colSpan={5} className="px-5 py-4 bg-indigo-50">
-                        <div className="flex gap-6 mb-3">
+                        <div className="flex gap-6 mb-3 items-center">
                           <div>
                             <p className="text-xs text-gray-500">Total Purchased</p>
                             <p className="font-bold text-gray-800">{fmt(ledger.summary?.total_purchased ?? 0)}</p>
@@ -908,7 +926,67 @@ function SuppliersTab({ shopGstType }: { shopGstType?: string }) {
                             <p className="text-xs text-gray-500">Outstanding</p>
                             <p className="font-bold text-red-600">{fmt(ledger.summary?.outstanding ?? 0)}</p>
                           </div>
+                          <button
+                            onClick={() => {
+                              setShowPaymentForm(s.id);
+                              setPayAmount(String(ledger.summary?.outstanding ?? ''));
+                            }}
+                            className="ml-auto bg-green-600 text-white px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-green-100 hover:scale-105 active:scale-95 transition-all"
+                          >
+                            Pay Dues
+                          </button>
                         </div>
+
+                        {showPaymentForm === s.id && (
+                          <div className="bg-white p-4 rounded-2xl border border-green-100 shadow-sm mb-4 space-y-4 animate-in slide-in-from-top-2 duration-300">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-xs font-black uppercase text-green-600 tracking-widest">Record Payment to {s.name}</h4>
+                              <button onClick={() => setShowPaymentForm(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+                            </div>
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                              <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Amount (₹)</label>
+                                <input type="number" value={payAmount} onChange={(e) => setPayAmount(e.target.value)}
+                                  className="w-full border border-gray-200 rounded-xl px-3 h-10 text-sm font-bold text-gray-800 focus:ring-2 focus:ring-green-400" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Method</label>
+                                <select value={payMethod} onChange={(e) => setPayMethod(e.target.value)}
+                                  className="w-full border border-gray-200 rounded-xl px-2 h-10 text-sm bg-white">
+                                  {['cash', 'upi', 'neft', 'cheque', 'card'].map(m => <option key={m} value={m}>{m.toUpperCase()}</option>)}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Date</label>
+                                <input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)}
+                                  className="w-full border border-gray-200 rounded-xl px-3 h-10 text-sm" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Note / Ref</label>
+                                <input type="text" value={payNote} onChange={(e) => setPayNote(e.target.value)} placeholder="Txn ID or Narration"
+                                  className="w-full border border-gray-200 rounded-xl px-3 h-10 text-sm" />
+                              </div>
+                            </div>
+                            <div className="flex justify-end pt-2">
+                              <button
+                                onClick={() => {
+                                  if(!payAmount || Number(payAmount) <= 0) return;
+                                  recordPaymentMutation.mutate({
+                                    supplier_id: s.id,
+                                    amount: Number(payAmount),
+                                    payment_method: payMethod,
+                                    payment_date: payDate,
+                                    notes: payNote || undefined
+                                  });
+                                }}
+                                disabled={recordPaymentMutation.isPending}
+                                className="bg-green-600 text-white px-8 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-green-700 disabled:opacity-50"
+                              >
+                                {recordPaymentMutation.isPending ? 'Processing...' : 'Confirm Payment'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
                         <div className="space-y-1 max-h-48 overflow-y-auto">
                           {(ledger.ledger as any[])?.map((entry: any) => (
                             <div key={entry.id} className="flex justify-between text-xs text-gray-600 bg-white rounded-lg px-3 py-2">
