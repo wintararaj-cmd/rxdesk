@@ -297,10 +297,18 @@ export interface CreatePurchaseInput {
 export async function createPurchaseEntry(userId: string, input: CreatePurchaseInput) {
   const shop = await getShopOrThrow(userId);
 
+  let isUnregistered = !input.supplier_id;
+  if (!isUnregistered && input.supplier_id) {
+    const supplier = await prisma.supplier.findUnique({ where: { id: input.supplier_id } });
+    if (supplier && !supplier.gst_number) {
+      isUnregistered = true;
+    }
+  }
+
   // Calculate totals
   const itemsWithTotals = input.items.map((item): any => {
     const discountPct = item.discount_pct ?? 0;
-    const gstRate = item.gst_rate ?? 5;
+    const gstRate = isUnregistered ? 0 : (item.gst_rate ?? 5);
     const baseTotal = item.purchase_price * item.quantity;
     const discountAmt = baseTotal * (discountPct / 100);
     const taxableVal = baseTotal - discountAmt;
@@ -432,12 +440,11 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
       }
     }
 
-    // Auto-create expense entry
     await tx.expenseEntry.create({
       data: {
         shop_id: shop.id,
         category: 'medicine_purchase',
-        description: `Purchase from ${input.supplier_id ? 'supplier' : 'unregistered supplier'} — ${input.invoice_number ?? pe.id}`,
+        description: `Purchase from ${isUnregistered ? 'unregistered supplier' : 'supplier'} — ${input.invoice_number ?? pe.id}`,
         amount: totalAmount,
         payment_method: 'credit',
         entry_date: new Date(input.received_date ?? input.invoice_date),
@@ -495,10 +502,18 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
     // 2. Clear old items
     await tx.purchaseItem.deleteMany({ where: { purchase_id: id } });
 
+    let isUnregistered = !input.supplier_id;
+    if (!isUnregistered && input.supplier_id) {
+      const supplier = await tx.supplier.findUnique({ where: { id: input.supplier_id } });
+      if (supplier && !supplier.gst_number) {
+        isUnregistered = true;
+      }
+    }
+
     // 3. New Totals
     const itemsWithTotals = input.items.map((item): any => {
       const discountPct = item.discount_pct ?? 0;
-      const gstRate = item.gst_rate ?? 5;
+      const gstRate = isUnregistered ? 0 : (item.gst_rate ?? 5);
       const baseTotal = item.purchase_price * item.quantity;
       const discountAmt = baseTotal * (discountPct / 100);
       const taxableVal = baseTotal - discountAmt;
@@ -633,7 +648,7 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
       where: { linked_purchase_id: id },
       data: {
         amount: totalAmount,
-        description: `Purchase from ${input.supplier_id ? 'supplier' : 'unregistered'} — ${input.invoice_number ?? id} (EDITED)`,
+        description: `Purchase from ${isUnregistered ? 'unregistered' : 'supplier'} — ${input.invoice_number ?? id} (EDITED)`,
         entry_date: new Date(input.received_date ?? input.invoice_date),
       },
     });
@@ -1672,65 +1687,105 @@ export async function getStockValuation(userId: string) {
 
 export async function getGstSummary(userId: string, month: number, year: number) {
   const shop = await getShopOrThrow(userId);
+  const shopStateNormalized = normalizeState(shop.state);
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 0, 23, 59, 59);
 
   // Outward supplies — sales bills
   const billItems = await prisma.billItem.findMany({
     where: { bill: { shop_id: shop.id, payment_status: 'paid', created_at: { gte: start, lte: end } } },
-    select: { mrp: true, quantity: true, gst_rate: true, line_total: true },
+    select: {
+      gst_rate: true, line_total: true,
+      bill: { select: { billing_state: true } }
+    },
   });
 
-  // Group by GST rate
   const outwardByRate: Record<string, { taxable: number; gst: number; count: number }> = {};
   let totalOutwardTaxable = 0;
-  let totalGstCollected = 0;
+  let totalIgstCollected = 0;
+  let totalCgstCollected = 0;
+  let totalSgstCollected = 0;
 
   for (const item of billItems) {
     const rate = String(Number(item.gst_rate));
-    // In our system, line_total is the taxable value (price after discount, before GST)
-    const taxable = Number(item.line_total);
-    const gst = taxable * (Number(item.gst_rate) / 100);
+    const taxable = Number(item.line_total); // line_total is taxable val correctly in bills
+    const gstAmt = taxable * (Number(item.gst_rate) / 100);
+    
+    // Determine state split
+    const billingStateNormalized = normalizeState(item.bill.billing_state || shop.state);
+    const isInterState = billingStateNormalized && shopStateNormalized && billingStateNormalized !== shopStateNormalized;
+
+    if (isInterState) {
+      totalIgstCollected += gstAmt;
+    } else {
+      totalCgstCollected += gstAmt / 2;
+      totalSgstCollected += gstAmt / 2;
+    }
+
     if (!outwardByRate[rate]) outwardByRate[rate] = { taxable: 0, gst: 0, count: 0 };
     outwardByRate[rate].taxable += taxable;
-    outwardByRate[rate].gst += gst;
+    outwardByRate[rate].gst += gstAmt;
     outwardByRate[rate].count += 1;
     totalOutwardTaxable += taxable;
-    totalGstCollected += gst;
   }
+
+  const totalGstCollected = totalIgstCollected + totalCgstCollected + totalSgstCollected;
 
   // Inward supplies — purchases (ITC)
   const purchaseItems = await prisma.purchaseItem.findMany({
     where: { purchase: { shop_id: shop.id, received_date: { gte: start, lte: end } } },
-    select: { purchase_price: true, quantity: true, discount_pct: true, gst_rate: true },
+    select: {
+      purchase_price: true, quantity: true, discount_pct: true, gst_rate: true,
+      purchase: { select: { supplier: { select: { state: true } } } }
+    },
   });
 
-  let totalITC = 0;
+  let totalItcIgst = 0;
+  let totalItcCgst = 0;
+  let totalItcSgst = 0;
+
   for (const item of purchaseItems) {
     const base = Number(item.purchase_price) * item.quantity * (1 - Number(item.discount_pct) / 100);
-    const gst = base * (Number(item.gst_rate) / 100);
-    totalITC += gst;
+    const gstAmt = base * (Number(item.gst_rate) / 100);
+
+    const supplierStateNormalized = normalizeState(item.purchase.supplier?.state || shop.state);
+    const isInterState = supplierStateNormalized && shopStateNormalized && supplierStateNormalized !== shopStateNormalized;
+
+    if (isInterState) {
+      totalItcIgst += gstAmt;
+    } else {
+      totalItcCgst += gstAmt / 2;
+      totalItcSgst += gstAmt / 2;
+    }
   }
 
+  const totalITC = totalItcIgst + totalItcCgst + totalItcSgst;
+  
+  // ITC Utilization logic
+  const itcUtilised = Math.min(totalGstCollected, totalITC);
   const netTaxPayable = Math.max(0, totalGstCollected - totalITC);
+  const itcCarryForward = Math.max(0, totalITC - totalGstCollected);
 
   return {
     period: { month, year },
     outward_supplies: {
       taxable_value: Math.round(totalOutwardTaxable * 100) / 100,
       gst_collected: {
-        cgst: Math.round((totalGstCollected / 2) * 100) / 100,
-        sgst: Math.round((totalGstCollected / 2) * 100) / 100,
-        igst: 0,
+        cgst: Math.round(totalCgstCollected * 100) / 100,
+        sgst: Math.round(totalSgstCollected * 100) / 100,
+        igst: Math.round(totalIgstCollected * 100) / 100,
       },
       total_gst_collected: Math.round(totalGstCollected * 100) / 100,
     },
     inward_supplies: {
       itc_available: {
-        cgst: Math.round((totalITC / 2) * 100) / 100,
-        sgst: Math.round((totalITC / 2) * 100) / 100,
+        cgst: Math.round(totalItcCgst * 100) / 100,
+        sgst: Math.round(totalItcSgst * 100) / 100,
+        igst: Math.round(totalItcIgst * 100) / 100,
       },
       total_itc: Math.round(totalITC * 100) / 100,
+      itc_utilised: Math.round(itcUtilised * 100) / 100,
+      itc_carry_forward: Math.round(itcCarryForward * 100) / 100,
     },
     net_tax_payable: Math.round(netTaxPayable * 100) / 100,
     rate_wise_summary: Object.entries(outwardByRate).map(([rate, data]) => ({
@@ -2024,8 +2079,16 @@ export interface CreatePurchaseReturnInput {
 
 export async function createPurchaseReturn(userId: string, input: CreatePurchaseReturnInput) {
   const shop = await getShopOrThrow(userId);
+  let isUnregistered = !input.supplier_id;
+  if (!isUnregistered && input.supplier_id) {
+    const supplier = await prisma.supplier.findUnique({ where: { id: input.supplier_id } });
+    if (supplier && !supplier.gst_number) {
+      isUnregistered = true;
+    }
+  }
+
   const itemsWithTotals = input.items.map((item) => {
-    const gstRate = item.gst_rate ?? 12;
+    const gstRate = isUnregistered ? 0 : (item.gst_rate ?? 12);
     const lineTotal = item.purchase_price * item.quantity * (1 + gstRate / 100);
     return { ...item, gst_rate: gstRate, line_total: lineTotal };
   });

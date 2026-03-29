@@ -65,6 +65,16 @@ interface Expense {
   payment_method: string;
   entry_date: string;
   is_auto_entry: boolean;
+  type: 'PAYMENT' | 'RECEIPT';
+}
+
+interface Income {
+  id: string;
+  entry_type: string;
+  amount: number;
+  notes: string | null;
+  payment_method: string;
+  entry_date: string;
 }
 
 interface Supplier {
@@ -110,8 +120,10 @@ interface GstSummary {
     total_gst_collected: number;
   };
   inward_supplies: {
-    itc_available: { cgst: number; sgst: number };
+    itc_available: { cgst: number; sgst: number; igst: number };
     total_itc: number;
+    itc_utilised: number;
+    itc_carry_forward: number;
   };
   net_tax_payable: number;
   rate_wise_summary: { gst_rate: number; taxable_value: number; gst_amount: number }[];
@@ -217,7 +229,7 @@ function HsnEntryModal({ medicineName, onSave, onCancel }: { medicineName: strin
 }
 
 // ── panel tabs ────────────────────────────────────────────────────────────────
-const TABS = ['P&L', 'Expenses', 'Suppliers', 'Purchases', 'Outstandings', 'GST', 'Sale Ret.', 'Pur. Ret.', 'Contra', 'Cashbook', 'Bankbook', 'Settings'] as const;
+const TABS = ['P&L', 'Receipts & Payments', 'Suppliers', 'Purchases', 'Outstandings', 'GST', 'Sale Ret.', 'Pur. Ret.', 'Contra', 'Cashbook', 'Bankbook', 'Settings'] as const;
 type Tab = (typeof TABS)[number];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -361,25 +373,44 @@ function PLTab() {
 // ─────────────────────────────────────────────────────────────────────────────
 function ExpensesTab() {
   const qc = useQueryClient();
+  const [entryType, setEntryType] = useState<'PAYMENT' | 'RECEIPT'>('PAYMENT');
   const [category, setCategory] = useState('miscellaneous');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
-   const [payMethod, setPayMethod] = useState('cash');
+  const [payMethod, setPayMethod] = useState('cash');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const CATS = ['rent', 'salary', 'electricity', 'water', 'phone', 'internet', 'maintenance', 'transport', 'advertising', 'miscellaneous'];
+  const INCOME_TYPES = ['other_income', 'credit_recovery', 'capital_infusion', 'loan_receipt'];
 
-  const { data, isLoading } = useQuery<{ items: Expense[]; total: number }>({
+  const { data: expensesRes, isLoading: exLoading } = useQuery<{ items: Expense[]; total: number }>({
     queryKey: ['web-expenses'],
     queryFn: () => accountingApi.listExpenses().then((r) => r.data.data),
   });
 
-   const createMutation = useMutation({
-    mutationFn: (d: object) => editingId ? accountingApi.updateExpense(editingId, d) : accountingApi.createExpense(d),
+  const { data: incomeRes, isLoading: inLoading } = useQuery<{ items: Income[]; total: number }>({
+    queryKey: ['web-income-manual'],
+    queryFn: () => accountingApi.listIncome().then((r) => r.data.data),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (d: any) => {
+      if (entryType === 'RECEIPT') {
+        return accountingApi.createManualIncome({
+          entry_type: d.category,
+          amount: d.amount,
+          notes: d.description,
+          payment_method: d.payment_method
+        });
+      }
+      return editingId ? accountingApi.updateExpense(editingId, d) : accountingApi.createExpense(d);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['web-expenses'] });
+      qc.invalidateQueries({ queryKey: ['web-income-manual'] });
       qc.invalidateQueries({ queryKey: ['web-pl'] });
+      qc.invalidateQueries({ queryKey: ['accounting-status'] });
       setShowForm(false);
       setEditingId(null);
       setAmount('');
@@ -388,74 +419,117 @@ function ExpensesTab() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => accountingApi.deleteExpense(id),
+    mutationFn: (id: string) => entryType === 'RECEIPT' ? Promise.reject('Deletion for income via this UI not implemented yet') : accountingApi.deleteExpense(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['web-expenses'] });
-      qc.invalidateQueries({ queryKey: ['web-pl'] });
+      qc.invalidateQueries({ queryKey: ['web-income-manual'] });
     },
   });
 
+  const combinedItems = [
+    ...(expensesRes?.items ?? []).map(e => ({ ...e, type: 'PAYMENT' as const })),
+    ...(incomeRes?.items ?? []).map(i => ({
+      id: i.id,
+      category: i.entry_type,
+      amount: i.amount,
+      description: i.notes,
+      payment_method: i.payment_method,
+      entry_date: i.entry_date,
+      is_auto_entry: false,
+      type: 'RECEIPT' as const
+    }))
+  ].sort((a, b) => new Date(b.entry_date).getTime() - new Date(a.entry_date).getTime());
+
+  const totalPayments = expensesRes?.items?.reduce((sum, e) => sum + Number(e.amount), 0) ?? 0;
+  const totalReceipts = incomeRes?.items?.reduce((sum, i) => sum + Number(i.amount), 0) ?? 0;
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-gray-600 font-medium">
-          Total: <span className="text-red-600 font-bold">{fmt(data?.total ?? 0)}</span>
-        </p>
+      {/* Title + Stats */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+        <div className="flex items-center gap-6">
+          <div>
+            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Total Payments (Out)</p>
+            <p className="text-lg font-black text-red-600">{fmt(totalPayments)}</p>
+          </div>
+          <div className="w-px h-8 bg-gray-100" />
+          <div>
+            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Total Receipts (In)</p>
+            <p className="text-lg font-black text-emerald-600">{fmt(totalReceipts)}</p>
+          </div>
+        </div>
         <button
-          onClick={() => setShowForm((v) => !v)}
-          className="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
+          onClick={() => { setShowForm((v) => !v); setEditingId(null); }}
+          className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95"
         >
-          + Add Expense
+          {showForm ? 'Close Form' : '+ Add Receipt / Payment'}
         </button>
       </div>
 
-       {showForm && (
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-red-100">
-          <h3 className="font-semibold text-gray-700 mb-4">{editingId ? 'Edit Expense' : 'New Expense'}</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {showForm && (
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-indigo-100 ring-4 ring-indigo-50/50">
+          <div className="flex items-center gap-4 mb-6 pb-4 border-b border-gray-50">
+             <button
+              onClick={() => { setEntryType('PAYMENT'); setCategory('miscellaneous'); }}
+              className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${entryType === 'PAYMENT' ? 'bg-red-500 text-white shadow-lg shadow-red-100' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+             >
+               Record Payment (OUT)
+             </button>
+             <button
+              onClick={() => { setEntryType('RECEIPT'); setCategory('other_income'); }}
+              className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${entryType === 'RECEIPT' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+             >
+               Record Receipt (IN)
+             </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <label className="text-gray-500 text-xs block mb-1">Category</label>
+              <label className="text-gray-400 text-[10px] font-black uppercase tracking-widest block mb-1">{entryType === 'PAYMENT' ? 'Expense Category' : 'Receipt Type'}</label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-red-400"
+                className="w-full border border-gray-100 bg-gray-50/50 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
               >
-                {CATS.map((c) => <option key={c} value={c}>{c}</option>)}
+                {entryType === 'PAYMENT' 
+                  ? CATS.map((c) => <option key={c} value={c}>{c.toUpperCase().replace('_', ' ')}</option>)
+                  : INCOME_TYPES.map((c) => <option key={c} value={c}>{c.toUpperCase().replace('_', ' ')}</option>)
+                }
               </select>
             </div>
             <div>
-              <label className="text-gray-500 text-xs block mb-1">Amount (₹)</label>
+              <label className="text-gray-400 text-[10px] font-black uppercase tracking-widest block mb-1">Amount (₹)</label>
               <input
                 type="number"
                 min={0}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-red-400"
+                className="w-full border border-gray-100 bg-gray-50/50 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
               />
             </div>
             <div>
-              <label className="text-gray-500 text-xs block mb-1">Description</label>
+              <label className="text-gray-400 text-[10px] font-black uppercase tracking-widest block mb-1">Narration / Description</label>
               <input
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Monthly rent"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-red-400"
+                placeholder={entryType === 'PAYMENT' ? 'e.g. Electricity bill paid' : 'e.g. Cash received from X'}
+                className="w-full border border-gray-100 bg-gray-50/50 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
               />
             </div>
             <div>
-              <label className="text-gray-500 text-xs block mb-1">Payment Method</label>
+              <label className="text-gray-400 text-[10px] font-black uppercase tracking-widest block mb-1">Method</label>
               <select
                 value={payMethod}
                 onChange={(e) => setPayMethod(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-red-400"
+                className="w-full border border-gray-100 bg-gray-50/50 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
               >
-                {['cash', 'upi', 'card'].map((m) => <option key={m} value={m}>{m}</option>)}
+                {['cash', 'upi', 'card', 'bank_transfer'].map((m) => <option key={m} value={m}>{m.toUpperCase()}</option>)}
               </select>
             </div>
           </div>
-          <div className="flex gap-3 mt-4">
+          <div className="flex gap-4 mt-6">
             <button
               onClick={() => {
                 const amt = parseFloat(amount);
@@ -463,73 +537,86 @@ function ExpensesTab() {
                 createMutation.mutate({ category, amount: amt, description, payment_method: payMethod });
               }}
               disabled={createMutation.isPending}
-              className="bg-red-500 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-red-600 disabled:opacity-50 transition-colors"
+              className={`flex-1 ${entryType === 'PAYMENT' ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-600 hover:bg-emerald-700'} text-white py-3 rounded-xl text-sm font-bold shadow-lg transition-all disabled:opacity-50`}
             >
-              {createMutation.isPending ? 'Saving...' : 'Save'}
+              {createMutation.isPending ? 'Processing...' : (editingId ? 'Update Entry' : `Save ${entryType}`)}
             </button>
-            <button onClick={() => setShowForm(false)} className="text-gray-500 text-sm px-4 py-2 hover:text-gray-700">
+            <button onClick={() => setShowForm(false)} className="px-6 py-3 text-gray-400 font-bold text-sm hover:text-gray-600">
               Cancel
             </button>
           </div>
         </div>
       )}
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="w-7 h-7 border-4 border-red-400 border-t-transparent rounded-full animate-spin" />
+      {(exLoading || inLoading) ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 text-gray-500 text-xs uppercase">
-                <th className="text-left px-5 py-3">Date</th>
-                <th className="text-left px-5 py-3">Category</th>
-                <th className="text-left px-5 py-3">Description</th>
-                <th className="text-left px-5 py-3">Method</th>
-                <th className="text-right px-5 py-3">Amount</th>
-                <th className="px-5 py-3" />
+              <tr className="bg-gray-50 text-gray-400 text-[10px] font-black uppercase tracking-widest border-b border-gray-100">
+                <th className="text-left px-5 py-4">Date</th>
+                <th className="text-left px-5 py-4">Type</th>
+                <th className="text-left px-5 py-4">Category</th>
+                <th className="text-left px-5 py-4">Narration</th>
+                <th className="text-left px-5 py-4">Method</th>
+                <th className="text-right px-5 py-4">Amount</th>
+                <th className="px-5 py-4" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {(data?.items ?? []).map((e) => (
-                <tr key={e.id} className="hover:bg-gray-50/50">
-                  <td className="px-5 py-3 text-gray-600">
-                    {new Date(e.entry_date).toLocaleDateString('en-IN')}
+              {combinedItems.map((item) => (
+                <tr key={item.id} className="hover:bg-gray-50/30 transition-colors group">
+                  <td className="px-5 py-4 text-gray-500 text-[10px] font-bold">
+                    {new Date(item.entry_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </td>
-                  <td className="px-5 py-3">
-                    <span className="capitalize bg-red-50 text-red-700 px-2 py-0.5 rounded-full text-xs">
-                      {e.category}
+                  <td className="px-5 py-4">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${item.type === 'RECEIPT' ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'}`}>
+                      {item.type}
                     </span>
-                    {e.is_auto_entry && (
-                      <span className="ml-2 bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-xs">auto</span>
+                  </td>
+                  <td className="px-5 py-4">
+                    <span className="capitalize text-gray-700 font-black text-[10px] tracking-tight border-b border-gray-100">
+                      {item.category.replace('_', ' ')}
+                    </span>
+                    {(item as any).is_auto_entry && (
+                      <span className="ml-2 bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded text-[9px] font-black uppercase">auto</span>
                     )}
                   </td>
-                  <td className="px-5 py-3 text-gray-600 max-w-[200px] truncate">{e.description ?? '—'}</td>
-                  <td className="px-5 py-3 text-gray-500 capitalize">{e.payment_method}</td>
-                  <td className="px-5 py-3 text-right font-semibold text-gray-800">{fmt(e.amount)}</td>
-                   <td className="px-5 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                       {!e.is_auto_entry && (
+                  <td className="px-5 py-4 text-gray-600 text-xs font-medium max-w-[250px] truncate">
+                    {item.description || <span className="text-gray-300 italic">No narration</span>}
+                  </td>
+                  <td className="px-5 py-4">
+                    <span className="text-gray-400 text-[10px] font-black uppercase tracking-wider">{item.payment_method}</span>
+                  </td>
+                  <td className={`px-5 py-4 text-right font-black text-sm ${item.type === 'RECEIPT' ? 'text-emerald-700' : 'text-red-700'}`}>
+                    {item.type === 'RECEIPT' ? '+' : '-'}{fmt(item.amount)}
+                  </td>
+                   <td className="px-5 py-4 text-right">
+                    <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                       {!(item as any).is_auto_entry && item.type === 'PAYMENT' && (
                         <>
                           <button
                             onClick={() => {
-                              setEditingId(e.id);
-                              setCategory(e.category);
-                              setAmount(String(e.amount));
-                              setDescription(e.description || '');
-                              setPayMethod(e.payment_method);
+                              setEditingId(item.id);
+                              setEntryType('PAYMENT');
+                              setCategory(item.category);
+                              setAmount(String(item.amount));
+                              setDescription(item.description || '');
+                              setPayMethod(item.payment_method);
                               setShowForm(true);
                             }}
-                            className="text-violet-600 hover:text-violet-800 transition-colors text-xs font-bold"
+                            className="text-indigo-600 hover:text-indigo-800 text-[10px] font-black uppercase tracking-widest"
                           >
                             Edit
                           </button>
                           <button
-                            onClick={() => { if(confirm('Delete this expense?')) deleteMutation.mutate(e.id); }}
-                            className="text-red-400 hover:text-red-600 transition-colors text-xs"
+                            onClick={() => { if(confirm('Delete this entry?')) { setEntryType('PAYMENT'); deleteMutation.mutate(item.id); } }}
+                            className="text-rose-400 hover:text-rose-600"
                           >
-                            Delete
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                           </button>
                         </>
                       )}
@@ -539,8 +626,13 @@ function ExpensesTab() {
               ))}
             </tbody>
           </table>
-          {(data?.items ?? []).length === 0 && (
-            <p className="text-center text-gray-400 py-10 text-sm">No expenses recorded</p>
+          {combinedItems.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+              </div>
+              <p className="text-gray-400 text-sm font-medium">No vouchers recorded for this period</p>
+            </div>
           )}
         </div>
       )}
@@ -2657,9 +2749,9 @@ function GSTTab() {
           {/* Summary cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard label="Taxable Outward Supplies" value={fmt(data.outward_supplies.taxable_value)} color="bg-violet-50" textColor="text-violet-700" />
-            <StatCard label="GST Collected (Output)" value={fmt(data.outward_supplies.total_gst_collected)} sub={`CGST ${fmt(data.outward_supplies.gst_collected.cgst)} + SGST ${fmt(data.outward_supplies.gst_collected.sgst)}`} color="bg-blue-50" textColor="text-blue-700" />
-            <StatCard label="ITC (Input Tax Credit)" value={fmt(data.inward_supplies.total_itc)} sub={`CGST ${fmt(data.inward_supplies.itc_available.cgst)} + SGST ${fmt(data.inward_supplies.itc_available.sgst)}`} color="bg-green-50" textColor="text-green-700" />
-            <StatCard label="Net GST Payable" value={fmt(data.net_tax_payable)} sub={`Output − ITC`} color="bg-indigo-50" textColor="text-indigo-700" />
+            <StatCard label="GST Collected (Output)" value={fmt(data.outward_supplies.total_gst_collected)} sub={`${data.outward_supplies.gst_collected.igst > 0 ? `IGST ${fmt(data.outward_supplies.gst_collected.igst)}` : `CGST ${fmt(data.outward_supplies.gst_collected.cgst)} + SGST ${fmt(data.outward_supplies.gst_collected.sgst)}`}`} color="bg-blue-50" textColor="text-blue-700" />
+            <StatCard label="ITC (Input Tax Credit)" value={fmt(data.inward_supplies.total_itc)} sub={`${data.inward_supplies.itc_available.igst > 0 ? `IGST ${fmt(data.inward_supplies.itc_available.igst)}` : `CGST ${fmt(data.inward_supplies.itc_available.cgst)} + SGST ${fmt(data.inward_supplies.itc_available.sgst)}`}`} color="bg-green-50" textColor="text-green-700" />
+            <StatCard label="Net GST Payable" value={fmt(data.net_tax_payable)} sub={data.net_tax_payable === 0 && data.inward_supplies.itc_carry_forward > 0 ? `Excess ITC: ${fmt(data.inward_supplies.itc_carry_forward)}` : `Output − ITC`} color="bg-indigo-50" textColor="text-indigo-700" />
           </div>
 
           {/* Outward supplies rate-wise */}
@@ -2706,7 +2798,7 @@ function GSTTab() {
           <div className="bg-white rounded-xl p-5 shadow-sm">
             <h3 className="font-semibold text-gray-700 mb-1">Inward Supplies — Input Tax Credit (ITC)</h3>
             <p className="text-gray-400 text-xs mb-4">GST paid on purchases — eligible to offset output tax</p>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-green-50 rounded-xl p-4">
                 <p className="text-xs text-gray-500 mb-1">CGST (ITC)</p>
                 <p className="text-lg font-bold text-green-700">{fmt(data.inward_supplies.itc_available.cgst)}</p>
@@ -2714,6 +2806,10 @@ function GSTTab() {
               <div className="bg-green-50 rounded-xl p-4">
                 <p className="text-xs text-gray-500 mb-1">SGST (ITC)</p>
                 <p className="text-lg font-bold text-green-700">{fmt(data.inward_supplies.itc_available.sgst)}</p>
+              </div>
+              <div className="bg-green-50 rounded-xl p-4">
+                <p className="text-xs text-gray-500 mb-1">IGST (ITC)</p>
+                <p className="text-lg font-bold text-green-700">{fmt(data.inward_supplies.itc_available.igst)}</p>
               </div>
               <div className="bg-green-100 rounded-xl p-4">
                 <p className="text-xs text-gray-500 mb-1">Total ITC Available</p>
@@ -2732,14 +2828,19 @@ function GSTTab() {
               </div>
               <span className="text-gray-400 font-bold text-lg">−</span>
               <div>
-                <span className="text-gray-500">ITC </span>
-                <span className="font-bold text-green-700">{fmt(data.inward_supplies.total_itc)}</span>
+                <span className="text-gray-500">Utilized ITC </span>
+                <span className="font-bold text-green-700">{fmt(data.inward_supplies.itc_utilised)}</span>
               </div>
               <span className="text-gray-400 font-bold text-lg">=</span>
               <div>
                 <span className="text-gray-500">Net Payable </span>
                 <span className="font-bold text-indigo-700 text-base">{fmt(data.net_tax_payable)}</span>
               </div>
+              {data.inward_supplies.itc_carry_forward > 0 && (
+                <div className="ml-auto bg-green-100 px-3 py-1 rounded-full text-green-700 font-bold text-xs">
+                  Net ITC Available: {fmt(data.inward_supplies.itc_carry_forward)}
+                </div>
+              )}
             </div>
           </div>
         </>
@@ -4204,7 +4305,7 @@ export default function AccountingPage() {
 
         {/* Tab content */}
         {activeTab === 'P&L' && <PLTab />}
-        {activeTab === 'Expenses' && <ExpensesTab />}
+        {activeTab === 'Receipts & Payments' && <ExpensesTab />}
         {activeTab === 'Suppliers' && <SuppliersTab shopGstType={shop?.gst_type} />}
         {activeTab === 'Purchases' && <PurchasesTab />}
         {activeTab === 'Outstandings' && <OutstandingsTab />}
