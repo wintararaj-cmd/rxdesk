@@ -2809,6 +2809,19 @@ export async function generateGstr2Excel(userId: string, month: number, year: nu
     orderBy: { return_date: 'asc' },
   });
 
+  // Load HSN codes mapping for all items
+  const purchasedItemNames = purchases.flatMap(p => p.items.map(i => i.medicine_name));
+  const returnedItemNames = purchaseReturns.flatMap(r => r.items.map(i => i.medicine_name));
+  const allNames = Array.from(new Set([...purchasedItemNames, ...returnedItemNames]));
+
+  const shopMedicines = await prisma.shopMedicine.findMany({
+    where: { shop_id: shop.id, medicine_name: { in: allNames } },
+    select: { medicine_name: true, hsn_code: true }
+  });
+  const nameToHsn = new Map(shopMedicines.map(m => [m.medicine_name.trim().toLowerCase(), m.hsn_code]));
+
+  const hsnSummary: Record<string, any> = {};
+
   const workbook = new ExcelJS.Workbook();
   
   // 1. B2B Sheet (Registered Suppliers)
@@ -2914,6 +2927,27 @@ export async function generateGstr2Excel(userId: string, month: number, year: nu
     const pos = pur.supplier?.state || shop.state || 'N/A';
     const dateStr = pur.invoice_date.toISOString().split('T')[0];
 
+    // Update HSN Summary
+    for (const item of pur.items) {
+      const hsn = nameToHsn.get(item.medicine_name.trim().toLowerCase()) || 'N/A';
+      const key = `${hsn}_${item.medicine_name.trim().toLowerCase()}`;
+      if (!hsnSummary[key]) {
+        hsnSummary[key] = { hsn, desc: item.medicine_name, uqc: 'OTH', qty: 0, total_val: 0, taxable_val: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 };
+      }
+      const rate = Number(item.gst_rate);
+      const totalLine = Number(item.line_total);
+      const taxable = totalLine / (1 + rate / 100);
+      const totalGst = totalLine - taxable;
+      let cgst = 0, sgst = 0, igst = 0;
+      if (isInterState) igst = totalGst; else { cgst = totalGst / 2; sgst = totalGst / 2; }
+      hsnSummary[key].qty += item.quantity + (item.free_qty || 0);
+      hsnSummary[key].taxable_val += taxable;
+      hsnSummary[key].igst += igst;
+      hsnSummary[key].cgst += cgst;
+      hsnSummary[key].sgst += sgst;
+      hsnSummary[key].total_val += totalLine;
+    }
+
     // Group items by tax rate
     const rates = Array.from(new Set(pur.items.map(i => Number(i.gst_rate))));
     
@@ -2971,6 +3005,27 @@ export async function generateGstr2Excel(userId: string, month: number, year: nu
     const dateStr = ret.return_date.toISOString().split('T')[0];
     const totalVal = Number(ret.total_amount);
 
+    // Update HSN Summary
+    for (const item of ret.items) {
+      const hsn = nameToHsn.get(item.medicine_name.trim().toLowerCase()) || 'N/A';
+      const key = `${hsn}_${item.medicine_name.trim().toLowerCase()}`;
+      if (!hsnSummary[key]) {
+        hsnSummary[key] = { hsn, desc: item.medicine_name, uqc: 'OTH', qty: 0, total_val: 0, taxable_val: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 };
+      }
+      const rate = Number(item.gst_rate);
+      const totalLine = Number(item.line_total);
+      const taxable = totalLine / (1 + rate / 100);
+      const totalGst = totalLine - taxable;
+      let cgst = 0, sgst = 0, igst = 0;
+      if (isInterState) igst = totalGst; else { cgst = totalGst / 2; sgst = totalGst / 2; }
+      hsnSummary[key].qty -= item.quantity;
+      hsnSummary[key].taxable_val -= taxable;
+      hsnSummary[key].igst -= igst;
+      hsnSummary[key].cgst -= cgst;
+      hsnSummary[key].sgst -= sgst;
+      hsnSummary[key].total_val -= totalLine;
+    }
+
     // Group items by tax rate
     const rates = Array.from(new Set(ret.items.map(i => Number(i.gst_rate))));
     
@@ -3012,6 +3067,59 @@ export async function generateGstr2Excel(userId: string, month: number, year: nu
       } else {
         cdnurSheet.addRow(rowData);
       }
+    }
+  }
+
+  // 5. HSNSUM Sheet
+  const hsnSumSheet = workbook.addWorksheet('HSNSUM');
+  hsnSumSheet.columns = [
+    { key: 'A', width: 15 }, { key: 'B', width: 25 }, { key: 'C', width: 15 },
+    { key: 'D', width: 15 }, { key: 'E', width: 15 }, { key: 'F', width: 15 },
+    { key: 'G', width: 20 }, { key: 'H', width: 20 }, { key: 'I', width: 20 }, { key: 'J', width: 15 }
+  ];
+
+  const hsnRows = Object.values(hsnSummary);
+  const totalHsnCount = hsnRows.length;
+  const totVal = hsnRows.reduce((acc, r) => acc + r.total_val, 0);
+  const totTaxVal = hsnRows.reduce((acc, r) => acc + r.taxable_val, 0);
+  const totIgst = hsnRows.reduce((acc, r) => acc + r.igst, 0);
+  const totCgst = hsnRows.reduce((acc, r) => acc + r.cgst, 0);
+  const totSgst = hsnRows.reduce((acc, r) => acc + r.sgst, 0);
+  const totCess = hsnRows.reduce((acc, r) => acc + r.cess, 0);
+
+  const formatCurrency = (val: number) => Number(val.toFixed(2));
+
+  const row1 = hsnSumSheet.addRow(['Summary For HSN(13)']);
+  row1.font = { bold: true };
+  hsnSumSheet.mergeCells('A1:J1');
+  
+  const row2 = hsnSumSheet.addRow([
+    'No. of HSN', '', '', '', 
+    'Total Value', 'Total Taxable Value', 'Total Integrated Tax', 
+    'Total Central Tax', 'Total State/UT Tax', 'Total Cess'
+  ]);
+  row2.font = { bold: true };
+
+  hsnSumSheet.addRow([
+    totalHsnCount, '', '', '',
+    formatCurrency(totVal), formatCurrency(totTaxVal), formatCurrency(totIgst),
+    formatCurrency(totCgst), formatCurrency(totSgst), formatCurrency(totCess)
+  ]);
+
+  const row4 = hsnSumSheet.addRow([
+    'HSN', 'Description', 'UQC', 'Total Quantity',
+    'Total Value', 'Taxable Value', 'Integrated Tax Amount',
+    'Central Tax Amount', 'State/UT Tax Amount', 'Cess Amount'
+  ]);
+  row4.font = { bold: true };
+
+  for (const r of hsnRows) {
+    if (r.qty !== 0 || r.total_val !== 0) { // skip if completely returned
+      hsnSumSheet.addRow([
+        r.hsn, r.desc, r.uqc, formatCurrency(r.qty),
+        formatCurrency(r.total_val), formatCurrency(r.taxable_val), formatCurrency(r.igst),
+        formatCurrency(r.cgst), formatCurrency(r.sgst), formatCurrency(r.cess)
+      ]);
     }
   }
 
