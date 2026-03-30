@@ -90,6 +90,8 @@ export default function ReportsPage() {
   // Quick links to other report sections
   const quickLinks = [
     { href: '/dashboard/reports/sales', label: 'Sales Report', icon: '💰', desc: 'Detailed sales analysis' },
+    { href: '/dashboard/reports/purchase', label: 'Purchase Report', icon: '🛒', desc: 'Stock inward & supplier analysis' },
+    { href: '/dashboard/reports/gst', label: 'GST Report', icon: '📋', desc: 'GST summary & tax filing' },
   ];
 
   const { data: analytics, isLoading, isError } = useQuery<Analytics>({
