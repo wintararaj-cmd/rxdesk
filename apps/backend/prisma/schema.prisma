@@ -123,6 +123,11 @@ enum ExpenseCategory {
   utilities
   transport
   maintenance
+  electricity
+  water
+  phone
+  internet
+  advertising
   miscellaneous
 }
 
@@ -133,6 +138,7 @@ enum AccountingPaymentMethod {
   cheque
   card
   credit
+  bank_transfer
 }
 
 enum IncomeEntryType {
@@ -140,6 +146,10 @@ enum IncomeEntryType {
   consultation_fee_collection
   misc_income
   refund_reversal
+  other_income
+  credit_recovery
+  capital_infusion
+  loan_receipt
 }
 
 enum PurchasePaymentStatus {

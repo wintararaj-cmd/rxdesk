@@ -767,7 +767,7 @@ export interface RecordSupplierPaymentInput {
   supplier_id: string;
   purchase_id?: string;
   amount: number;
-  payment_method: 'cash' | 'upi' | 'neft' | 'cheque' | 'card';
+  payment_method: 'cash' | 'upi' | 'neft' | 'cheque' | 'card' | 'credit' | 'bank_transfer';
   payment_date?: string;
   reference_no?: string;
   notes?: string;
@@ -842,10 +842,10 @@ export async function listSupplierPayments(userId: string, opts: { supplier_id?:
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface CreateExpenseInput {
-  category: 'medicine_purchase' | 'rent' | 'salary' | 'utilities' | 'transport' | 'maintenance' | 'miscellaneous';
+  category: 'medicine_purchase' | 'rent' | 'salary' | 'utilities' | 'transport' | 'maintenance' | 'electricity' | 'water' | 'phone' | 'internet' | 'advertising' | 'miscellaneous';
   description?: string;
   amount: number;
-  payment_method?: 'cash' | 'upi' | 'neft' | 'cheque' | 'card';
+  payment_method?: 'cash' | 'upi' | 'neft' | 'cheque' | 'card' | 'credit' | 'bank_transfer';
   reference_no?: string;
   entry_date?: string;
 }
@@ -955,7 +955,15 @@ export async function listIncome(userId: string, opts: { from?: string; to?: str
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
 }
 
-export async function createManualIncome(userId: string, input: { entry_type: string; amount: number; payment_method?: string; entry_date?: string; notes?: string }) {
+export interface CreateIncomeInput {
+  entry_type: 'sale_income' | 'consultation_fee_collection' | 'misc_income' | 'refund_reversal' | 'other_income' | 'credit_recovery' | 'capital_infusion' | 'loan_receipt';
+  amount: number;
+  payment_method?: 'cash' | 'upi' | 'neft' | 'cheque' | 'card' | 'credit' | 'bank_transfer';
+  entry_date?: string;
+  notes?: string;
+}
+
+export async function createManualIncome(userId: string, input: CreateIncomeInput) {
   const shop = await getShopOrThrow(userId);
   return prisma.incomeEntry.create({
     data: {
