@@ -1886,14 +1886,15 @@ function PurchasesTab() {
                       <button onClick={(e) => { e.stopPropagation(); handleEditClick(p.id); }} title="Edit Invoice" className="w-8 h-8 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-400 hover:text-amber-600 hover:border-amber-200 transition-all shadow-sm">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
                       </button>
-                      {p.payment_status === 'pending' && (
+                      {(p.payment_status === 'unpaid' || p.payment_status === 'partial') && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if(confirm('Confirm VOID this purchase? Inventory will be reversed.')) voidMutation.mutate(p.id);
+                            if(confirm('Confirm DELETE this purchase? Inventory will be reversed and linked payments will be removed.')) voidMutation.mutate(p.id);
                           }}
                           disabled={voidMutation.isPending}
                           className="w-8 h-8 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-400 hover:text-red-600 hover:border-red-200 transition-all shadow-sm"
+                          title="Delete Invoice"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.34 9m-4.74 0L9.26 9m9.96-2.14c.88.14 1.53.58 1.53 1.14v0c0 .56-.65 1-1.53 1.14m-16.92 0c-.88-.14-1.53-.58-1.53-1.14v0c0-.56.65-1 1.53-1.14m1.14-2.14A1.875 1.875 0 015.25 4.5h11.5a1.875 1.875 0 011.875 1.875v14.25A1.875 1.875 0 0116.75 22.5H7.25A1.875 1.875 0 015.375 20.625V6.375z" /></svg>
                         </button>
@@ -2017,12 +2018,12 @@ function PurchaseDetailModal({ id, onClose, onEdit }: { id: string; onClose: () 
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
             </button>
-            {p?.payment_status === 'pending' && (
+            {(p?.payment_status === 'unpaid' || p?.payment_status === 'partial') && (
               <button
-                onClick={() => { if(confirm('Confirm VOID this purchase? Inventory will be reversed.')) voidMutation.mutate(p.id); }}
+                onClick={() => { if(confirm('Confirm DELETE this purchase? Inventory will be reversed and linked payments removed.')) voidMutation.mutate(p.id); }}
                 disabled={voidMutation.isPending}
                 className="w-10 h-10 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-300 hover:text-red-500 hover:border-red-200 transition-all shadow-sm"
-                title="Void Purchase"
+                title="Delete Purchase"
               >
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.34 9m-4.74 0L9.26 9m9.96-2.14c.88.14 1.53.58 1.53 1.14v0c0 .56-.65 1-1.53 1.14m-16.92 0c-.88-.14-1.53-.58-1.53-1.14v0c0-.56.65-1 1.53-1.14m1.14-2.14A1.875 1.875 0 015.25 4.5h11.5a1.875 1.875 0 011.875 1.875v14.25A1.875 1.875 0 0116.75 22.5H7.25A1.875 1.875 0 015.375 20.625V6.375z" /></svg>
               </button>
