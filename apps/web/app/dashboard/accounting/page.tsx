@@ -235,6 +235,9 @@ type Tab = (typeof TABS)[number];
 // ─────────────────────────────────────────────────────────────────────────────
 //  P&L Tab
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+//  P&L Tab
+// ─────────────────────────────────────────────────────────────────────────────
 function PLTab() {
   const [from, setFrom] = useState(FIRST_OF_MONTH);
   const [to, setTo] = useState(TODAY_STR);
@@ -252,114 +255,182 @@ function PLTab() {
   });
 
   return (
-    <div className="space-y-6">
-      {/* Date range */}
-      <div className="bg-white rounded-xl p-4 shadow-sm flex flex-wrap items-center gap-4">
-        <div>
-          <label className="text-gray-500 text-xs block mb-1">From</label>
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400"
-          />
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Date Range & Controls */}
+      <div className="bg-white/70 backdrop-blur-xl rounded-[32px] p-2 shadow-sm border border-gray-100 flex items-center justify-between gap-4 max-w-fit mx-auto lg:mx-0">
+        <div className="flex items-center gap-1">
+          <div className="relative group">
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="bg-transparent border-0 rounded-2xl px-5 py-3 text-sm font-black text-gray-700 focus:ring-2 focus:ring-violet-500/10 cursor-pointer"
+            />
+            <span className="absolute -top-1 left-4 px-1.5 bg-white text-[8px] font-black text-gray-400 uppercase tracking-widest">From</span>
+          </div>
+          <div className="w-4 h-px bg-gray-200" />
+          <div className="relative group">
+            <input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="bg-transparent border-0 rounded-2xl px-5 py-3 text-sm font-black text-gray-700 focus:ring-2 focus:ring-violet-500/10 cursor-pointer"
+            />
+            <span className="absolute -top-1 left-4 px-1.5 bg-white text-[8px] font-black text-gray-400 uppercase tracking-widest">To</span>
+          </div>
         </div>
-        <div>
-          <label className="text-gray-500 text-xs block mb-1">To</label>
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400"
-          />
-        </div>
+        <button 
+          onClick={() => { setFrom(FIRST_OF_MONTH); setTo(TODAY_STR); }}
+          className="bg-gray-900 text-white p-3 rounded-2xl hover:bg-black transition-colors shadow-lg shadow-gray-200"
+          title="Reset to current month"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+        </button>
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
+        <div className="flex flex-col items-center justify-center py-32 text-center">
+          <div className="w-12 h-12 border-4 border-violet-500 border-t-transparent rounded-full animate-spin mb-4" />
+          <p className="text-xs font-black text-violet-500 uppercase tracking-[0.2em] animate-pulse">Calculating Ledger...</p>
         </div>
       ) : pl ? (
         <>
-          {/* Top cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard label="Total Revenue" value={fmt(pl.revenue.total)} color="bg-violet-50" textColor="text-violet-700" />
-            <StatCard label="Gross Profit" value={fmt(pl.gross_profit)} sub={`Margin: ${pl.gross_margin_pct.toFixed(1)}%`} color="bg-blue-50" textColor="text-blue-700" />
-            <StatCard label="Operating Expenses" value={fmt(pl.expenses.total)} color="bg-red-50" textColor="text-red-600" />
-            <StatCard
-              label="Net Profit"
-              value={fmt(pl.net_profit)}
-              sub={`Net margin: ${pl.net_margin_pct.toFixed(1)}%`}
-              color={pl.net_profit >= 0 ? 'bg-green-50' : 'bg-red-50'}
-              textColor={pl.net_profit >= 0 ? 'text-green-700' : 'text-red-700'}
-            />
+          {/* Performance Overview */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+             <div className="bg-white rounded-[32px] p-6 shadow-sm border border-gray-100 relative overflow-hidden group">
+               <div className="absolute top-0 right-0 w-24 h-24 bg-violet-50 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110 duration-500" />
+               <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1 relative z-10">Gross Revenue</p>
+               <h3 className="text-3xl font-black text-gray-900 tracking-tighter relative z-10">{fmt(pl.revenue.total)}</h3>
+               <div className="mt-4 flex items-center gap-2 relative z-10">
+                 <span className="text-[10px] bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-black uppercase">Sales + Other</span>
+               </div>
+             </div>
+
+             <div className="bg-white rounded-[32px] p-6 shadow-sm border border-gray-100 relative overflow-hidden group">
+               <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110 duration-500" />
+               <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1 relative z-10">Gross Profit</p>
+               <h3 className="text-3xl font-black text-blue-700 tracking-tighter relative z-10">{fmt(pl.gross_profit)}</h3>
+               <div className="mt-4 flex items-center gap-2 relative z-10">
+                 <span className="text-xs font-bold text-gray-500">Margin: {pl.gross_margin_pct.toFixed(1)}%</span>
+               </div>
+             </div>
+
+             <div className="bg-white rounded-[32px] p-6 shadow-sm border border-gray-100 relative overflow-hidden group">
+               <div className="absolute top-0 right-0 w-24 h-24 bg-rose-50 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110 duration-500" />
+               <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1 relative z-10">Op. Expenses</p>
+               <h3 className="text-3xl font-black text-rose-600 tracking-tighter relative z-10">{fmt(pl.expenses.total)}</h3>
+               <div className="mt-4 flex items-center gap-2 relative z-10">
+                 <span className="text-[10px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-black uppercase">Operating</span>
+               </div>
+             </div>
+
+             <div className={`${pl.net_profit >= 0 ? 'bg-indigo-600 shadow-indigo-100' : 'bg-rose-600 shadow-rose-100'} rounded-[32px] p-6 shadow-2xl relative overflow-hidden group transition-all`}>
+               <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />
+               <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1 relative z-10">Net Profit / Loss</p>
+               <h3 className="text-3xl font-black text-white tracking-tighter relative z-10">{fmt(pl.net_profit)}</h3>
+               <div className="mt-4 flex items-center gap-2 relative z-10">
+                 <span className="text-xs font-black text-white/90 bg-white/10 px-2.5 py-1 rounded-full">{pl.net_margin_pct.toFixed(1)}% Net Margin</span>
+               </div>
+             </div>
           </div>
 
-          {/* Revenue + Expense breakdown */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-white rounded-xl p-5 shadow-sm">
-              <h3 className="font-semibold text-gray-700 mb-4">Revenue by Payment Method</h3>
-              {(['sales_income', 'other_income'] as const).map((m) => {
-                const val = pl.revenue[m] as number;
-                const p = pl.revenue.total > 0 ? (val / pl.revenue.total) * 100 : 0;
-                const clr: Record<string, string> = { sales_income: 'bg-green-400', other_income: 'bg-blue-400' };
-                const label: Record<string, string> = { sales_income: 'Sales Income', other_income: 'Other Income' };
-                return (
-                  <div key={m} className="mb-3">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-600">{label[m]}</span>
-                      <span className="text-gray-700 font-medium">{fmt(val)} <span className="text-gray-400 font-normal">({p.toFixed(0)}%)</span></span>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="bg-white rounded-[32px] p-8 shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between mb-8">
+                <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Revenue Mix</h3>
+                <div className="w-8 h-8 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" /></svg>
+                </div>
+              </div>
+              
+              <div className="space-y-6">
+                {(['sales_income', 'other_income'] as const).map((m) => {
+                  const val = pl.revenue[m] as number;
+                  const p = pl.revenue.total > 0 ? (val / pl.revenue.total) * 100 : 0;
+                  const clr: Record<string, string> = { sales_income: 'bg-indigo-500', other_income: 'bg-emerald-400' };
+                  const label: Record<string, string> = { sales_income: 'Sales Revenue', other_income: 'Miscellaneous Income' };
+                  return (
+                    <div key={m} className="group">
+                      <div className="flex justify-between items-end mb-2">
+                        <div>
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{label[m]}</p>
+                          <p className="text-base font-black text-gray-800">{fmt(val)}</p>
+                        </div>
+                        <span className="text-xl font-black text-gray-200 group-hover:text-gray-400 transition-colors uppercase tracking-widest">{p.toFixed(0)}%</span>
+                      </div>
+                      <div className="h-3 bg-gray-50 rounded-full overflow-hidden shadow-inner border border-gray-100">
+                        <div className={`h-full rounded-full transition-all duration-1000 ease-out shadow-sm ${clr[m]}`} style={{ width: `${p}%` }} />
+                      </div>
                     </div>
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div className={`h-2 rounded-full ${clr[m]}`} style={{ width: `${p}%` }} />
-                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-[32px] p-8 shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between mb-8">
+                <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Expense Breakdown</h3>
+                <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                {Object.entries(pl.expenses).filter(([k]) => k !== 'total').length === 0 ? (
+                  <div className="py-12 flex flex-col items-center justify-center text-center opacity-40">
+                    <svg className="w-10 h-10 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                    <p className="text-xs font-black uppercase tracking-widest">No Expenditures</p>
                   </div>
-                );
-              })}
-            </div>
-
-            <div className="bg-white rounded-xl p-5 shadow-sm">
-              <h3 className="font-semibold text-gray-700 mb-4">Expense Breakdown</h3>
-              {Object.entries(pl.expenses).filter(([k]) => k !== 'total').length === 0 ? (
-                <p className="text-gray-400 text-sm">No expenses in this period</p>
-              ) : (
-                Object.entries(pl.expenses)
-                  .filter(([k]) => k !== 'total')
-                  .sort(([, a], [, b]) => (b as number) - (a as number))
-                  .map(([cat, amt]) => (
-                    <div key={cat} className="flex justify-between py-2 border-b border-gray-50 last:border-0">
-                      <span className="capitalize text-gray-600 text-sm">{cat}</span>
-                      <span className="text-gray-700 text-sm font-medium">{fmt(amt as number)}</span>
-                    </div>
-                  ))
-              )}
-              <div className="flex justify-between pt-3 border-t border-gray-200 mt-1">
-                <span className="text-gray-700 font-semibold text-sm">Total</span>
-                <span className="text-red-600 font-bold text-sm">{fmt(pl.expenses.total)}</span>
+                ) : (
+                  Object.entries(pl.expenses)
+                    .filter(([k]) => k !== 'total')
+                    .sort(([, a], [, b]) => (b as number) - (a as number))
+                    .map(([cat, amt]) => (
+                      <div key={cat} className="flex justify-between items-center py-3.5 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors px-2 rounded-xl">
+                        <div>
+                          <p className="capitalize text-gray-700 font-bold text-xs">{cat.replace('_', ' ')}</p>
+                          <p className="text-[10px] text-gray-400 font-medium tracking-tight">Operating Cost</p>
+                        </div>
+                        <span className="text-gray-900 font-black text-sm">{fmt(amt as number)}</span>
+                      </div>
+                    ))
+                )}
+              </div>
+              <div className="flex justify-between items-center pt-6 border-t border-gray-100 mt-4 px-2">
+                <span className="text-gray-400 font-black text-[10px] uppercase tracking-widest">Total Operating Expenses</span>
+                <span className="text-rose-600 font-black text-lg tracking-tight">{fmt(pl.expenses.total)}</span>
               </div>
             </div>
           </div>
 
-          {/* GST quick view */}
+          {/* GST Insights */}
           {gst && (
-            <div className="bg-white rounded-xl p-5 shadow-sm">
-              <h3 className="font-semibold text-gray-700 mb-4">
-                GST Summary — {new Date(TODAY.getFullYear(), TODAY.getMonth(), 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' })}
-              </h3>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <p className="text-gray-500 text-xs">Outward Taxable</p>
-                  <p className="font-bold text-gray-800 text-lg">{fmt(gst.outward_supplies.taxable_value)}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 text-xs">Total GST Collected</p>
-                  <p className="font-bold text-gray-800 text-lg">{fmt(gst.outward_supplies.total_gst_collected)}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 text-xs">Net GST Payable</p>
-                  <p className="font-bold text-indigo-600 text-lg">{fmt(gst.net_tax_payable)}</p>
-                </div>
-              </div>
+            <div className="bg-indigo-900 rounded-[40px] p-8 shadow-2xl relative overflow-hidden">
+               <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32 pointer-events-none" />
+               <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/5 rounded-full -ml-32 -mb-32 pointer-events-none" />
+               
+               <h3 className="text-white text-lg font-black uppercase tracking-widest mb-8 flex items-center gap-3">
+                  <div className="w-2 h-6 bg-indigo-400 rounded-full" />
+                  Taxation Snapshot — {new Date(TODAY.getFullYear(), month-1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' })}
+               </h3>
+
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
+                 <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/10">
+                   <p className="text-white/50 text-[10px] font-black uppercase tracking-widest mb-2">Outward Taxable</p>
+                   <p className="text-2xl font-black text-white tracking-tighter">{fmt(gst.outward_supplies.taxable_value)}</p>
+                   <div className="w-12 h-1 bg-white/20 mt-4 rounded-full" />
+                 </div>
+                 <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/10">
+                   <p className="text-white/50 text-[10px] font-black uppercase tracking-widest mb-2">GST Collected</p>
+                   <p className="text-2xl font-black text-emerald-400 tracking-tighter">{fmt(gst.outward_supplies.total_gst_collected)}</p>
+                   <div className="w-12 h-1 bg-emerald-400/20 mt-4 rounded-full" />
+                 </div>
+                 <div className="bg-indigo-500 rounded-3xl p-6 shadow-2xl shadow-indigo-950/50">
+                   <p className="text-white/70 text-[10px] font-black uppercase tracking-widest mb-2">Net Tax Payable</p>
+                   <p className="text-3xl font-black text-white tracking-tighter">{fmt(gst.net_tax_payable)}</p>
+                   <p className="text-[10px] text-white/50 font-bold mt-2 uppercase tracking-tight">After ITC Adjustment</p>
+                 </div>
+               </div>
             </div>
           )}
         </>
@@ -371,6 +442,8 @@ function PLTab() {
 // ─────────────────────────────────────────────────────────────────────────────
 //  Expenses Tab
 // ─────────────────────────────────────────────────────────────────────────────
+//  Receipts & Payments (Vouchers) Tab
+// ─────────────────────────────────────────────────────────────────────────────
 function ExpensesTab() {
   const qc = useQueryClient();
   const [entryType, setEntryType] = useState<'PAYMENT' | 'RECEIPT'>('PAYMENT');
@@ -378,11 +451,19 @@ function ExpensesTab() {
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [payMethod, setPayMethod] = useState('cash');
+  const [refNo, setRefNo] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  
+  // Search & Filter State
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<'ALL' | 'PAYMENT' | 'RECEIPT'>('ALL');
+  const [filterCat, setFilterCat] = useState('ALL');
 
   const CATS = ['rent', 'salary', 'electricity', 'water', 'phone', 'internet', 'maintenance', 'transport', 'advertising', 'miscellaneous'];
-  const INCOME_TYPES = ['other_income', 'credit_recovery', 'capital_infusion', 'loan_receipt'];
+  const INCOME_TYPES = [
+    'other_income', 'credit_recovery', 'capital_infusion', 'loan_receipt', 'misc_income', 'consultation_fee_collection'
+  ];
 
   const { data: expensesRes, isLoading: exLoading } = useQuery<{ items: Expense[]; total: number }>({
     queryKey: ['web-expenses'],
@@ -401,7 +482,8 @@ function ExpensesTab() {
           entry_type: d.category,
           amount: d.amount,
           notes: d.description,
-          payment_method: d.payment_method
+          payment_method: d.payment_method,
+          reference_no: d.reference_no
         });
       }
       return editingId ? accountingApi.updateExpense(editingId, d) : accountingApi.createExpense(d);
@@ -415,6 +497,7 @@ function ExpensesTab() {
       setEditingId(null);
       setAmount('');
       setDescription('');
+      setRefNo('');
     },
   });
 
@@ -436,60 +519,148 @@ function ExpensesTab() {
       payment_method: i.payment_method,
       entry_date: i.entry_date,
       is_auto_entry: false,
-      type: 'RECEIPT' as const
+      type: 'RECEIPT' as const,
+      reference_no: (i as any).reference_no
     }))
   ].sort((a, b) => new Date(b.entry_date).getTime() - new Date(a.entry_date).getTime());
+
+  // Filter Logic
+  const filteredItems = combinedItems.filter(item => {
+    const matchesSearch = !searchTerm || (item.description || '').toLowerCase().includes(searchTerm.toLowerCase()) || (item.category || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = filterType === 'ALL' || item.type === filterType;
+    const matchesCat = filterCat === 'ALL' || item.category === filterCat;
+    return matchesSearch && matchesType && matchesCat;
+  });
 
   const totalPayments = expensesRes?.items?.reduce((sum, e) => sum + Number(e.amount), 0) ?? 0;
   const totalReceipts = incomeRes?.items?.reduce((sum, i) => sum + Number(i.amount), 0) ?? 0;
 
   return (
-    <div className="space-y-4">
-      {/* Title + Stats */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-        <div className="flex items-center gap-6">
-          <div>
-            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Total Payments (Out)</p>
-            <p className="text-lg font-black text-red-600">{fmt(totalPayments)}</p>
+    <div className="space-y-6">
+      {/* Header Stat Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col justify-between group hover:shadow-md transition-all">
+          <div className="flex justify-between items-start mb-4">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
+            <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full font-black uppercase tracking-tight">Active Balance</span>
           </div>
-          <div className="w-px h-8 bg-gray-100" />
-          <div>
-            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Total Receipts (In)</p>
-            <p className="text-lg font-black text-emerald-600">{fmt(totalReceipts)}</p>
+          <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1">Inflow vs Outflow</p>
+          <div className="flex items-baseline gap-2">
+            <h3 className="text-3xl font-black text-gray-900 tracking-tight">{fmt(totalReceipts - totalPayments)}</h3>
+            <span className={`text-xs font-bold ${totalReceipts >= totalPayments ? 'text-emerald-500' : 'text-rose-500'}`}>
+              {totalReceipts >= totalPayments ? 'Surplus' : 'Deficit'}
+            </span>
           </div>
         </div>
-        <button
-          onClick={() => { setShowForm((v) => !v); setEditingId(null); }}
-          className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95"
-        >
-          {showForm ? 'Close Form' : '+ Add Receipt / Payment'}
-        </button>
+
+        <div className="bg-white/50 backdrop-blur-md rounded-3xl p-6 shadow-sm border border-gray-100 flex items-center gap-4 transition-all">
+          <div className="w-14 h-14 rounded-3xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-100">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 11l5-5m0 0l5 5m-5-5v12" /></svg>
+          </div>
+          <div>
+            <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">Total Receipts</p>
+            <h3 className="text-2xl font-black text-gray-900 tracking-tight">{fmt(totalReceipts)}</h3>
+            <p className="text-[10px] text-emerald-600 font-bold mt-0.5">Direct Inflow</p>
+          </div>
+        </div>
+
+        <div className="bg-white/50 backdrop-blur-md rounded-3xl p-6 shadow-sm border border-gray-100 flex items-center gap-4 transition-all">
+          <div className="w-14 h-14 rounded-3xl bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-100">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 13l-5 5m0 0l-5-5m5 5V6" /></svg>
+          </div>
+          <div>
+            <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">Total Payments</p>
+            <h3 className="text-2xl font-black text-gray-900 tracking-tight">{fmt(totalPayments)}</h3>
+            <p className="text-[10px] text-rose-600 font-bold mt-0.5">Operating Outflow</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Actions Bar */}
+      <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-50 flex flex-col lg:flex-row items-center justify-between gap-4">
+        <div className="flex flex-1 w-full gap-3">
+          <div className="relative flex-1 group">
+            <svg className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            <input 
+              type="text"
+              placeholder="Search by narration or category..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all placeholder:text-gray-400 font-medium"
+            />
+          </div>
+          <select 
+            value={filterType}
+            onChange={e => setFilterType(e.target.value as any)}
+            className="bg-gray-50/50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer"
+          >
+            <option value="ALL">All Types</option>
+            <option value="PAYMENT">Payments Only</option>
+            <option value="RECEIPT">Receipts Only</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-3 w-full lg:w-auto">
+          <button
+            onClick={() => { setShowForm((v) => !v); setEditingId(null); }}
+            className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl text-sm font-black transition-all active:scale-95 shadow-lg ${showForm ? 'bg-gray-900 text-white shadow-gray-200' : 'bg-indigo-600 text-white shadow-indigo-200 hover:bg-indigo-700'}`}
+          >
+            {showForm ? (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                Close Form
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                Create Voucher
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {showForm && (
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-indigo-100 ring-4 ring-indigo-50/50">
-          <div className="flex items-center gap-4 mb-6 pb-4 border-b border-gray-50">
+        <div className="bg-white rounded-[32px] p-8 shadow-2xl border border-indigo-50 ring-8 ring-indigo-50/30 animate-in slide-in-from-top duration-300">
+          <div className="flex items-center gap-4 mb-8">
+            <div className={`p-3 rounded-2xl ${entryType === 'PAYMENT' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                {entryType === 'PAYMENT' 
+                  ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                }
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-gray-900">{editingId ? 'Edit Transaction' : 'Record New Entry'}</h3>
+              <p className="text-xs text-gray-400 font-medium tracking-tight">Manual voucher entry for cash and bank operations</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-1.5 bg-gray-100/50 rounded-[20px] mb-8 w-fit">
              <button
               onClick={() => { setEntryType('PAYMENT'); setCategory('miscellaneous'); }}
-              className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${entryType === 'PAYMENT' ? 'bg-red-500 text-white shadow-lg shadow-red-100' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+              className={`px-8 py-2.5 rounded-2xl text-xs font-black transition-all ${entryType === 'PAYMENT' ? 'bg-white text-rose-600 shadow-md transform scale-105' : 'text-gray-400 hover:text-gray-600'}`}
              >
-               Record Payment (OUT)
+               PAYMENT (OUT)
              </button>
              <button
               onClick={() => { setEntryType('RECEIPT'); setCategory('other_income'); }}
-              className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${entryType === 'RECEIPT' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+              className={`px-8 py-2.5 rounded-2xl text-xs font-black transition-all ${entryType === 'RECEIPT' ? 'bg-white text-emerald-600 shadow-md transform scale-105' : 'text-gray-400 hover:text-gray-600'}`}
              >
-               Record Receipt (IN)
+               RECEIPT (IN)
              </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="text-gray-400 text-[10px] font-black uppercase tracking-widest block mb-1">{entryType === 'PAYMENT' ? 'Expense Category' : 'Receipt Type'}</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8">
+            <div className="space-y-1.5">
+              <label className="text-gray-400 text-[10px] font-black uppercase tracking-widest ml-1">{entryType === 'PAYMENT' ? 'Expense Category' : 'Income Category'}</label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full border border-gray-100 bg-gray-50/50 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-inner"
               >
                 {entryType === 'PAYMENT' 
                   ? CATS.map((c) => <option key={c} value={c}>{c.toUpperCase().replace('_', ' ')}</option>)
@@ -497,145 +668,199 @@ function ExpensesTab() {
                 }
               </select>
             </div>
-            <div>
-              <label className="text-gray-400 text-[10px] font-black uppercase tracking-widest block mb-1">Amount (₹)</label>
+            
+            <div className="space-y-1.5">
+              <label className="text-gray-400 text-[10px] font-black uppercase tracking-widest ml-1">Amount (₹)</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">₹</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-9 pr-4 py-3.5 text-sm font-black text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-inner"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-gray-400 text-[10px] font-black uppercase tracking-widest ml-1">Ref Number / ID</label>
               <input
-                type="number"
-                min={0}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
-                className="w-full border border-gray-100 bg-gray-50/50 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                type="text"
+                value={refNo}
+                onChange={(e) => setRefNo(e.target.value)}
+                placeholder="Check No, UPI ID, etc."
+                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-inner"
               />
             </div>
-            <div>
-              <label className="text-gray-400 text-[10px] font-black uppercase tracking-widest block mb-1">Narration / Description</label>
+
+            <div className="lg:col-span-2 space-y-1.5">
+              <label className="text-gray-400 text-[10px] font-black uppercase tracking-widest ml-1">Voucher Narration / Remarks</label>
               <input
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder={entryType === 'PAYMENT' ? 'e.g. Electricity bill paid' : 'e.g. Cash received from X'}
-                className="w-full border border-gray-100 bg-gray-50/50 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                placeholder={entryType === 'PAYMENT' ? 'e.g. Paid for electrical repairs' : 'e.g. Manual cash receipt from party'}
+                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-inner"
               />
             </div>
-            <div>
-              <label className="text-gray-400 text-[10px] font-black uppercase tracking-widest block mb-1">Method</label>
+
+            <div className="space-y-1.5">
+              <label className="text-gray-400 text-[10px] font-black uppercase tracking-widest ml-1">Payment Method</label>
               <select
                 value={payMethod}
                 onChange={(e) => setPayMethod(e.target.value)}
-                className="w-full border border-gray-100 bg-gray-50/50 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-inner"
               >
-                {['cash', 'upi', 'card', 'bank_transfer'].map((m) => <option key={m} value={m}>{m.toUpperCase()}</option>)}
+                {['cash', 'upi', 'card', 'bank_transfer', 'cheque', 'neft'].map((m) => <option key={m} value={m}>{m.toUpperCase()}</option>)}
               </select>
             </div>
           </div>
-          <div className="flex gap-4 mt-6">
+
+          <div className="flex gap-4 mt-10">
             <button
               onClick={() => {
                 const amt = parseFloat(amount);
                 if (!amt) return;
-                createMutation.mutate({ category, amount: amt, description, payment_method: payMethod });
+                createMutation.mutate({ category, amount: amt, description, payment_method: payMethod, reference_no: refNo });
               }}
               disabled={createMutation.isPending}
-              className={`flex-1 ${entryType === 'PAYMENT' ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-600 hover:bg-emerald-700'} text-white py-3 rounded-xl text-sm font-bold shadow-lg transition-all disabled:opacity-50`}
+              className={`flex-1 py-4 rounded-2xl text-sm font-black shadow-xl transition-all active:scale-95 disabled:opacity-50 text-white ${entryType === 'PAYMENT' ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-200' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200'}`}
             >
-              {createMutation.isPending ? 'Processing...' : (editingId ? 'Update Entry' : `Save ${entryType}`)}
+              {createMutation.isPending ? 'Validating Entry...' : (editingId ? 'Confirm Changes' : `Finalize ${entryType} Voucher`)}
             </button>
-            <button onClick={() => setShowForm(false)} className="px-6 py-3 text-gray-400 font-bold text-sm hover:text-gray-600">
-              Cancel
+            <button 
+              onClick={() => setShowForm(false)} 
+              className="px-8 py-4 text-gray-400 font-bold text-sm tracking-tight hover:text-gray-600 transition-colors"
+            >
+              Discard
             </button>
           </div>
         </div>
       )}
 
-      {(exLoading || inLoading) ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 text-gray-400 text-[10px] font-black uppercase tracking-widest border-b border-gray-100">
-                <th className="text-left px-5 py-4">Date</th>
-                <th className="text-left px-5 py-4">Type</th>
-                <th className="text-left px-5 py-4">Category</th>
-                <th className="text-left px-5 py-4">Narration</th>
-                <th className="text-left px-5 py-4">Method</th>
-                <th className="text-right px-5 py-4">Amount</th>
-                <th className="px-5 py-4" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {combinedItems.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50/30 transition-colors group">
-                  <td className="px-5 py-4 text-gray-500 text-[10px] font-bold">
-                    {new Date(item.entry_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${item.type === 'RECEIPT' ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'}`}>
-                      {item.type}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className="capitalize text-gray-700 font-black text-[10px] tracking-tight border-b border-gray-100">
-                      {item.category.replace('_', ' ')}
-                    </span>
-                    {(item as any).is_auto_entry && (
-                      <span className="ml-2 bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded text-[9px] font-black uppercase">auto</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-4 text-gray-600 text-xs font-medium max-w-[250px] truncate">
-                    {item.description || <span className="text-gray-300 italic">No narration</span>}
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className="text-gray-400 text-[10px] font-black uppercase tracking-wider">{item.payment_method}</span>
-                  </td>
-                  <td className={`px-5 py-4 text-right font-black text-sm ${item.type === 'RECEIPT' ? 'text-emerald-700' : 'text-red-700'}`}>
-                    {item.type === 'RECEIPT' ? '+' : '-'}{fmt(item.amount)}
-                  </td>
-                   <td className="px-5 py-4 text-right">
-                    <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                       {!(item as any).is_auto_entry && item.type === 'PAYMENT' && (
-                        <>
-                          <button
-                            onClick={() => {
-                              setEditingId(item.id);
-                              setEntryType('PAYMENT');
-                              setCategory(item.category);
-                              setAmount(String(item.amount));
-                              setDescription(item.description || '');
-                              setPayMethod(item.payment_method);
-                              setShowForm(true);
-                            }}
-                            className="text-indigo-600 hover:text-indigo-800 text-[10px] font-black uppercase tracking-widest"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => { if(confirm('Delete this entry?')) { setEntryType('PAYMENT'); deleteMutation.mutate(item.id); } }}
-                            className="text-rose-400 hover:text-rose-600"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
+      {/* List Section */}
+      <div className="bg-white rounded-[32px] shadow-sm border border-gray-50 overflow-hidden min-h-[400px]">
+        {(exLoading || inLoading) ? (
+          <div className="flex flex-col items-center justify-center py-32 text-center">
+            <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="text-sm font-black text-indigo-500 uppercase tracking-widest animate-pulse">Fetching Ledger...</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-gray-50/80 backdrop-blur-sm text-gray-400 text-[10px] font-black uppercase tracking-widest border-b border-gray-100">
+                  <th className="text-left px-8 py-5">Dated</th>
+                  <th className="text-left px-5 py-5">Type / Category</th>
+                  <th className="text-left px-5 py-5">Voucher Details</th>
+                  <th className="text-left px-5 py-5">Method / Ref</th>
+                  <th className="text-right px-5 py-5">Amount</th>
+                  <th className="px-8 py-5" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {combinedItems.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                <svg className="w-8 h-8 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filteredItems.map((item) => (
+                  <tr key={item.id} className="hover:bg-indigo-50/30 transition-all group">
+                    <td className="px-8 py-6 whitespace-nowrap">
+                      <p className="text-gray-900 font-black text-sm">
+                        {new Date(item.entry_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                      </p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase">{new Date(item.entry_date).getFullYear()}</p>
+                    </td>
+                    <td className="px-5 py-6">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${item.type === 'RECEIPT' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            {item.type === 'RECEIPT' 
+                              ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                              : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 12h8" />
+                            }
+                          </svg>
+                        </div>
+                        <div>
+                          <p className={`text-[10px] font-black uppercase tracking-tight ${item.type === 'RECEIPT' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {item.type}
+                          </p>
+                          <p className="text-xs font-bold text-gray-700 capitalize">
+                            {item.category.replace('_', ' ')}
+                            {(item as any).is_auto_entry && <span className="ml-1.5 text-[8px] bg-gray-100 text-gray-400 px-1 py-0.5 rounded uppercase">sys</span>}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-5 py-6">
+                      <p className="text-gray-700 font-medium text-xs max-w-[300px] leading-relaxed line-clamp-2">
+                        {item.description || <span className="text-gray-300 italic">No narration provided</span>}
+                      </p>
+                    </td>
+                    <td className="px-5 py-6">
+                      <span className="text-indigo-600 text-[10px] font-black uppercase tracking-widest block">{item.payment_method}</span>
+                      <span className="text-[10px] text-gray-400 font-medium truncate block max-w-[120px]">
+                        {(item as any).reference_no || 'No Ref'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-6 text-right">
+                      <p className={`text-base font-black tracking-tight ${item.type === 'RECEIPT' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                        {item.type === 'RECEIPT' ? '+' : '-'}{Number(item.amount).toLocaleString('en-IN')}
+                      </p>
+                    </td>
+                    <td className="px-8 py-6 text-right">
+                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                         <button 
+                           onClick={() => alert('Voucher printing functionality coming soon!')}
+                           className="p-2 text-gray-400 hover:text-indigo-600 rounded-lg hover:bg-white transition-all shadow-sm shadow-transparent hover:shadow-gray-200"
+                           title="Print Voucher"
+                         >
+                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                         </button>
+                         {!(item as any).is_auto_entry && item.type === 'PAYMENT' && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                setEditingId(item.id);
+                                setEntryType('PAYMENT');
+                                setCategory(item.category);
+                                setAmount(String(item.amount));
+                                setDescription(item.description || '');
+                                setPayMethod(item.payment_method);
+                                setRefNo((item as any).reference_no || '');
+                                setShowForm(true);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              className="p-2 text-indigo-400 hover:text-indigo-600 rounded-lg hover:bg-white transition-all"
+                              title="Edit Entry"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            </button>
+                            <button
+                              onClick={() => { if(confirm('Are you sure you want to delete this voucher?')) { setEntryType('PAYMENT'); deleteMutation.mutate(item.id); } }}
+                              className="p-2 text-rose-300 hover:text-rose-500 rounded-lg hover:bg-white transition-all"
+                              title="Delete Entry"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {(filteredItems.length === 0 && !exLoading && !inLoading) && (
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <div className="w-20 h-20 bg-gray-50 rounded-[32px] flex items-center justify-center mb-6">
+                  <svg className="w-10 h-10 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                </div>
+                <h4 className="text-lg font-black text-gray-400 uppercase tracking-widest">No matching records</h4>
+                <p className="text-xs text-gray-400 font-medium mt-1">Try adjusting your filters or search term</p>
               </div>
-              <p className="text-gray-400 text-sm font-medium">No vouchers recorded for this period</p>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -2328,108 +2553,135 @@ function OutstandingsTab() {
   const overdueCount = (out?.receivables ?? []).filter((r: any) => r.overdue).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* High-Impact Alert for Collection Risks */}
       {overdueCount > 0 && (
-        <div className="bg-rose-50 border border-rose-100 rounded-3xl p-5 flex items-center justify-between animate-in slide-in-from-top-4 duration-500 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-rose-100 rounded-2xl flex items-center justify-center text-rose-600 shadow-inner">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-              </svg>
-            </div>
-            <div>
-              <h4 className="text-rose-900 font-black tracking-tight">Outstanding Alert</h4>
-              <p className="text-rose-600/70 text-xs font-medium uppercase tracking-widest">{overdueCount} customer(s) have not cleared dues in 30+ days.</p>
-            </div>
-          </div>
-          <p className="text-rose-900/40 text-[10px] font-black uppercase tracking-widest mr-4">Action required</p>
-        </div>
-      )}
-
-      {/* Search and Summary */}
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-        <div className="relative w-full md:w-96 text-gray-900">
-          <input
-            type="text"
-            placeholder="Search customer or supplier..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-violet-400 focus:outline-none shadow-sm transition-all"
-          />
-          <svg className="absolute left-3.5 top-3 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-        </div>
-        <div className="flex gap-4 items-center">
-          {!showCustomerForm && (
-            <div className="flex gap-4 items-center">
-              <button
-                onClick={() => downloadCsv('customers_template.csv', 'name,phone,address,notes,credit_limit,opening_balance\n"Ramesh Chandra","9876543210","Sector 12, Janakpuri","",5000,0')}
-                className="text-[10px] text-emerald-400 font-bold uppercase hover:underline"
-              >
-                Template
-              </button>
-              <div className="flex gap-2">
-                <input type="file" ref={customerImportRef} onChange={handleImportCustomers} accept=".csv,.json" className="hidden" />
-                <button
-                  onClick={() => customerImportRef.current?.click()}
-                  disabled={importCustomersMutation.isPending}
-                  className="bg-white text-emerald-600 border border-emerald-200 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-50 transition-all shadow-sm"
-                >
-                  {importCustomersMutation.isPending ? 'Importing...' : 'Bulk Import'}
-                </button>
-                <button
-                  onClick={() => setShowCustomerForm(true)}
-                  className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
-                >
-                  + Add Customer
-                </button>
+          <div className="bg-rose-900 rounded-[40px] p-8 border border-rose-800 shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 hover:scale-[1.01] transition-all duration-500 group">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32 pointer-events-none group-hover:bg-white/10 transition-all" />
+            <div className="flex items-center gap-6 relative z-10">
+              <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-3xl flex items-center justify-center text-rose-400 shadow-2xl shadow-black/20 ring-1 ring-rose-400/30">
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+              </div>
+              <div>
+                <h4 className="text-white text-xl font-black tracking-tight mb-1">Collection Risk Priority</h4>
+                <p className="text-rose-200/60 text-[10px] font-black uppercase tracking-[0.2em]">{overdueCount} Critical Receivables (&gt;30 Days Overdue)</p>
               </div>
             </div>
-          )}
-          <div className="hidden md:flex gap-4">
-            <div className="bg-emerald-50 px-5 py-2.5 rounded-2xl border border-emerald-100">
-              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Receivables</p>
-              <p className="text-lg font-black text-emerald-700">{fmt(totalRec)}</p>
-            </div>
-            <div className="bg-rose-50 px-5 py-2.5 rounded-2xl border border-rose-100">
-              <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Payables</p>
-              <p className="text-lg font-black text-rose-700">{fmt(totalPay)}</p>
+            <div className="bg-rose-800/40 backdrop-blur-sm self-stretch md:self-center px-6 py-3 rounded-2xl border border-rose-700 text-rose-200 text-[10px] font-black uppercase tracking-widest whitespace-nowrap relative z-10 ring-1 ring-rose-400/10 shadow-lg shadow-black/20 font-mono">
+              Action Required
             </div>
           </div>
+      )}
+
+      {/* Credit Dashboard Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white rounded-[40px] p-8 shadow-sm border border-gray-100 flex items-center gap-6 group hover:shadow-xl hover:border-violet-100 transition-all duration-500 hover:-translate-y-1">
+          <div className="w-16 h-16 bg-violet-50 text-violet-600 rounded-[28px] flex items-center justify-center shadow-inner group-hover:bg-violet-600 group-hover:text-white transition-all duration-500">
+            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.15em] mb-1">Total Receivables</p>
+            <p className="text-3xl font-black text-gray-900 tracking-tighter">{fmt(totalRec)}</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-[40px] p-8 shadow-sm border border-gray-100 flex items-center gap-6 group hover:shadow-xl hover:border-rose-100 transition-all duration-500 hover:-translate-y-1">
+          <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-[28px] flex items-center justify-center shadow-inner group-hover:bg-rose-600 group-hover:text-white transition-all duration-500">
+            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.15em] mb-1">Total Payables</p>
+            <p className="text-3xl font-black text-rose-600 tracking-tighter">{fmt(totalPay)}</p>
+          </div>
+        </div>
+
+        <div className={`rounded-[40px] p-8 shadow-2xl relative overflow-hidden transition-all duration-700 hover:shadow-violet-200 hover:-translate-y-1 group ${totalRec - totalPay >= 0 ? 'bg-gradient-to-br from-violet-600 to-indigo-700' : 'bg-gradient-to-br from-rose-600 to-red-700'}`}>
+           <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+           <p className="text-white/60 text-[10px] font-black uppercase tracking-[0.15em] mb-1 relative z-10">Net Credit Position</p>
+           <h3 className="text-3xl font-black text-white tracking-tighter relative z-10">{fmt(totalRec - totalPay)}</h3>
+           <div className="mt-4 flex items-center gap-2 relative z-10">
+             <span className="text-[10px] font-black text-white/90 bg-white/10 px-3 py-1 rounded-full uppercase tracking-widest ring-1 ring-white/20">Active Balance</span>
+           </div>
+        </div>
+      </div>
+
+      {/* Modern Search & Action Bar */}
+      <div className="flex flex-col lg:flex-row gap-6 items-center justify-between">
+        <div className="relative w-full lg:w-[500px] group">
+          <input
+            type="text"
+            placeholder="Search by candidate name, phone or company..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-14 pr-8 py-5 bg-white border border-gray-100 rounded-[32px] text-base font-bold focus:ring-4 focus:ring-violet-500/5 focus:border-violet-200 outline-none shadow-sm transition-all placeholder:text-gray-300 text-gray-800"
+          />
+          <div className="absolute left-5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-violet-50 flex items-center justify-center text-violet-500 group-focus-within:bg-violet-500 group-focus-within:text-white transition-all">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-3 w-full lg:w-auto">
+          <input type="file" ref={customerImportRef} onChange={handleImportCustomers} accept=".csv,.json" className="hidden" />
+          <button 
+            onClick={() => customerImportRef.current?.click()}
+            className="flex-1 lg:flex-none px-6 h-14 rounded-[24px] bg-white border border-gray-100 text-[11px] font-black uppercase tracking-widest text-gray-400 hover:bg-gray-50 hover:text-gray-900 transition-all flex items-center justify-center gap-2 active:scale-95"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+            Bulk Import
+          </button>
+          <button
+            onClick={() => setShowCustomerForm(true)}
+            className="flex-1 lg:flex-none px-10 h-14 rounded-[28px] bg-gray-900 text-white text-[11px] font-black uppercase tracking-[0.1em] hover:bg-black transition-all shadow-2xl shadow-gray-200 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+            Add New Record
+          </button>
         </div>
       </div>
 
        {showCustomerForm && (
-        <div className="bg-white rounded-[2rem] p-8 border border-emerald-100 shadow-xl shadow-emerald-50 animate-in zoom-in-95 duration-200">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-black text-gray-900 tracking-tight">{editingCustomerId ? 'Edit Credit Customer' : 'Register New Credit Customer'}</h3>
-            <button onClick={() => setShowCustomerForm(false)} className="text-gray-400 hover:text-gray-900 transition-colors">✕</button>
+        <div className="bg-white rounded-[48px] p-10 border border-emerald-100 shadow-2xl animate-in zoom-in-95 duration-300 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-full -mr-16 -mt-16 pointer-events-none" />
+          <div className="flex items-center justify-between mb-8 relative z-10">
+            <div>
+              <h3 className="text-2xl font-black text-gray-900 tracking-tight">{editingCustomerId ? 'Refine Customer Data' : 'New Credit Line Entry'}</h3>
+              <p className="text-gray-400 text-xs font-medium">Define credit terms and identification details</p>
+            </div>
+            <button onClick={() => setShowCustomerForm(false)} className="w-10 h-10 rounded-2xl bg-gray-50 text-gray-400 hover:text-gray-900 transition-colors flex items-center justify-center">✕</button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 ml-1">Full Name *</label>
-              <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="e.g. Ramesh Chandra" className="w-full border border-gray-200 rounded-xl px-4 h-11 text-sm focus:ring-2 focus:ring-emerald-400 outline-none transition-all" />
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Identity *</label>
+              <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="e.g. Ramesh Chandra" className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl px-5 h-14 text-sm font-bold focus:ring-2 focus:ring-emerald-400 outline-none transition-all shadow-sm" />
             </div>
-            <div>
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 ml-1">Phone Number</label>
-              <input type="text" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="10-digit mobile" className="w-full border border-gray-200 rounded-xl px-4 h-11 text-sm focus:ring-2 focus:ring-emerald-400 outline-none transition-all" />
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Mobile Contact</label>
+              <input type="text" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="10-digit mobile" className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl px-5 h-14 text-sm font-bold focus:ring-2 focus:ring-emerald-400 outline-none transition-all shadow-sm" />
             </div>
-            <div>
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 ml-1">Opening Balance (₹)</label>
-              <input type="number" value={customerOpening} onChange={(e) => setCustomerOpening(e.target.value)} placeholder="0.00" className="w-full border border-emerald-100 bg-emerald-50/30 rounded-xl px-4 h-11 text-sm font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-400 outline-none transition-all" />
-              <p className="text-[9px] text-emerald-600 mt-1 italic font-medium">Initial amount this customer owes you</p>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Carried Balance (₹)</label>
+              <input type="number" value={customerOpening} onChange={(e) => setCustomerOpening(e.target.value)} placeholder="0.00" className="w-full border border-emerald-100 bg-emerald-50 rounded-2xl px-5 h-14 text-lg font-black text-emerald-700 focus:ring-2 focus:ring-emerald-400 outline-none transition-all shadow-inner" />
             </div>
-            <div className="md:col-span-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 ml-1">Address</label>
-              <input type="text" value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} placeholder="Street, City, Area" className="w-full border border-gray-200 rounded-xl px-4 h-11 text-sm focus:ring-2 focus:ring-emerald-400 outline-none transition-all" />
+            <div className="md:col-span-2 space-y-1.5">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Primary Address</label>
+              <input type="text" value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} placeholder="Street, City, Area" className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl px-5 h-14 text-sm font-bold focus:ring-2 focus:ring-emerald-400 outline-none transition-all shadow-sm" />
             </div>
-            <div>
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 ml-1">Credit Limit</label>
-              <input type="number" value={customerLimit} onChange={(e) => setCustomerLimit(e.target.value)} placeholder="5000" className="w-full border border-gray-200 rounded-xl px-4 h-11 text-sm focus:ring-2 focus:ring-emerald-400 outline-none transition-all" />
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Max Credit Limit</label>
+              <input type="number" value={customerLimit} onChange={(e) => setCustomerLimit(e.target.value)} placeholder="5000" className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl px-5 h-14 text-sm font-bold focus:ring-2 focus:ring-emerald-400 outline-none transition-all shadow-sm" />
             </div>
           </div>
-          <div className="flex gap-4 mt-8">
+          
+          <div className="flex gap-4 mt-10">
             <button
               onClick={() => {
                 if (!customerName.trim()) return;
@@ -2443,172 +2695,202 @@ function OutstandingsTab() {
                 });
               }}
               disabled={createCustomerMutation.isPending || !customerName.trim()}
-              className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-emerald-100 hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all"
+              className="px-10 py-5 rounded-[28px] bg-emerald-600 text-white text-xs font-black uppercase tracking-[0.2em] shadow-2xl shadow-emerald-100 hover:bg-emerald-700 hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all flex items-center gap-3"
              >
-              {createCustomerMutation.isPending ? 'Saving...' : editingCustomerId ? 'Update Customer' : 'Register Customer'}
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+              {createCustomerMutation.isPending ? 'Propagating...' : editingCustomerId ? 'Confirm Update' : 'Finalize Registration'}
             </button>
-            <button onClick={() => setShowCustomerForm(false)} className="text-gray-400 text-xs font-black uppercase tracking-widest px-6 py-3 hover:text-gray-900 transition-colors">Discard</button>
+            <button onClick={() => setShowCustomerForm(false)} className="px-8 py-5 rounded-[28px] bg-gray-50 text-gray-400 text-xs font-black uppercase tracking-widest hover:text-gray-900 transition-colors">Abort</button>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+      {/* Split Ledger View */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
         {/* Receivables Column */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-xs shadow-sm">IN</div>
-            <h3 className="font-black text-gray-800 tracking-tight uppercase text-xs">Customer Dues (Receivables)</h3>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between px-2">
+            <h3 className="font-black text-gray-900 tracking-tight uppercase text-xs flex items-center gap-3">
+              <span className="w-1.5 h-6 bg-emerald-500 rounded-full" />
+              Customer Ledgers (Assets)
+            </h3>
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{receivables.length} Profiles</span>
           </div>
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50/50 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
-                  <th className="text-left px-5 py-4">Customer</th>
-                  <th className="text-right px-5 py-4">Balance</th>
-                  <th className="w-10"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {receivables.map((c: any) => (
-                  <Fragment key={c.id}>
-                    <tr onClick={() => toggleExpand(c.id, 'customer')} className={`group cursor-pointer transition-all ${c.overdue ? 'bg-rose-50/40 hover:bg-rose-50/60' : 'hover:bg-violet-50/30'} ${expandedId === c.id ? (c.overdue ? 'bg-rose-50' : 'bg-violet-50/50') : ''}`}>
-                      <td className="px-5 py-4">
-                        <p className={`font-bold transition-colors ${c.overdue ? 'text-rose-900 group-hover:text-rose-700' : 'text-gray-800 group-hover:text-violet-700'}`}>{c.name}</p>
-                        <p className={`text-[10px] font-medium ${c.overdue ? 'text-rose-400' : 'text-gray-400'}`}>{c.phone || 'No phone'}</p>
-                      </td>
-                      <td className="px-5 py-4 text-right">
-                        <p className={`font-black ${c.overdue ? 'text-rose-600' : 'text-emerald-600'}`}>{fmt(c.total_outstanding)}</p>
-                        {c.overdue && (
-                          <div className="flex items-center justify-end gap-1 mt-0.5">
-                            <span className="w-1 h-1 rounded-full bg-rose-500 animate-pulse" />
-                            <span className="text-[9px] font-black text-rose-500 uppercase tracking-tighter">Overdue 30d+</span>
+          
+          <div className="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50/50 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
+                    <th className="text-left px-8 py-5">Party Detail</th>
+                    <th className="text-right px-8 py-5">Balance</th>
+                    <th className="w-10"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {receivables.map((c: any) => (
+                    <Fragment key={c.id}>
+                      <tr onClick={() => toggleExpand(c.id, 'customer')} className={`group cursor-pointer transition-all ${c.overdue ? 'bg-rose-50/30 hover:bg-rose-50/50' : 'hover:bg-violet-50/30'} ${expandedId === c.id ? (c.overdue ? 'bg-rose-50' : 'bg-violet-50/50') : ''}`}>
+                        <td className="px-8 py-6">
+                          <p className={`text-base font-black transition-colors tracking-tight ${c.overdue ? 'text-rose-900 group-hover:text-rose-700' : 'text-gray-800'}`}>{c.name}</p>
+                          <div className="flex items-center gap-3 mt-1">
+                            <span className={`text-[10px] font-black uppercase tracking-widest ${c.overdue ? 'text-rose-400' : 'text-gray-400'}`}>{c.phone || 'Unknown Phone'}</span>
                           </div>
-                        )}
-                      </td>
-                       <td className="pr-4 text-gray-300 transition-colors">
-                        <div className="flex items-center gap-1">
-                          {!c.id.startsWith('pending-') && (
-                            <>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingCustomerId(c.id);
-                                  setCustomerName(c.name);
-                                  setCustomerPhone(c.phone || '');
-                                  setCustomerAddress(c.address || '');
-                                  setCustomerNotes(c.notes || '');
-                                  setCustomerLimit(String(c.credit_limit || ''));
-                                  setCustomerOpening(String(c.opening_balance || '0'));
-                                  setShowCustomerForm(true);
-                                }}
-                                className="p-1.5 text-gray-400 hover:text-violet-600 transition-colors"
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if(confirm(`Deactivate ${c.name}?`)) deleteCustomerMutation.mutate(c.id);
-                                }}
-                                className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                              </button>
-                            </>
+                        </td>
+                        <td className="px-8 py-6 text-right">
+                          <p className={`text-lg font-black tracking-tighter ${c.overdue ? 'text-rose-600' : 'text-emerald-600'}`}>{fmt(c.total_outstanding)}</p>
+                          {c.overdue && (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-rose-100 rounded-full text-[8px] font-black text-rose-600 uppercase tracking-tighter mt-1">
+                              ⚠ Critical Overdue
+                            </span>
                           )}
-                          <svg className={`w-4 h-4 transition-transform ${expandedId === c.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" /></svg>
-                        </div>
-                      </td>
-                    </tr>
-                    {expandedId === c.id && expandedType === 'customer' && customerLedger && (
-                      <tr>
-                        <td colSpan={3} className="bg-gray-50/80 p-6">
-                          <LedgerPanel
-                            data={c}
-                            type="customer"
-                            ledger={customerLedger}
-                            payAmount={payAmount}
-                            setPayAmount={setPayAmount}
-                            payMethod={payMethod}
-                            setPayMethod={setPayMethod}
-                            onPay={() => {
-                              const amt = parseFloat(payAmount);
-                              if (!amt || amt <= 0) return;
-                              payMutation.mutate({ id: c.id, amount: amt, method: payMethod });
-                            }}
-                            isPending={payMutation.isPending}
-                          />
+                        </td>
+                        <td className="pr-6 text-gray-200 transition-colors">
+                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {!c.id.startsWith('pending-') && (
+                              <>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingCustomerId(c.id);
+                                    setCustomerName(c.name);
+                                    setCustomerPhone(c.phone || '');
+                                    setCustomerAddress(c.address || '');
+                                    setCustomerNotes(c.notes || '');
+                                    setCustomerLimit(String(c.credit_limit || ''));
+                                    setCustomerOpening(String(c.opening_balance || '0'));
+                                    setShowCustomerForm(true);
+                                  }}
+                                  className="p-2.5 rounded-xl bg-white border border-gray-100 text-gray-400 hover:text-violet-600 shadow-sm transition-all"
+                                >
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if(confirm(`Confirm deactivation of ${c.name}? All ledger records will be preserved.`)) deleteCustomerMutation.mutate(c.id);
+                                  }}
+                                  className="p-2.5 rounded-xl bg-white border border-gray-100 text-gray-400 hover:text-rose-500 shadow-sm transition-all"
+                                >
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                              </>
+                            )}
+                            <div className={`p-2 transition-transform duration-300 ${expandedId === c.id ? 'rotate-180 text-violet-500' : 'text-gray-300'}`}>
+                              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            </div>
+                          </div>
                         </td>
                       </tr>
-                    )}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-            {receivables.length === 0 && (
-              <div className="py-20 text-center"><p className="text-xs text-gray-400 font-medium">No matching customers</p></div>
-            )}
+                      {expandedId === c.id && expandedType === 'customer' && customerLedger && (
+                        <tr>
+                          <td colSpan={3} className="px-5 py-4 border-b border-gray-100 animate-in slide-in-from-top-4 duration-500">
+                             <div className="bg-gray-50/50 rounded-[40px] p-2 border border-gray-100 shadow-inner overflow-hidden">
+                                <LedgerPanel
+                                  data={c}
+                                  type="customer"
+                                  ledger={customerLedger}
+                                  payAmount={payAmount}
+                                  setPayAmount={setPayAmount}
+                                  payMethod={payMethod}
+                                  setPayMethod={setPayMethod}
+                                  onPay={() => {
+                                    const amt = parseFloat(payAmount);
+                                    if (!amt || amt <= 0) return;
+                                    payMutation.mutate({ id: c.id, amount: amt, method: payMethod });
+                                  }}
+                                  isPending={payMutation.isPending}
+                                />
+                             </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+              {receivables.length === 0 && (
+                <div className="py-32 flex flex-col items-center justify-center text-center opacity-30">
+                  <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                  <p className="text-xs font-black uppercase tracking-widest">No matching receivables found</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Payables Column */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-xs shadow-sm">OUT</div>
-            <h3 className="font-black text-gray-800 tracking-tight uppercase text-xs">Supplier Dues (Payables)</h3>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between px-2">
+            <h3 className="font-black text-gray-900 tracking-tight uppercase text-xs flex items-center gap-3">
+              <span className="w-1.5 h-6 bg-rose-500 rounded-full" />
+              Supplier Dues (Liabilities)
+            </h3>
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{payables.length} Accounts</span>
           </div>
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50/50 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
-                  <th className="text-left px-5 py-4">Supplier</th>
-                  <th className="text-right px-5 py-4">To Pay</th>
-                  <th className="w-10"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {payables.map((p: any) => (
-                  <Fragment key={p.id}>
-                    <tr onClick={() => toggleExpand(p.id, 'supplier')} className={`group cursor-pointer hover:bg-rose-50/30 transition-all ${expandedId === p.id ? 'bg-rose-50/50' : ''}`}>
-                      <td className="px-5 py-4">
-                        <p className="font-bold text-gray-800 group-hover:text-rose-700 transition-colors">{p.name}</p>
-                        <p className="text-[10px] text-gray-400 font-medium">{p.address || 'No address'}</p>
-                      </td>
-                      <td className="px-5 py-4 text-right">
-                        <p className="font-black text-rose-600">{fmt(p.total_outstanding)}</p>
-                      </td>
-                      <td className="pr-4 text-gray-300 group-hover:text-rose-400 transition-colors">
-                        <svg className={`w-4 h-4 transition-transform ${expandedId === p.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" /></svg>
-                      </td>
-                    </tr>
-                    {expandedId === p.id && expandedType === 'supplier' && supplierLedger && (
-                      <tr>
-                        <td colSpan={3} className="bg-gray-50/80 p-6">
-                          <LedgerPanel
-                            data={p}
-                            type="supplier"
-                            ledger={supplierLedger}
-                            payAmount={payAmount}
-                            setPayAmount={setPayAmount}
-                            payMethod={payMethod}
-                            setPayMethod={setPayMethod}
-                            onPay={() => {
-                              const amt = parseFloat(payAmount);
-                              if (!amt || amt <= 0) return;
-                              payMutation.mutate({ id: p.id, amount: amt, method: payMethod });
-                            }}
-                            isPending={payMutation.isPending}
-                          />
+
+          <div className="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50/50 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
+                    <th className="text-left px-8 py-5">Entity Detail</th>
+                    <th className="text-right px-8 py-5">Amount Due</th>
+                    <th className="w-10"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {payables.map((p: any) => (
+                    <Fragment key={p.id}>
+                      <tr onClick={() => toggleExpand(p.id, 'supplier')} className={`group cursor-pointer hover:bg-rose-50/30 transition-all ${expandedId === p.id ? 'bg-rose-50/50' : ''}`}>
+                        <td className="px-8 py-6">
+                          <p className="text-base font-black tracking-tight text-gray-800 transition-colors group-hover:text-rose-700">{p.name}</p>
+                          <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest truncate max-w-[200px] mt-1">{p.address || 'Global Sourcing'}</p>
+                        </td>
+                        <td className="px-8 py-6 text-right">
+                          <p className="text-lg font-black text-rose-600 tracking-tighter">{fmt(p.total_outstanding)}</p>
+                          <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Debit Payable</span>
+                        </td>
+                        <td className="pr-6">
+                          <div className={`p-2 transition-transform duration-300 ${expandedId === p.id ? 'rotate-180 text-rose-500' : 'text-gray-200'} group-hover:text-rose-300`}>
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          </div>
                         </td>
                       </tr>
-                    )}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-            {payables.length === 0 && (
-              <div className="py-20 text-center"><p className="text-xs text-gray-400 font-medium">No matching suppliers</p></div>
-            )}
+                      {expandedId === p.id && expandedType === 'supplier' && supplierLedger && (
+                        <tr>
+                          <td colSpan={3} className="px-5 py-4 border-b border-gray-100 animate-in slide-in-from-top-4 duration-500">
+                            <div className="bg-gray-50/50 rounded-[40px] p-2 border border-gray-100 shadow-inner overflow-hidden">
+                              <LedgerPanel
+                                data={p}
+                                type="supplier"
+                                ledger={supplierLedger}
+                                payAmount={payAmount}
+                                setPayAmount={setPayAmount}
+                                payMethod={payMethod}
+                                setPayMethod={setPayMethod}
+                                onPay={() => {
+                                  const amt = parseFloat(payAmount);
+                                  if (!amt || amt <= 0) return;
+                                  payMutation.mutate({ id: p.id, amount: amt, method: payMethod });
+                                }}
+                                isPending={payMutation.isPending}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+              {payables.length === 0 && (
+                <div className="py-32 flex flex-col items-center justify-center text-center opacity-30">
+                  <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                  <p className="text-xs font-black uppercase tracking-widest">No outstanding payables detected</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -2645,83 +2927,116 @@ function LedgerPanel({ data, type, ledger, payAmount, setPayAmount, payMethod, s
   ).sort((a: any, b: any) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime());
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-      <div>
-        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Recent Activity</h4>
-        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 no-scrollbar">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 p-6 bg-white rounded-[32px] shadow-sm border border-gray-100/50">
+      <div className="lg:col-span-7 space-y-6">
+        <div className="flex items-center justify-between px-2">
+          <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Transaction Timeline</h4>
+          <span className="px-2.5 py-0.5 bg-gray-100 rounded-full text-[9px] font-black text-gray-500 uppercase">{transactions.length} Records</span>
+        </div>
+        
+        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 no-scrollbar">
           {!ledger ? (
-            <div className="flex justify-center py-10"><div className="w-5 h-5 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" /></div>
+            <div className="flex flex-col items-center justify-center py-20 opacity-20">
+              <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin mb-4" />
+              <p className="text-[10px] font-black uppercase tracking-widest">Reconstructing Ledger...</p>
+            </div>
           ) : transactions.length === 0 ? (
-            <p className="text-center text-gray-400 py-10 text-[10px]">No transaction history</p>
+            <div className="flex flex-col items-center justify-center py-20 opacity-20 text-center">
+              <svg className="w-12 h-12 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-900 line-clamp-1">No historical data available</p>
+            </div>
           ) : (
             transactions.map((tx: any) => (
-              <div key={tx.id} className="bg-white rounded-2xl p-3 border border-gray-100 shadow-sm flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${tx.type === 'credit_given' ? (type === 'customer' ? 'bg-rose-50 text-rose-500' : 'bg-rose-50 text-rose-500') : 'bg-emerald-50 text-emerald-500'}`}>
-                    {tx.type === 'credit_given' ? (type === 'customer' ? '↑' : '↑') : '↓'}
+              <div key={tx.id} className="group bg-gray-50/50 hover:bg-white hover:shadow-xl hover:shadow-gray-100/50 rounded-2xl p-4 border border-transparent hover:border-gray-100 transition-all duration-300 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black transition-all ${tx.type === 'credit_given' ? 'bg-rose-50 text-rose-500 shadow-sm shadow-rose-100/50' : 'bg-emerald-50 text-emerald-500 shadow-sm shadow-emerald-100/50'}`}>
+                    {tx.type === 'credit_given' ? 'OUT' : 'SET'}
                   </div>
                   <div>
-                    <p className="text-[11px] font-bold text-gray-700 truncate max-w-[150px]">{tx.notes || (tx.type === 'credit_given' ? (type === 'customer' ? 'Credit Sale' : 'Purchase') : 'Payment Settlement')}</p>
-                    <p className="text-[9px] text-gray-400 font-bold uppercase">{new Date(tx.transaction_date).toLocaleDateString('en-IN')}</p>
+                    <p className="text-sm font-black text-gray-800 line-clamp-1">{tx.notes || (tx.type === 'credit_given' ? (type === 'customer' ? 'Sales Credit' : 'Inventory Purchase') : 'Debt Settlement')}</p>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{new Date(tx.transaction_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                   </div>
                 </div>
-                <p className={`text-xs font-black ${tx.type === 'credit_given' ? 'text-rose-500' : 'text-emerald-500'}`}>
-                  {tx.type === 'credit_given' ? '+' : '-'}{fmt(tx.amount)}
-                </p>
+                <div className="text-right">
+                  <p className={`text-sm font-black tracking-tighter ${tx.type === 'credit_given' ? 'text-rose-600' : 'text-emerald-600'}`}>
+                    {tx.type === 'credit_given' ? '+' : '-'}{fmt(tx.amount)}
+                  </p>
+                </div>
               </div>
             ))
           )}
         </div>
-        <div className="mt-4">
+
+        <div className="pt-4 px-2">
           <button
             onClick={() => {
-              const msg = `Hello ${data.name},\n\nYour current outstanding balance is ${fmt(data.total_outstanding)}.\n\nPlease settle at your earliest convenience.\n\nThank you!`;
+              const msg = `Greetings ${data.name},\n\nWe would like to remind you of your current outstanding balance of ${fmt(data.total_outstanding)} with us.\n\nKindly process the settlement at your earliest convenience.\n\nBest Regards,\nAccounting Dept.`;
               const url = `https://wa.me/${data.phone?.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`;
               window.open(url, '_blank');
             }}
             disabled={!data.phone}
-            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${data.phone ? 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-100' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+            className={`w-full h-14 rounded-2xl text-[11px] font-black uppercase tracking-[0.15em] transition-all flex items-center justify-center gap-3 ${data.phone ? 'bg-[#25D366] text-white hover:brightness-105 shadow-xl shadow-[#25D366]/20' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
           >
-            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.246 2.248 3.484 5.232 3.484 8.412-.003 6.557-5.338 11.892-11.893 11.892-1.997-.001-3.951-.5-5.688-1.448l-6.309 1.656zm6.224-3.82l.339.201c1.53 1.01 3.321 1.543 5.167 1.545l.006.001c5.82 0 10.555-4.735 10.558-10.555 0-2.819-1.098-5.471-3.091-7.465-1.993-1.993-4.644-3.092-7.463-3.093h-.008c-5.819 0-10.554 4.735-10.558 10.556 0 2.053.593 4.053 1.716 5.79l.244.379-1.025 3.746 3.834-1.005zm12.333-10.579l-1.423-.711-.336-.168c-.149-.074-.3-.112-.451-.112-.11 0-.22.02-.321.061-.091.037-.183.1-.264.18l-.946.945c-.092.092-.153.21-.173.336-.02.126-.002.253.051.373.491 1.076 1.111 2.067 1.841 2.943.08.096.165.188.254.277l.797.796.347.348c.15.15.344.225.541.225.12 0 .241-.028.35-.084l.215-.107 1.118-.559c.142-.071.25-.183.308-.323s.06-.296.002-.43l-.337-.768-.901-2.051c-.086-.197-.282-.322-.497-.322zm-3.692 3.693c-.49-.49-.96-.948-1.408-1.375l-.265-.252c-.426-.406-.827-.788-1.201-1.144-.127-.121-.241-.23-.339-.324-1.503-1.432-2.122-2.316-2.174-2.394-.052-.078-.052-.078-.052-.078s0 0 0 0l-.338-1.014c-.053-.159-.172-.288-.327-.357s-.332-.071-.489-.001l-.756.336-.339.151c-.098.044-.187.112-.266.197-.18.196-.3.428-.351.68-.13.626.059 1.42 1.489 3.197l.1.124.017.02c.032.039.064.079.098.118 1.48 1.761 3.518 3.55 5.518 4.316l.164.06c.306.111.64.129.957.05.295-.074.56-.231.751-.453l.945-.945c.291-.291.291-.763 0-1.054l-.797-.796z" /></svg>
-            Send WhatsApp Report
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.246 2.248 3.484 5.232 3.484 8.412-.003 6.557-5.338 11.892-11.893 11.892-1.997-.001-3.951-.5-5.688-1.448l-6.309 1.656zm6.224-3.82l.339.201c1.53 1.01 3.321 1.543 5.167 1.545l.006.001c5.82 0 10.555-4.735 10.558-10.555 0-2.819-1.098-5.471-3.091-7.465-1.993-1.993-4.644-3.092-7.463-3.093h-.008c-5.819 0-10.554 4.735-10.558 10.556 0 2.053.593 4.053 1.716 5.79l.244.379-1.025 3.746 3.834-1.005zm12.333-10.579l-1.423-.711-.336-.168c-.149-.074-.3-.112-.451-.112-.11 0-.22.02-.321.061-.091.037-.183.1-.264.18l-.946.945c-.092.092-.153.21-.173.336-.02.126-.002.253.051.373.491 1.076 1.111 2.067 1.841 2.943.08.096.165.188.254.277l.797.796.347.348c.15.15.344.225.541.225.12 0 .241-.028.35-.084l.215-.107 1.118-.559c.142-.071.25-.183.308-.323s.06-.296.002-.43l-.337-.768-.901-2.051c-.086-.197-.282-.322-.497-.322zm-3.692 3.693c-.49-.49-.96-.948-1.408-1.375l-.265-.252c-.426-.406-.827-.788-1.201-1.144-.127-.121-.241-.23-.339-.324-1.503-1.432-2.122-2.316-2.174-2.394-.052-.078-.052-.078-.052-.078s0 0 0 0l-.338-1.014c-.053-.159-.172-.288-.327-.357s-.332-.071-.489-.001l-.756.336-.339.151c-.098.044-.187.112-.266.197-.18.196-.3.428-.351.68-.13.626.059 1.42 1.489 3.197l.1.124.017.02c.032.039.064.079.098.118 1.48 1.761 3.518 3.55 5.518 4.316l.164.06c.306.111.64.129.957.05.295-.074.56-.231.751-.453l.945-.945c.291-.291.291-.763 0-1.054l-.797-.796z" /></svg>
+            Send WhatsApp Reminder
           </button>
         </div>
       </div>
-      <div className="bg-white rounded-3xl p-5 border border-violet-100 shadow-md h-fit">
-        <h4 className="text-xs font-black text-gray-800 uppercase tracking-tight mb-4">{type === 'customer' ? 'Record Repayment' : 'Record Payment Made'}</h4>
-        <div className="space-y-4">
-          <div>
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Amount (₹)</label>
-            <input
-              type="number"
-              value={payAmount}
-              onChange={(e) => setPayAmount(e.target.value)}
-              placeholder="0.00"
-              className="w-full border border-gray-100 bg-gray-50/50 rounded-2xl px-4 py-3 text-lg font-black text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-400 transition-all"
-            />
-            <button onClick={() => setPayAmount(String(data.total_outstanding))} className="text-[10px] text-violet-600 font-black hover:underline mt-1">Settle Full: {fmt(data.total_outstanding)}</button>
+
+      <div className="lg:col-span-5">
+        <div className="bg-gray-900 rounded-[32px] p-8 shadow-2xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 pointer-events-none transition-transform group-hover:scale-150 duration-700" />
+          
+          <div className="relative z-10 mb-8">
+            <h4 className="text-white/40 text-[10px] font-black uppercase tracking-[0.2em] mb-2">{type === 'customer' ? 'Receivable Management' : 'Payable Settlement'}</h4>
+            <h3 className="text-2xl font-black text-white tracking-tight">Post Transaction</h3>
           </div>
-          <div>
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Method</label>
-            <div className="flex gap-2">
-              {['cash', 'upi', 'card'].map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setPayMethod(m)}
-                  className={`flex-1 py-2 rounded-xl text-[10px] font-black tracking-widest border transition-all ${payMethod === m ? 'bg-violet-600 text-white border-violet-600 shadow-lg shadow-violet-100' : 'bg-gray-50 text-gray-400 border-gray-100 hover:bg-gray-100'}`}
+          
+          <div className="space-y-6 relative z-10 text-white">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Payment Amount (₹)</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full bg-white/5 border border-white/10 rounded-[20px] px-6 py-4 text-2xl font-black text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all placeholder:text-white/10"
+                />
+                <button 
+                  onClick={() => setPayAmount(String(data.total_outstanding))}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-white/10 hover:bg-white text-white hover:text-black rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
                 >
-                  {m.toUpperCase()}
+                  Max
                 </button>
-              ))}
+              </div>
+              <p className="text-white/20 text-[10px] font-medium ml-1">Limit: {fmt(data.total_outstanding)}</p>
             </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Settlement Channel</label>
+              <div className="grid grid-cols-3 gap-2">
+                {['cash', 'upi', 'card'].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setPayMethod(m)}
+                    className={`py-3 rounded-[20px] text-[10px] font-black tracking-widest border transition-all ${payMethod === m ? 'bg-white text-black border-white shadow-xl shadow-white/5' : 'bg-white/5 text-white/40 border-white/5 hover:border-white/20'}`}
+                  >
+                    {m.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={onPay}
+              disabled={isPending || !payAmount}
+              className={`w-full py-5 rounded-[24px] text-xs font-black uppercase tracking-[0.2em] shadow-2xl transition-all disabled:opacity-30 disabled:grayscale hover:scale-[1.02] active:scale-95 ${type === 'customer' ? 'bg-gradient-to-r from-emerald-400 to-teal-500 text-white shadow-emerald-500/20' : 'bg-gradient-to-r from-rose-400 to-red-500 text-white shadow-rose-500/20'}`}
+            >
+              {isPending ? 'Propagating...' : type === 'customer' ? 'Finalize Collection' : 'Confirm Disbursement'}
+            </button>
           </div>
-          <button
-            onClick={onPay}
-            disabled={isPending || !payAmount}
-            className="w-full bg-gradient-to-br from-violet-600 to-indigo-700 text-white py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-violet-100 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
-          >
-            {isPending ? 'Saving...' : type === 'customer' ? 'Collect & Update Ledger' : 'Pay & Update Ledger'}
-          </button>
         </div>
       </div>
     </div>
