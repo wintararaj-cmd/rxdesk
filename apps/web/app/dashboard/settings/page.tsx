@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { shopApi, subscriptionApi, chamberApi, accountingApi } from '../../../lib/apiClient';
 import { useAuthStore } from '../../../store/authStore';
-import { Phone, Mail, Clock, X, Database, Download, Upload, AlertCircle, Check, Printer } from 'lucide-react';
+import { Phone, Mail, Clock, X, Database, Download, Upload, AlertCircle, Check, Printer, HelpCircle, LayoutDashboard, Calendar, Users, Package, Receipt, BarChart3, Calculator, Settings as SettingsIcon } from 'lucide-react';
 
 type GstType = 'unregistered' | 'composite' | 'regular';
 
@@ -744,6 +744,96 @@ export default function SettingsPage() {
               Inventory and Bill records are NOT affected, but links to accounting entries may be lost if
               they aren't part of the backup.
             </div>
+          </div>
+        </div>
+        {/* Quick Explore Guide */}
+        <div className="bg-gradient-to-br from-violet-50 to-indigo-50 rounded-3xl border border-violet-100 p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-violet-600 rounded-xl">
+              <HelpCircle className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Quick Explore Guide</h2>
+              <p className="text-sm text-violet-600/70 font-medium">Master RxDesk in minutes</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[
+              {
+                icon: <LayoutDashboard className="w-4 h-4" />,
+                title: 'Dashboard',
+                desc: 'Your daily overview. Track today’s appointments, revenue at a glance, and critical low-stock alerts.',
+                color: 'text-blue-600',
+                bg: 'bg-blue-100'
+              },
+              {
+                icon: <Calendar className="w-4 h-4" />,
+                title: 'Appointments',
+                desc: 'Manage doctor bookings. Book walk-in patients, update visit status, and view historical patient visits.',
+                color: 'text-indigo-600',
+                bg: 'bg-indigo-100'
+              },
+              {
+                icon: <Users className="w-4 h-4" />,
+                title: 'Doctors',
+                desc: 'Doctor management center. Set consultation fees, manage chamber schedules, and approve doctor requests.',
+                color: 'text-violet-600',
+                bg: 'bg-violet-100'
+              },
+              {
+                icon: <Package className="w-4 h-4" />,
+                title: 'Inventory',
+                desc: 'Complete stock control. Track batch-wise expiry, manage rack locations, and reorder low-stock items.',
+                color: 'text-emerald-600',
+                bg: 'bg-emerald-100'
+              },
+              {
+                icon: <Receipt className="w-4 h-4" />,
+                title: 'Billing',
+                desc: 'Fast checkout system. Generate professional GST invoices, search customers, and track pending payments.',
+                color: 'text-amber-600',
+                bg: 'bg-amber-100'
+              },
+              {
+                icon: <BarChart3 className="w-4 h-4" />,
+                title: 'Reports',
+                desc: 'Deep analytics. View detailed Sales, Purchase, and GST reports. Export GSTR-1, 2, and 3B Excel files.',
+                color: 'text-rose-600',
+                bg: 'bg-rose-100'
+              },
+              {
+                icon: <Calculator className="w-4 h-4" />,
+                title: 'Accounting',
+                desc: 'Full finance suite. Manage Suppliers, record Expenses, track Income, and monitor overall Outstandings.',
+                color: 'text-sky-600',
+                bg: 'bg-sky-100'
+              },
+              {
+                icon: <SettingsIcon className="w-4 h-4" />,
+                title: 'Settings',
+                desc: 'App customization. Update shop profile, manage subscriptions, and perform secure data backups.',
+                color: 'text-gray-600',
+                bg: 'bg-gray-100'
+              },
+            ].map((item, idx) => (
+              <div key={idx} className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/50 hover:border-violet-200 transition-all group">
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 rounded-lg ${item.bg} ${item.color} group-hover:scale-110 transition-transform`}>
+                    {item.icon}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-sm">{item.title}</h3>
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">{item.desc}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 p-4 bg-violet-600 rounded-2xl text-white text-center">
+            <p className="text-xs font-semibold uppercase tracking-wider opacity-80">Pro Tip</p>
+            <p className="text-sm mt-1 font-medium">Use the <span className="underline decoration-violet-300">Shortcuts</span> menu in the sidebar for lighting-fast access to common tasks!</p>
           </div>
         </div>
       </div>
