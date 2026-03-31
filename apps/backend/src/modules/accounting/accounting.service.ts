@@ -3593,6 +3593,14 @@ export async function initializeShopAccounts(shopId: string) {
       { name: 'Purchase Account', gName: 'Direct Expenses', locked: true },
       { name: 'GST Input Tax', gName: 'Current Assets', locked: true },
       { name: 'GST Output Tax', gName: 'Current Liabilities', locked: true },
+      // Common Indirect Expenses
+      { name: 'Rent Expense', gName: 'Indirect Expenses', locked: false },
+      { name: 'Salary Expense', gName: 'Indirect Expenses', locked: false },
+      { name: 'Electricity Bill', gName: 'Indirect Expenses', locked: false },
+      { name: 'Water Bill', gName: 'Indirect Expenses', locked: false },
+      { name: 'Communication/Internet', gName: 'Indirect Expenses', locked: false },
+      { name: 'Advertising/Marketing', gName: 'Indirect Expenses', locked: false },
+      { name: 'Maintenance/Repairs', gName: 'Indirect Expenses', locked: false },
     ];
 
     for (const e of essential) {

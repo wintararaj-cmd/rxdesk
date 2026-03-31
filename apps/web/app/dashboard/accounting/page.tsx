@@ -476,9 +476,30 @@ function ExpensesTab() {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const { data: accounts } = useQuery<ChartOfAccount[]>({
-    queryKey: ['coa-accounts-expense'],
+    queryKey: ['coa-accounts-expense', entryType],
     queryFn: () => accountingApi.listChartOfAccounts(entryType === 'PAYMENT' ? 'expense' : 'income').then(r => r.data.data)
   });
+
+  // Phase 2: Auto-select ledger based on category
+  useEffect(() => {
+    if (accounts && category) {
+      const cat = category.toLowerCase();
+      // Try to find a match. e.g. "rent" matches "Rent Expense"
+      const match = accounts.find(a => {
+        const name = a.name.toLowerCase();
+        return name.includes(cat) || cat.includes(name.split(' ')[0].toLowerCase());
+      });
+      if (match) {
+        setAccountId(match.id);
+      } else {
+        // Fallback to "Miscellaneous" if category is miscellaneous and no direct ledger match
+        if (cat === 'miscellaneous') {
+           const misc = accounts.find(a => a.name.toLowerCase().includes('misc'));
+           if (misc) setAccountId(misc.id);
+        }
+      }
+    }
+  }, [category, accounts]);
   
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('');
@@ -4816,14 +4837,13 @@ function ChartOfAccountsTab() {
           <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">Organize your Business Ledgers</p>
         </div>
         <div className="flex gap-2">
-          {!hasGroups && (
-            <button 
-              onClick={() => initMutation.mutate()}
-              className="bg-violet-600 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-violet-200 hover:scale-105 active:scale-95 transition-all"
-            >
-              Initialize Default Accounts
-            </button>
-          )}
+          <button 
+            onClick={() => initMutation.mutate()}
+            disabled={initMutation.isPending}
+            className="bg-violet-600 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-violet-200 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+          >
+            {initMutation.isPending ? 'Syncing...' : 'Sync System Defaults'}
+          </button>
           <button 
             onClick={() => setShowAdd(!showAdd)}
             className="bg-gray-900 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-gray-200 hover:scale-105 active:scale-95 transition-all"
