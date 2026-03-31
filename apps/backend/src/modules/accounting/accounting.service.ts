@@ -29,7 +29,7 @@ function normalizeState(s?: string | null): string {
 //  Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function getShopOrThrow(userId: string) {
+export async function getShopOrThrow(userId: string) {
   const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });
   if (!shop) throw new AppError(403, 'FORBIDDEN', 'Only shop owners can access accounting');
   return shop;
