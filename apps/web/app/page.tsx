@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
@@ -16,6 +16,7 @@ const SPECIALIZATIONS = ['General Physician', 'Cardiologist', 'Dermatologist', '
 interface DoctorShop { id: string; shop_name: string; address_line: string; city: string; pin_code: string; }
 interface DoctorChamber { id: string; distance_km?: number; shop: DoctorShop; }
 interface Doctor { id: string; full_name: string; specialization?: string; qualifications: string[]; experience_years?: number; consultation_fee?: number; chambers: DoctorChamber[]; }
+interface Shop { id: string; shop_name: string; address_line: string; city: string; pin_code: string; contact_phone: string; latitude: number; longitude: number; distance_km?: number; }
 
 export default function LandingPage() {
   const [query, setQuery] = useState('');
@@ -23,7 +24,9 @@ export default function LandingPage() {
   const [locStatus, setLocStatus] = useState<'idle' | 'loading' | 'ok' | 'denied'>('idle');
   const [searching, setSearching] = useState(false);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [shops, setShops] = useState<Shop[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [hasSearchedShops, setHasSearchedShops] = useState(false);
   const [searchErr, setSearchErr] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -39,7 +42,7 @@ export default function LandingPage() {
 
   const runSearch = async (overrideQuery?: string) => {
     const q = overrideQuery ?? query;
-    setSearching(true); setSearchErr(''); setHasSearched(true);
+    setSearching(true); setSearchErr(''); setHasSearched(true); setHasSearchedShops(false);
     try {
       const params: Record<string, string | number> = {};
       if (q.trim()) params.q = q.trim();
@@ -48,6 +51,36 @@ export default function LandingPage() {
       setDoctors(res.data.data ?? []);
     } catch {
       setSearchErr('Unable to fetch results. Please try again.'); setDoctors([]);
+    } finally { setSearching(false); }
+  };
+
+  const runShopSearch = async () => {
+    setSearching(true); setSearchErr(''); setHasSearched(false); setHasSearchedShops(true);
+    try {
+      const params: Record<string, string | number> = { radius: 10 };
+      if (coords) { 
+        params.lat = coords.lat; 
+        params.lng = coords.lng; 
+      } else {
+        // Fallback or ask for location
+        locate();
+        setSearchErr('Please allow location access to find nearby pharmacies.');
+        setSearching(false);
+        return;
+      }
+      const res = await axios.get(`${API_URL}/shops/nearby`, { params });
+      
+      // Calculate distances manually if needed, or just set them
+      let data = res.data.data ?? [];
+      if (coords) {
+        data = data.map((s: Shop) => {
+          // simple haversine could be here, but let's just show them for now
+          return s;
+        });
+      }
+      setShops(data);
+    } catch {
+      setSearchErr('Unable to fetch pharmacies. Please try again.'); setShops([]);
     } finally { setSearching(false); }
   };
 
@@ -152,11 +185,11 @@ export default function LandingPage() {
                   type="text" value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && runSearch()}
-                  placeholder="Search doctor, specializationâ€¦"
+                  placeholder="Search doctor, specialization…"
                   className="flex-1 bg-transparent outline-none text-sm text-white placeholder:text-gray-600"
                 />
               </div>
-              <div className="flex gap-2 shrink-0">
+              <div className="flex flex-wrap gap-2 shrink-0">
                 <button
                   onClick={() => { if (locStatus !== 'ok') locate(); }}
                   title="Use my location"
@@ -167,15 +200,24 @@ export default function LandingPage() {
                   }`}
                 >
                   <Navigation className="w-4 h-4" />
-                  <span className="hidden sm:inline">{locStatus === 'ok' ? 'Located' : locStatus === 'loading' ? 'â€¦' : 'Near Me'}</span>
+                  <span className="hidden sm:inline">{locStatus === 'ok' ? 'Located' : locStatus === 'loading' ? '…' : 'Near Me'}</span>
                 </button>
-                <button
-                  onClick={() => runSearch()}
-                  disabled={searching}
-                  className="px-6 h-12 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 rounded-xl text-sm font-semibold transition-all disabled:opacity-60 shadow shadow-violet-500/20"
-                >
-                  {searching ? 'Searchingâ€¦' : 'Find Doctors'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => runSearch()}
+                    disabled={searching}
+                    className="px-5 h-12 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 rounded-xl text-sm font-semibold transition-all disabled:opacity-60 shadow shadow-violet-500/20"
+                  >
+                    {searching && hasSearched ? 'Searching…' : 'Find Doctors'}
+                  </button>
+                  <button
+                    onClick={() => runShopSearch()}
+                    disabled={searching}
+                    className="px-5 h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 rounded-xl text-sm font-semibold transition-all disabled:opacity-60 shadow shadow-emerald-500/20 flex items-center gap-2"
+                  >
+                    {searching && hasSearchedShops ? 'Finding…' : <><Store className="w-4 h-4" /> Near Pharmacy</>}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -201,12 +243,69 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* â”€â”€ SEARCH RESULTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ———————————————————————————————————————————————————————— SEARCH RESULTS ———————————————————————————————————————————————————————— */}
+      {hasSearchedShops && (
+        <section id="results-section" className="px-4 pb-16">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Store className="w-5 h-5 text-emerald-400" /> Nearby Pharmacies
+              </h2>
+              <p className="text-xs text-gray-500">
+                {searching ? 'Finding…' : `${shops.length} pharmacy found within 10km`}
+              </p>
+            </div>
+
+            {searchErr && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-400 text-sm mb-4">{searchErr}</div>
+            )}
+
+            {!searching && !searchErr && shops.length === 0 && (
+              <div className="text-center py-16 text-gray-600">
+                <Store className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <p className="font-medium text-gray-500">No pharmacies found nearby</p>
+                <p className="text-sm mt-1">Try moving to a different location or check permissions</p>
+              </div>
+            )}
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              {shops.map((shop) => (
+                <div key={shop.id} className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5 hover:border-emerald-500/25 transition-all">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 shrink-0 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center">
+                      <Store className="w-5 h-5 text-emerald-400" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold text-white truncate">{shop.shop_name}</h3>
+                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{shop.address_line}, {shop.city}</p>
+                      <div className="flex items-center gap-3 mt-3">
+                        <a href={`tel:${shop.contact_phone}`} className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 transition-colors">
+                           Call Shop
+                        </a>
+                        <span className="text-gray-700">·</span>
+                        <a 
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${shop.latitude},${shop.longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 text-[11px] font-semibold text-blue-400 hover:text-blue-300 transition-colors"
+                        >
+                          Directions
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {hasSearched && (
         <section id="results-section" className="px-4 pb-16">
           <div className="max-w-4xl mx-auto">
             <p className="text-sm text-gray-500 mb-5">
-              {searching ? 'Searchingâ€¦' : `${doctors.length} doctor${doctors.length !== 1 ? 's' : ''} found${coords ? ' Â· sorted by distance' : ''}`}
+              {searching ? 'Searching…' : `${doctors.length} doctor${doctors.length !== 1 ? 's' : ''} found${coords ? ' · sorted by distance' : ''}`}
             </p>
 
             {searchErr && (
@@ -235,7 +334,7 @@ export default function LandingPage() {
                         <h3 className="font-semibold text-white">Dr. {doc.full_name}</h3>
                         <div className="flex items-center gap-3 text-xs text-gray-500 shrink-0">
                           {doc.experience_years ? <span>{doc.experience_years}+ yrs</span> : null}
-                          {doc.consultation_fee ? <span className="text-emerald-400 font-medium">â‚¹{doc.consultation_fee}</span> : null}
+                          {doc.consultation_fee ? <span className="text-emerald-400 font-medium">₹{doc.consultation_fee}</span> : null}
                         </div>
                       </div>
                       {doc.specialization && <p className="text-violet-400 text-sm mb-1">{doc.specialization}</p>}
@@ -247,7 +346,7 @@ export default function LandingPage() {
                             <div key={ch.id} className="flex items-start gap-2 text-xs">
                               <MapPin className="w-3 h-3 text-gray-500 mt-0.5 shrink-0" />
                               <span className="text-gray-400 font-medium">{ch.shop.shop_name}</span>
-                              <span className="text-gray-600">Â·</span>
+                              <span className="text-gray-600">·</span>
                               <span className="text-gray-600">{ch.shop.address_line}, {ch.shop.city} {ch.shop.pin_code}</span>
                               {ch.distance_km !== undefined && (
                                 <span className="text-emerald-400 font-semibold ml-1 shrink-0">
