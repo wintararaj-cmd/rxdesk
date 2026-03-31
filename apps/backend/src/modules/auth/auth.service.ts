@@ -284,7 +284,7 @@ export async function resetPasswordWithOtp(
 
 export async function refreshAccessToken(
   rawRefreshToken: string
-): Promise<{ access_token: string }> {
+): Promise<{ access_token: string; refresh_token: string }> {
   const [tokenId, ...rest] = rawRefreshToken.split(':');
   const token = rest.join(':');
 
