@@ -345,6 +345,8 @@ model MedicalShop {
   contra_entries      ContraEntry[]
   shop_medicines      ShopMedicine[]
   recharges           SubscriptionPayment[]
+  account_groups      AccountGroup[]
+  chart_of_accounts   ChartOfAccount[]
 
   @@map("medical_shops")
 }
@@ -792,6 +794,7 @@ model PurchaseEntry {
   total_amount    Decimal               @db.Decimal(12, 2)
   payment_status  PurchasePaymentStatus @default(unpaid)
   amount_paid     Decimal               @default(0) @db.Decimal(12, 2)
+  is_inventory    Boolean               @default(true)
   notes           String?
   created_by      String?
   created_at      DateTime              @default(now())
@@ -881,17 +884,20 @@ model ExpenseEntry {
   payment_method     AccountingPaymentMethod @default(cash)
   reference_no       String?
   linked_purchase_id String?                 @unique
+  account_id         String?                 // Link to ChartOfAccount (Phase 2)
   entry_date         DateTime                @db.Date
   receipt_url        String?
   created_by         String?
   created_at         DateTime                @default(now())
 
-  shop     MedicalShop    @relation(fields: [shop_id], references: [id], onDelete: Cascade)
-  purchase PurchaseEntry? @relation(fields: [linked_purchase_id], references: [id])
-  creator  User?          @relation("ExpenseCreatedBy", fields: [created_by], references: [id])
+  shop     MedicalShop     @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  purchase PurchaseEntry?  @relation(fields: [linked_purchase_id], references: [id])
+  account  ChartOfAccount? @relation("ExpenseAccount", fields: [account_id], references: [id])
+  creator  User?           @relation("ExpenseCreatedBy", fields: [created_by], references: [id])
 
   @@index([shop_id, entry_date])
   @@index([shop_id, category])
+  @@index([account_id])
   @@map("expense_entries")
 }
 
@@ -1106,3 +1112,52 @@ model SubscriptionPayment {
   @@map("subscription_payments")
 }
 
+// ————————————————————————————————————————————————
+//  Chart of Accounts (Phase 2)
+// ————————————————————————————————————————————————
+
+enum AccountType {
+  asset
+  liability
+  equity
+  income
+  expense
+}
+
+model AccountGroup {
+  id          String      @id @default(uuid())
+  name        String
+  type        AccountType
+  parent_id   String?
+  shop_id     String?     // null if system-wide default
+  created_at  DateTime    @default(now())
+
+  shop        MedicalShop?   @relation(fields: [shop_id], references: [id])
+  parent      AccountGroup?  @relation("GroupToGroup", fields: [parent_id], references: [id])
+  children    AccountGroup[] @relation("GroupToGroup")
+  accounts    ChartOfAccount[]
+
+  @@unique([shop_id, name], name: "shop_id_name")
+  @@map("account_groups")
+}
+
+model ChartOfAccount {
+  id               String       @id @default(uuid())
+  shop_id          String
+  group_id         String
+  name             String
+  code             String?
+  description      String?
+  is_system_locked Boolean      @default(false)
+  opening_balance  Decimal      @default(0) @db.Decimal(12, 2)
+  is_active        Boolean      @default(true)
+  created_at       DateTime     @default(now())
+  updated_at       DateTime     @updatedAt
+
+  shop            MedicalShop    @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  group           AccountGroup   @relation(fields: [group_id], references: [id])
+  expense_entries ExpenseEntry[] @relation("ExpenseAccount")
+
+  @@unique([shop_id, name], name: "shop_id_name")
+  @@map("chart_of_accounts")
+}

@@ -612,4 +612,43 @@ router.get('/agent-backup', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ─── Chart of Accounts (Phase 2) ─────────────────────────────────────────────
+
+router.get('/account-groups', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.listAccountGroups(req.user!.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/chart-of-accounts', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.listChartOfAccounts(req.user!.id, req.query.type as any);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/chart-of-accounts', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.createChartOfAccount(req.user!.id, req.body);
+    res.status(201).json({ success: true, data, message: 'Account created' });
+  } catch (err) { next(err); }
+});
+
+router.post('/initialize-coa', shopAuth, async (req, res, next) => {
+  try {
+    const shop = await service.getShopOrThrow(req.user!.id);
+    await service.initializeShopAccounts(shop.id);
+    res.json({ success: true, message: 'Accounting system initialized' });
+  } catch (err) { next(err); }
+});
+
+router.get('/reports/gl-statement', shopAuth, async (req, res, next) => {
+  try {
+    const { id, from, to } = req.query as { id: string; from: string; to: string };
+    const data = await service.getGeneralLedgerStatement(req.user!.id, id, from, to);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 export default router;

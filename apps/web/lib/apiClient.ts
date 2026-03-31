@@ -260,6 +260,15 @@ export const accountingApi = {
   restore: (data: object) => apiClient.post('/accounting/restore', data),
   getBackupList: () => apiClient.get('/accounting/backups/list'),
   triggerServerBackup: () => apiClient.post('/accounting/backups/trigger'),
+
+  // Chart of Accounts (Phase 2)
+  listAccountGroups: () => apiClient.get('/accounting/account-groups'),
+  listChartOfAccounts: (type?: string) => 
+    apiClient.get('/accounting/chart-of-accounts', { params: type ? { type } : undefined }),
+  createChartOfAccount: (data: object) => apiClient.post('/accounting/chart-of-accounts', data),
+  initializeCOA: () => apiClient.post('/accounting/initialize-coa'),
+  getGLStatement: (id: string, from: string, to: string) =>
+    apiClient.get('/accounting/reports/gl-statement', { params: { id, from, to } }),
 };
 
 export const doctorApi = {

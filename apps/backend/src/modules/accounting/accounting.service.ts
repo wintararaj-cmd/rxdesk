@@ -307,8 +307,10 @@ export interface CreatePurchaseInput {
   invoice_date: string;
   received_date?: string;
   notes?: string;
+  is_inventory?: boolean; // New field
   items: {
     medicine_id?: string;
+// ...
     medicine_name: string;
     batch_number: string;
     expiry_date: string;
@@ -363,6 +365,7 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
         subtotal,
         gst_amount: totalGst,
         total_amount: totalAmount,
+        is_inventory: input.is_inventory ?? true,
         created_by: userId,
         items: {
           create: itemsWithTotals.map((item) => ({
@@ -383,97 +386,99 @@ export async function createPurchaseEntry(userId: string, input: CreatePurchaseI
       include: { items: true },
     });
 
-    // Upsert inventory for each item
-    for (const item of itemsWithTotals) {
-      const totalQty = item.quantity + (item.free_qty ?? 0);
-      const mName = item.medicine_name.trim();
-      const bNumber = (item.batch_number || '').trim();
-      const unit = item.unit || 'strip';
+    // Upsert inventory for each item ONLY IF is_inventory is true
+    if (input.is_inventory !== false) {
+      for (const item of itemsWithTotals) {
+        const totalQty = item.quantity + (item.free_qty ?? 0);
+        const mName = item.medicine_name.trim();
+        const bNumber = (item.batch_number || '').trim();
+        const unit = item.unit || 'strip';
 
-      // 1. Ensure ShopMedicine (Master Record) exists
-      const shopMed = await tx.shopMedicine.upsert({
-        where: {
-          shop_id_medicine_name_unit: {
-            shop_id: shop.id,
-            medicine_name: mName,
-            unit: unit,
-          }
-        },
-        create: {
-          shop_id: shop.id,
-          medicine_id: item.medicine_id || null,
-          medicine_name: mName,
-          unit: unit,
-          hsn_code: item.hsn_code,
-        },
-        update: {
-          medicine_id: item.medicine_id || null,
-          hsn_code: item.hsn_code || undefined,
-        },
-      });
-
-      // 2. Find exact batch match
-      let existing = await tx.shopInventory.findFirst({
-        where: {
-          shop_id: shop.id,
-          shop_medicine_id: shopMed.id,
-          ...(bNumber === ''
-            ? { OR: [{ batch_number: '' }, { batch_number: null }] }
-            : { batch_number: { equals: bNumber, mode: 'insensitive' } })
-        },
-      });
-
-      // 3. Fallback: find any negative stock batch for this medicine
-      if (!existing) {
-        existing = await tx.shopInventory.findFirst({
+        // 1. Ensure ShopMedicine (Master Record) exists
+        const shopMed = await tx.shopMedicine.upsert({
           where: {
-            shop_id: shop.id,
-            shop_medicine_id: shopMed.id,
-            stock_qty: { lt: 0 },
+            shop_id_medicine_name_unit: {
+              shop_id: shop.id,
+              medicine_name: mName,
+              unit: unit,
+            }
           },
-          orderBy: { stock_qty: 'asc' },
-        });
-      }
-
-      if (existing) {
-        await tx.shopInventory.update({
-          where: { id: existing.id },
-          data: {
-            stock_qty: { increment: totalQty },
-            mrp: item.mrp,
-            purchase_price: item.purchase_price,
-            unit: unit,
-            expiry_date: new Date(item.expiry_date),
-            hsn_code: item.hsn_code ?? existing.hsn_code,
-            shop_medicine_id: shopMed.id,
-            medicine_id: item.medicine_id || null,
-          },
-        });
-      } else {
-        await tx.shopInventory.create({
-          data: {
+          create: {
             shop_id: shop.id,
-            shop_medicine_id: shopMed.id,
             medicine_id: item.medicine_id || null,
             medicine_name: mName,
-            batch_number: bNumber,
-            expiry_date: new Date(item.expiry_date),
-            mrp: item.mrp,
-            purchase_price: item.purchase_price,
-            stock_qty: totalQty,
-            gst_rate: item.gst_rate ?? 5,
             unit: unit,
             hsn_code: item.hsn_code,
           },
+          update: {
+            medicine_id: item.medicine_id || null,
+            hsn_code: item.hsn_code || undefined,
+          },
         });
+
+        // 2. Find exact batch match
+        let existing = await tx.shopInventory.findFirst({
+          where: {
+            shop_id: shop.id,
+            shop_medicine_id: shopMed.id,
+            ...(bNumber === ''
+              ? { OR: [{ batch_number: '' }, { batch_number: null }] }
+              : { batch_number: { equals: bNumber, mode: 'insensitive' } })
+          },
+        });
+
+        // 3. Fallback: find any negative stock batch for this medicine
+        if (!existing) {
+          existing = await tx.shopInventory.findFirst({
+            where: {
+              shop_id: shop.id,
+              shop_medicine_id: shopMed.id,
+              stock_qty: { lt: 0 },
+            },
+            orderBy: { stock_qty: 'asc' },
+          });
+        }
+
+        if (existing) {
+          await tx.shopInventory.update({
+            where: { id: existing.id },
+            data: {
+              stock_qty: { increment: totalQty },
+              mrp: item.mrp,
+              purchase_price: item.purchase_price,
+              unit: unit,
+              expiry_date: new Date(item.expiry_date),
+              hsn_code: item.hsn_code ?? existing.hsn_code,
+              shop_medicine_id: shopMed.id,
+              medicine_id: item.medicine_id || null,
+            },
+          });
+        } else {
+          await tx.shopInventory.create({
+            data: {
+              shop_id: shop.id,
+              shop_medicine_id: shopMed.id,
+              medicine_id: item.medicine_id || null,
+              medicine_name: mName,
+              batch_number: bNumber,
+              expiry_date: new Date(item.expiry_date),
+              mrp: item.mrp,
+              purchase_price: item.purchase_price,
+              stock_qty: totalQty,
+              gst_rate: item.gst_rate ?? 5,
+              unit: unit,
+              hsn_code: item.hsn_code,
+            },
+          });
+        }
       }
     }
 
     await tx.expenseEntry.create({
       data: {
         shop_id: shop.id,
-        category: 'medicine_purchase',
-        description: `Purchase from ${isUnregistered ? 'unregistered supplier' : 'supplier'} — ${input.invoice_number ?? pe.id}`,
+        category: input.is_inventory === false ? 'utilities' : 'medicine_purchase',
+        description: `${input.is_inventory === false ? 'General Purchase/Service' : 'Medicine Purchase'} from ${isUnregistered ? 'unregistered supplier' : 'supplier'} — ${input.invoice_number ?? pe.id}`,
         amount: totalAmount,
         payment_method: 'credit',
         entry_date: new Date(input.received_date ?? input.invoice_date),
@@ -499,32 +504,34 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
 
     if (!oldPurchase) throw new AppError(404, 'NOT_FOUND', 'Purchase record not found');
 
-    // 1. Reverse Old Inventory
-    for (const item of oldPurchase.items) {
-      const bNo = (item.batch_number || '').trim();
-      const existing = await tx.shopInventory.findFirst({
-        where: {
-          shop_id: shop.id,
-          AND: [
-            {
-              OR: [
-                ...(item.medicine_id ? [{ medicine_id: item.medicine_id }] : []),
-                { medicine_name: { equals: item.medicine_name.trim(), mode: 'insensitive' } }
-              ]
-            },
-            bNo === ''
-              ? { OR: [{ batch_number: '' }, { batch_number: null }] }
-              : { batch_number: { equals: bNo, mode: 'insensitive' } }
-          ]
-        },
-      });
-      if (existing) {
-        await tx.shopInventory.update({
-          where: { id: existing.id },
-          data: {
-            stock_qty: { decrement: item.quantity + (item.free_qty || 0) },
+    // 1. Reverse Old Inventory ONLY IF it was an inventory purchase
+    if (oldPurchase.is_inventory) {
+      for (const item of oldPurchase.items) {
+        const bNo = (item.batch_number || '').trim();
+        const existing = await tx.shopInventory.findFirst({
+          where: {
+            shop_id: shop.id,
+            AND: [
+              {
+                OR: [
+                  ...(item.medicine_id ? [{ medicine_id: item.medicine_id }] : []),
+                  { medicine_name: { equals: item.medicine_name.trim(), mode: 'insensitive' } }
+                ]
+              },
+              bNo === ''
+                ? { OR: [{ batch_number: '' }, { batch_number: null }] }
+                : { batch_number: { equals: bNo, mode: 'insensitive' } }
+            ]
           },
         });
+        if (existing) {
+          await tx.shopInventory.update({
+            where: { id: existing.id },
+            data: {
+              stock_qty: { decrement: item.quantity + (item.free_qty || 0) },
+            },
+          });
+        }
       }
     }
 
@@ -567,6 +574,7 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
         subtotal,
         gst_amount: totalGst,
         total_amount: totalAmount,
+        is_inventory: input.is_inventory ?? true,
         items: {
           create: itemsWithTotals.map((item) => ({
             medicine_id: item.medicine_id || null,
@@ -676,8 +684,9 @@ export async function updatePurchaseEntry(userId: string, id: string, input: Cre
     await tx.expenseEntry.updateMany({
       where: { linked_purchase_id: id },
       data: {
+        category: input.is_inventory === false ? 'utilities' : 'medicine_purchase',
         amount: totalAmount,
-        description: `Purchase from ${isUnregistered ? 'unregistered' : 'supplier'} — ${input.invoice_number ?? id} (EDITED)`,
+        description: `${input.is_inventory === false ? 'General Purchase/Service' : 'Medicine Purchase'} from ${isUnregistered ? 'unregistered' : 'supplier'} — ${input.invoice_number ?? id} (EDITED)`,
         entry_date: new Date(input.received_date ?? input.invoice_date),
       },
     });
@@ -843,6 +852,7 @@ export async function listSupplierPayments(userId: string, opts: { supplier_id?:
 
 export interface CreateExpenseInput {
   category: 'medicine_purchase' | 'rent' | 'salary' | 'utilities' | 'transport' | 'maintenance' | 'electricity' | 'water' | 'phone' | 'internet' | 'advertising' | 'miscellaneous';
+  account_id?: string; // New field for COA
   description?: string;
   amount: number;
   payment_method?: 'cash' | 'upi' | 'neft' | 'cheque' | 'card' | 'credit' | 'bank_transfer';
@@ -856,6 +866,7 @@ export async function createExpense(userId: string, input: CreateExpenseInput) {
     data: {
       shop_id: shop.id,
       category: input.category as any,
+      account_id: input.account_id || null,
       description: input.description,
       amount: input.amount,
       payment_method: (input.payment_method ?? 'cash') as any,
@@ -906,6 +917,7 @@ export async function updateExpense(userId: string, expenseId: string, data: Par
     where: { id: expenseId },
     data: {
       ...(data.category ? { category: data.category as any } : {}),
+      ...(data.account_id !== undefined ? { account_id: data.account_id } : {}),
       ...(data.description !== undefined ? { description: data.description } : {}),
       ...(data.amount !== undefined ? { amount: data.amount } : {}),
       ...(data.payment_method ? { payment_method: data.payment_method as any } : {}),
@@ -3492,4 +3504,171 @@ export async function generateGstr3bExcel(userId: string, month: number, year: n
   sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
 
   return workbook.xlsx.writeBuffer();
+}
+// ─────────────────────────────────────────────────────────────────────────────
+//  Chart of Accounts (Phase 2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function listAccountGroups(userId: string) {
+  const shop = await getShopOrThrow(userId);
+  const groups = await prisma.accountGroup.findMany({
+    where: { OR: [{ shop_id: shop.id }, { shop_id: null }] },
+    orderBy: { name: 'asc' },
+    include: { accounts: { where: { shop_id: shop.id } } }
+  });
+  return groups;
+}
+
+export async function listChartOfAccounts(userId: string, type?: 'asset' | 'liability' | 'equity' | 'income' | 'expense') {
+  const shop = await getShopOrThrow(userId);
+  return prisma.chartOfAccount.findMany({
+    where: {
+      shop_id: shop.id,
+      is_active: true,
+      ...(type ? { group: { type } } : {})
+    },
+    include: { group: true },
+    orderBy: { name: 'asc' }
+  });
+}
+
+export async function createChartOfAccount(userId: string, input: {
+  group_id: string;
+  name: string;
+  code?: string;
+  description?: string;
+  opening_balance?: number;
+}) {
+  const shop = await getShopOrThrow(userId);
+  return prisma.chartOfAccount.create({
+    data: {
+      shop_id: shop.id,
+      group_id: input.group_id,
+      name: input.name,
+      code: input.code,
+      description: input.description,
+      opening_balance: input.opening_balance ?? 0,
+    },
+    include: { group: true }
+  });
+}
+
+/**
+ * Ensures every shop has a basic set of accounting groups and ledgers.
+ */
+export async function initializeShopAccounts(shopId: string) {
+  return prisma.$transaction(async (tx) => {
+    // 1. Create Default Groups
+    const groups = [
+      { name: 'Current Assets', type: 'asset' },
+      { name: 'Fixed Assets', type: 'asset' },
+      { name: 'Current Liabilities', type: 'liability' },
+      { name: 'Long Term Liabilities', type: 'liability' },
+      { name: 'Capital Account', type: 'equity' },
+      { name: 'Direct Income', type: 'income' },
+      { name: 'Indirect Income', type: 'income' },
+      { name: 'Direct Expenses', type: 'expense' },
+      { name: 'Indirect Expenses', type: 'expense' },
+    ];
+
+    for (const g of groups) {
+      const existing = await tx.accountGroup.findFirst({
+        where: { shop_id: shopId, name: g.name }
+      });
+      if (!existing) {
+        await tx.accountGroup.create({
+          data: { shop_id: shopId, name: g.name, type: g.type as any }
+        });
+      }
+    }
+
+    const allGroups = await tx.accountGroup.findMany({ where: { shop_id: shopId } });
+    const getG = (name: string) => allGroups.find(x => x.name === name);
+
+    // 2. Create Essential Ledgers
+    const essential = [
+      { name: 'Cash in Hand', gName: 'Current Assets', locked: true },
+      { name: 'Bank Account', gName: 'Current Assets', locked: false },
+      { name: 'Sales Account', gName: 'Direct Income', locked: true },
+      { name: 'Purchase Account', gName: 'Direct Expenses', locked: true },
+      { name: 'GST Input Tax', gName: 'Current Assets', locked: true },
+      { name: 'GST Output Tax', gName: 'Current Liabilities', locked: true },
+    ];
+
+    for (const e of essential) {
+      const g = getG(e.gName);
+      if (!g) continue;
+      
+      const existingAcc = await tx.chartOfAccount.findFirst({
+        where: { shop_id: shopId, name: e.name }
+      });
+      if (!existingAcc) {
+        await tx.chartOfAccount.create({
+          data: {
+            shop_id: shopId,
+            group_id: g.id,
+            name: e.name,
+            is_system_locked: e.locked
+          }
+        });
+      }
+    }
+  });
+}
+
+/**
+ * General Ledger Report (GL Statement)
+ */
+export async function getGeneralLedgerStatement(userId: string, accountId: string, from?: string, to?: string) {
+  const shop = await getShopOrThrow(userId);
+  const account = await prisma.chartOfAccount.findUnique({ 
+    where: { id: accountId, shop_id: shop.id },
+    include: { group: true }
+  });
+  if (!account) throw new AppError(404, 'NOT_FOUND', 'Account not found');
+
+  const fromDate = from ? new Date(from) : new Date('2000-01-01');
+  const toDate = to ? new Date(to) : new Date();
+
+  // For full compliance, we fetch all relevant entries
+  // In a real system, we'd have a JournalEntries table. 
+  // For now, we simulate from Expense, Income, etc.
+  
+  const [expenses, incomes, supplierPayments, paymentsReceived] = await Promise.all([
+    prisma.expenseEntry.findMany({
+      where: { 
+        shop_id: shop.id, 
+        account_id: accountId,
+        entry_date: { gte: fromDate, lte: toDate }
+      },
+      orderBy: { entry_date: 'asc' }
+    }),
+    prisma.incomeEntry.findMany({
+      where: { 
+        shop_id: shop.id, 
+        // Logic: if this is a sales income, it hits the Sales Account
+        ...(account.name === 'Sales Account' ? { entry_type: 'sale_income' } : { id: 'none' }),
+        entry_date: { gte: fromDate, lte: toDate }
+      }
+    }),
+    // ... we will expand this logic as the COA is deeply integrated
+    [], []
+  ]);
+
+  // Transform into common T-format
+  const entries = [
+    ...expenses.map(e => ({
+      date: e.entry_date,
+      ref: e.reference_no || e.id,
+      description: e.description || 'Expense',
+      type: 'debit',
+      amount: Number(e.amount)
+    }))
+  ];
+
+  return {
+    account,
+    opening_balance: Number(account.opening_balance),
+    entries: entries.sort((a,b) => a.date.getTime() - b.date.getTime())
+  };
 }

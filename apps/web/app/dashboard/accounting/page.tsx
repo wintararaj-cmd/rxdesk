@@ -129,6 +129,25 @@ interface GstSummary {
   rate_wise_summary: { gst_rate: number; taxable_value: number; gst_amount: number }[];
 }
 
+interface AccountGroup {
+  id: string;
+  name: string;
+  type: 'asset' | 'liability' | 'equity' | 'income' | 'expense';
+  parent_id?: string;
+  accounts?: ChartOfAccount[];
+}
+
+interface ChartOfAccount {
+  id: string;
+  group_id: string;
+  name: string;
+  code?: string;
+  description?: string;
+  opening_balance?: number;
+  is_system_locked?: boolean;
+  group?: AccountGroup;
+}
+
 // ── sub-components ────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, icon, trend, color = 'violet', textColor }: { label: string; value: string; sub?: string; icon?: React.ReactNode; trend?: string; color?: string; textColor?: string }) {
   // Backwards compatibility for legacy bg- class usage
@@ -229,7 +248,7 @@ function HsnEntryModal({ medicineName, onSave, onCancel }: { medicineName: strin
 }
 
 // ── panel tabs ────────────────────────────────────────────────────────────────
-const TABS = ['P&L', 'Receipts & Payments', 'Suppliers', 'Purchases', 'Outstandings', 'GST', 'Sale Ret.', 'Pur. Ret.', 'Contra', 'Cashbook', 'Bankbook', 'Settings'] as const;
+const TABS = ['P&L', 'Receipts & Payments', 'Suppliers', 'Purchases', 'Outstandings', 'GST', 'Sale Ret.', 'Pur. Ret.', 'Contra', 'Cashbook', 'Bankbook', 'Ledger', 'COA Setup', 'Settings'] as const;
 type Tab = (typeof TABS)[number];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -452,8 +471,14 @@ function ExpensesTab() {
   const [description, setDescription] = useState('');
   const [payMethod, setPayMethod] = useState('cash');
   const [refNo, setRefNo] = useState('');
+  const [accountId, setAccountId] = useState(''); // New Phase 2 State
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const { data: accounts } = useQuery<ChartOfAccount[]>({
+    queryKey: ['coa-accounts-expense'],
+    queryFn: () => accountingApi.listChartOfAccounts(entryType === 'PAYMENT' ? 'expense' : 'income').then(r => r.data.data)
+  });
   
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('');
@@ -498,6 +523,7 @@ function ExpensesTab() {
       setAmount('');
       setDescription('');
       setRefNo('');
+      setAccountId('');
     },
   });
 
@@ -668,6 +694,18 @@ function ExpensesTab() {
                 }
               </select>
             </div>
+
+            <div className="space-y-1.5">
+              <label className="text-gray-400 text-[10px] font-black uppercase tracking-widest ml-1">Accounting Ledger</label>
+              <select
+                value={accountId}
+                onChange={(e) => setAccountId(e.target.value)}
+                className="w-full bg-gray-50 border border-violet-100 rounded-2xl px-4 py-3.5 text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:bg-white transition-all shadow-inner"
+              >
+                <option value="">— Generic Ledger —</option>
+                {accounts?.map((acc) => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+              </select>
+            </div>
             
             <div className="space-y-1.5">
               <label className="text-gray-400 text-[10px] font-black uppercase tracking-widest ml-1">Amount (₹)</label>
@@ -723,7 +761,7 @@ function ExpensesTab() {
               onClick={() => {
                 const amt = parseFloat(amount);
                 if (!amt) return;
-                createMutation.mutate({ category, amount: amt, description, payment_method: payMethod, reference_no: refNo });
+                createMutation.mutate({ category, account_id: accountId || undefined, amount: amt, description, payment_method: payMethod, reference_no: refNo });
               }}
               disabled={createMutation.isPending}
               className={`flex-1 py-4 rounded-2xl text-sm font-black shadow-xl transition-all active:scale-95 disabled:opacity-50 text-white ${entryType === 'PAYMENT' ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-200' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200'}`}
@@ -1258,6 +1296,7 @@ function PurchasesTab() {
   const [invoiceDate, setInvoiceDate] = useState(TODAY_STR);
   const [receivedDate, setReceivedDate] = useState(TODAY_STR);
   const [notes, setNotes] = useState('');
+  const [isInventory, setIsInventory] = useState(true);
   const [piItems, setPiItems] = useState<PIItem[]>([{ ...EMPTY_PI_ITEM }]);
   const [suggestions, setSuggestions] = useState<Record<number, { id: string; medicine_name: string; mrp: number; gst_rate: number; hsn_code?: string; medicine_id?: string }[]>>({});
   const [suggHighlights, setSuggHighlights] = useState<Record<number, number>>({});
@@ -1313,13 +1352,29 @@ function PurchasesTab() {
     onError: (err: any) => alert(err.response?.data?.error?.message || 'Failed to save purchase'),
   });
 
-  const loadPurchaseForEdit = (p: Purchase) => {
+  const resetForm = () => {
+    setSupplierId('');
+    setInvoiceNumber('');
+    setInvoiceDate(TODAY_STR);
+    setReceivedDate(TODAY_STR);
+    setNotes('');
+    setPiItems([{ ...EMPTY_PI_ITEM }]);
+    setEditingId(null);
+    setTriedToSubmit(false);
+    setFormError(null);
+    setIsInventory(true);
+    setSuggestions({});
+    setSuggHighlights({});
+  };
+
+  const handleEdit = (p: any) => {
     setEditingId(p.id);
     setSupplierId(p.supplier_id || '');
     setInvoiceNumber(p.invoice_number || '');
     setInvoiceDate(p.invoice_date.split('T')[0]);
     setReceivedDate(p.received_date ? p.received_date.split('T')[0] : p.invoice_date.split('T')[0]);
     setNotes(p.notes || '');
+    setIsInventory(p.is_inventory ?? true);
     if (p.items && p.items.length > 0) {
       setPiItems(p.items.map((it: any) => ({
         medicine_id: it.medicine_id || '',
@@ -1345,7 +1400,7 @@ function PurchasesTab() {
   const handleEditClick = async (id: string) => {
     try {
       const res = await accountingApi.getPurchaseById(id);
-      loadPurchaseForEdit(res.data.data);
+      handleEdit(res.data.data);
     } catch {
       alert('Failed to load purchase details');
     }
@@ -1364,11 +1419,6 @@ function PurchasesTab() {
     }
   });
 
-  const resetForm = () => {
-    setSupplierId(''); setInvoiceNumber(''); setInvoiceDate(TODAY_STR);
-    setReceivedDate(TODAY_STR); setNotes(''); setEditingId(null);
-    setPiItems([{ ...EMPTY_PI_ITEM }]); setSuggestions({}); setSuggHighlights({});
-  };
 
   const updatePiItem = (idx: number, field: keyof PIItem, value: string) => {
     setPiItems((prev) => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it));
@@ -1421,8 +1471,8 @@ function PurchasesTab() {
     setSuggestions((p) => ({ ...p, [idx]: [] }));
     setSuggHighlights((p) => ({ ...p, [idx]: -1 }));
     
-    // Trigger HSN modal if hsn is missing
-    if (!inv.hsn_code) {
+    // Trigger HSN modal if hsn is missing AND it's inventory
+    if (!inv.hsn_code && isInventory) {
       setActiveHsnIdx(idx);
     }
 
@@ -1430,7 +1480,11 @@ function PurchasesTab() {
       if (!piItems[idx].unit) {
         piUnitRefs.current[idx]?.focus();
       } else {
-        piBatchRefs.current[idx]?.focus();
+        if (isInventory) {
+          piBatchRefs.current[idx]?.focus();
+        } else {
+          piQtyRefs.current[idx]?.focus();
+        }
       }
     }, 0);
   };
@@ -1485,13 +1539,20 @@ function PurchasesTab() {
     const validItems = piItems.filter((it) => it.medicine_name.trim() !== '' || Number(it.purchase_price) > 0 || Number(it.quantity) > 0);
 
     if (!validItems.length) {
-      setFormError('Please add at least one medicine item');
+      setFormError('Please add at least one item');
       return;
     }
 
-    const hasIncomplete = validItems.some(it => !it.medicine_name.trim() || !it.batch_number.trim() || !it.expiry_date || Number(it.purchase_price) <= 0);
+    const hasIncomplete = validItems.some(it => {
+      const basic = !it.medicine_name.trim() || Number(it.purchase_price) <= 0;
+      if (!isInventory) return basic; // Non-inventory only needs name and cost
+      return basic || !it.batch_number.trim() || !it.expiry_date;
+    });
+
     if (hasIncomplete) {
-      setFormError('Please fill missing Medicine, Batch, Expiry, and Cost for all rows');
+      setFormError(isInventory 
+        ? 'Please fill missing Item name, Batch, Expiry, and Cost for all rows'
+        : 'Please fill missing Item name and Cost for all rows');
       return;
     }
 
@@ -1501,12 +1562,13 @@ function PurchasesTab() {
       invoice_date: invoiceDate,
       received_date: receivedDate || invoiceDate,
       notes: notes || undefined,
+      is_inventory: isInventory,
       items: validItems.map((it) => ({
         medicine_id: it.medicine_id || undefined,
         medicine_name: it.medicine_name.trim(),
-        unit: it.unit || 'strip',
-        batch_number: it.batch_number.trim(),
-        expiry_date: it.expiry_date,
+        unit: it.unit || (isInventory ? 'strip' : 'nos'),
+        batch_number: isInventory ? it.batch_number.trim() : 'N/A',
+        expiry_date: isInventory ? it.expiry_date : invoiceDate,
         quantity: Number(it.quantity),
         free_qty: Number(it.free_qty) || 0,
         purchase_price: Number(it.purchase_price),
@@ -1613,18 +1675,38 @@ function PurchasesTab() {
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piMedRefs.current[0]?.focus(); } }}
                 className="w-full border border-gray-200 rounded-xl px-3 h-10 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400 shadow-sm transition-all" />
             </div>
+            <div>
+              <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider block mb-1.5 ml-1">Purchase Type</label>
+              <div className="flex bg-white rounded-xl border border-gray-200 h-10 p-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setIsInventory(true)}
+                  className={`flex-1 rounded-lg text-[10px] font-black uppercase transition-all ${isInventory ? 'bg-violet-600 text-white shadow-md shadow-violet-200' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                  Medicine
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsInventory(false)}
+                  className={`flex-1 rounded-lg text-[10px] font-black uppercase transition-all ${!isInventory ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                  Other
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Line items */}
           <div>
-            <div className="grid gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-2" style={{ gridTemplateColumns: '2.5fr 1fr 1.5fr 0.8fr 0.8fr 1fr 1fr 0.8fr 1fr 80px 32px 32px' }}>
-              <div>Medicine</div>
+            <div className={`grid gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-2 transition-all duration-500`}
+               style={{ gridTemplateColumns: isInventory ? '2.5fr 1fr 1.5fr 0.8fr 0.8fr 1fr 1fr 0.8fr 1fr 80px 32px 32px' : '3.5fr 1fr 0.8fr 1fr 0.8fr 1fr 80px 32px 32px' }}>
+              <div>{isInventory ? 'Medicine' : 'Description / Item'}</div>
               <div>Unit</div>
-              <div>Batch / Expiry</div>
+              {isInventory && <div>Batch / Expiry</div>}
               <div className="text-center">Qty</div>
-              <div className="text-center">Free</div>
+              {isInventory && <div className="text-center">Free</div>}
               <div>Cost (₹)</div>
-              <div>MRP (₹)</div>
+              {isInventory && <div>MRP (₹)</div>}
               <div className="text-center">Disc%</div>
               <div className="text-center">GST%</div>
               <div className="text-right">Line Total</div>
@@ -1634,15 +1716,16 @@ function PurchasesTab() {
             <div className="space-y-2">
               {piItems.map((item, idx) => (
                 <div key={idx} className="relative">
-                  <div className="grid gap-2 items-start" style={{ gridTemplateColumns: '2.5fr 1fr 1.5fr 0.8fr 0.8fr 1fr 1fr 0.8fr 1fr 80px 32px 32px' }}>
+                  <div className={`grid gap-2 items-start transition-all duration-500`} 
+                       style={{ gridTemplateColumns: isInventory ? '2.5fr 1fr 1.5fr 0.8fr 0.8fr 1fr 1fr 0.8fr 1fr 80px 32px 32px' : '3.5fr 1fr 0.8fr 1fr 0.8fr 1fr 80px 32px 32px' }}>
                     {/* Medicine Name with autocomplete */}
                     <div className="relative">
-                      <input type="text" placeholder="Search medicine..." value={item.medicine_name}
+                      <input type="text" placeholder={isInventory ? "Search medicine..." : "Description..."} value={item.medicine_name}
                         ref={(el) => { piMedRefs.current[idx] = el; }}
                         onChange={(e) => updatePiItem(idx, 'medicine_name', e.target.value)}
                         onBlur={() => {
                           setTimeout(() => {
-                            if (item.medicine_name.trim() && !item.medicine_id && !(suggestions[idx]?.length > 0)) {
+                            if (isInventory && item.medicine_name.trim() && !item.medicine_id && !(suggestions[idx]?.length > 0)) {
                               setActiveHsnIdx(idx);
                             }
                             setSuggestions((p) => ({ ...p, [idx]: [] }));
@@ -1658,7 +1741,7 @@ function PurchasesTab() {
                             e.preventDefault(); 
                             setSuggestions((p) => ({ ...p, [idx]: [] })); 
                             // If user typed a completely new name (not in suggestions)
-                            if (item.medicine_name.trim() && !item.medicine_id) {
+                            if (isInventory && item.medicine_name.trim() && !item.medicine_id) {
                               setActiveHsnIdx(idx);
                             }
                             piUnitRefs.current[idx]?.focus(); 
@@ -1676,7 +1759,7 @@ function PurchasesTab() {
                         }}
                         className={`w-full border rounded-xl px-3 h-10 text-sm text-gray-900 outline-none transition-all placeholder:text-gray-300 font-medium ${triedToSubmit && !item.medicine_name.trim() ? 'border-red-500 bg-red-50 focus:ring-red-100' : 'border-gray-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-100'}`}
                       />
-                      {suggestions[idx]?.length > 0 && (
+                      {isInventory && suggestions[idx]?.length > 0 && (
                         <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto ring-1 ring-black/5 animate-in fade-in slide-in-from-top-1">
                           {suggestions[idx].map((s, si) => (
                             <button key={s.id} type="button" onMouseDown={() => selectSuggestion(s, idx)}
@@ -1690,42 +1773,72 @@ function PurchasesTab() {
                     </div>
                     {/* Unit */}
                     <div>
-                      <select ref={(el) => { piUnitRefs.current[idx] = el; }} value={item.unit} onChange={(e) => updatePiItem(idx, 'unit', e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piBatchRefs.current[idx]?.focus(); } }}
+                      <select ref={(el) => { piUnitRefs.current[idx] = el; }} value={item.unit || (isInventory ? 'strip' : 'nos')} onChange={(e) => updatePiItem(idx, 'unit', e.target.value)}
+                        onKeyDown={(e) => { 
+                          if (e.key === 'Enter') { 
+                            e.preventDefault(); 
+                            if (isInventory) piBatchRefs.current[idx]?.focus();
+                            else piQtyRefs.current[idx]?.focus();
+                          } 
+                        }}
                         className="w-full border border-gray-200 rounded-xl px-2 h-10 text-xs text-gray-900 outline-none focus:border-violet-500 bg-white cursor-pointer uppercase font-bold shadow-sm">
-                        {Array.from(new Set([...PI_UNITS, item.unit].filter(Boolean))).map((u) => <option key={u} value={u}>{u}</option>)}
+                        {Array.from(new Set([...(isInventory ? PI_UNITS : ['nos', 'pcs', 'hour', 'month']), item.unit].filter(Boolean))).map((u) => <option key={u} value={u}>{u}</option>)}
                       </select>
                     </div>
-                    {/* Batch + Expiry stacked */}
-                    <div className="flex flex-col gap-1.5">
-                      <input ref={(el) => { piBatchRefs.current[idx] = el; }} type="text" placeholder="Batch" value={item.batch_number}
-                        onChange={(e) => updatePiItem(idx, 'batch_number', e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piExpiryRefs.current[idx]?.focus(); } }}
-                        className={`w-full border rounded-xl px-3 h-10 text-xs text-gray-900 outline-none transition-all font-mono placeholder:text-gray-300 ${triedToSubmit && !item.batch_number.trim() ? 'border-red-500 bg-red-50 focus:border-red-400' : 'border-gray-200 focus:border-violet-500'}`}
-                      />
-                      <input ref={(el) => { piExpiryRefs.current[idx] = el; }} type="date" value={item.expiry_date}
-                        onChange={(e) => updatePiItem(idx, 'expiry_date', e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piQtyRefs.current[idx]?.focus(); } }}
-                        className={`w-full border rounded-xl px-2 h-10 text-xs text-gray-900 outline-none transition-all ${triedToSubmit && !item.expiry_date ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-violet-500'}`}
-                      />
-                    </div>
+                    {/* Batch + Expiry stacked - Only for Inventory */}
+                    {isInventory && (
+                      <div className="flex flex-col gap-1.5">
+                        <input ref={(el) => { piBatchRefs.current[idx] = el; }} type="text" placeholder="Batch" value={item.batch_number}
+                          onChange={(e) => updatePiItem(idx, 'batch_number', e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piExpiryRefs.current[idx]?.focus(); } }}
+                          className={`w-full border rounded-xl px-3 h-10 text-xs text-gray-900 outline-none transition-all font-mono placeholder:text-gray-300 ${triedToSubmit && isInventory && !item.batch_number.trim() ? 'border-red-500 bg-red-50 focus:border-red-400' : 'border-gray-200 focus:border-violet-500'}`}
+                        />
+                        <input ref={(el) => { piExpiryRefs.current[idx] = el; }} type="date" value={item.expiry_date}
+                          onChange={(e) => updatePiItem(idx, 'expiry_date', e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piQtyRefs.current[idx]?.focus(); } }}
+                          className={`w-full border rounded-xl px-2 h-10 text-xs text-gray-900 outline-none transition-all ${triedToSubmit && isInventory && !item.expiry_date ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-violet-500'}`}
+                        />
+                      </div>
+                    )}
                     <div>
                       <input ref={(el) => { piQtyRefs.current[idx] = el; }} type="number" min="1" value={item.quantity} onChange={(e) => updatePiItem(idx, 'quantity', e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piFreeQtyRefs.current[idx]?.focus(); } }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if(isInventory) piFreeQtyRefs.current[idx]?.focus(); else piCostRefs.current[idx]?.focus(); } }}
                         className="w-full border border-gray-200 rounded-xl px-1 h-10 text-sm font-bold text-gray-900 outline-none focus:border-violet-500 text-center shadow-sm" />
                     </div>
-                    <div>
-                      <input ref={(el) => { piFreeQtyRefs.current[idx] = el; }} type="number" min="0" placeholder="0" value={item.free_qty} onChange={(e) => updatePiItem(idx, 'free_qty', e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piCostRefs.current[idx]?.focus(); } }}
-                        className="w-full border border-gray-200 rounded-xl px-1 h-10 text-sm italic text-gray-500 outline-none focus:border-violet-500 text-center shadow-sm" />
-                    </div>
+                    {isInventory && (
+                      <div>
+                        <input ref={(el) => { piFreeQtyRefs.current[idx] = el; }} type="number" min="0" placeholder="0" value={item.free_qty} onChange={(e) => updatePiItem(idx, 'free_qty', e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piCostRefs.current[idx]?.focus(); } }}
+                          className="w-full border border-gray-200 rounded-xl px-1 h-10 text-sm italic text-gray-500 outline-none focus:border-violet-500 text-center shadow-sm" />
+                      </div>
+                    )}
                     <div>
                       <input ref={(el) => { piCostRefs.current[idx] = el; }} type="number" min="0" step="0.01" placeholder="0.00" value={item.purchase_price} onChange={(e) => updatePiItem(idx, 'purchase_price', e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piMrpRefs.current[idx]?.focus(); } }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if(isInventory) piMrpRefs.current[idx]?.focus(); else piDiscRefs.current[idx]?.focus(); } }}
                         className={`w-full border rounded-xl px-2 h-10 text-sm font-bold outline-none transition-all ${triedToSubmit && Number(item.purchase_price) <= 0 ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-indigo-600 focus:border-indigo-500'}`} />
                     </div>
+                    {isInventory && (
+                      <div>
+                        <input ref={(el) => { piMrpRefs.current[idx] = el; }} type="number" min="0" step="0.01" placeholder="0.00" value={item.mrp} onChange={(e) => updatePiItem(idx, 'mrp', e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              piDiscRefs.current[idx]?.focus();
+                            }
+                          }}
+                          className="w-full border border-gray-200 rounded-xl px-2 h-10 text-sm font-black text-violet-700 outline-none focus:border-violet-500 shadow-sm" />
+                      </div>
+                    )}
                     <div>
-                      <input ref={(el) => { piMrpRefs.current[idx] = el; }} type="number" min="0" step="0.01" placeholder="0.00" value={item.mrp} onChange={(e) => updatePiItem(idx, 'mrp', e.target.value)}
+                      <input ref={(el) => { piDiscRefs.current[idx] = el; }} type="number" min="0" max="100" placeholder="0" value={item.discount_pct} onChange={(e) => updatePiItem(idx, 'discount_pct', e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piGstRefs.current[idx]?.focus(); } }}
+                        className="w-full border border-gray-200 rounded-xl px-1 h-10 text-sm text-center text-emerald-600 font-bold outline-none focus:border-emerald-500 shadow-sm" />
+                    </div>
+                    <div>
+                      <select 
+                        ref={(el) => { piGstRefs.current[idx] = el; }} 
+                        value={isUnregistered ? '0' : item.gst_rate} 
+                        onChange={(e) => updatePiItem(idx, 'gst_rate', e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
@@ -1737,18 +1850,6 @@ function PurchasesTab() {
                             }
                           }
                         }}
-                        className="w-full border border-gray-200 rounded-xl px-2 h-10 text-sm font-black text-violet-700 outline-none focus:border-violet-500 shadow-sm" />
-                    </div>
-                    <div>
-                      <input ref={(el) => { piDiscRefs.current[idx] = el; }} type="number" min="0" max="100" placeholder="0" value={item.discount_pct} onChange={(e) => updatePiItem(idx, 'discount_pct', e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); piGstRefs.current[idx]?.focus(); } }}
-                        className="w-full border border-gray-200 rounded-xl px-1 h-10 text-sm text-center text-emerald-600 font-bold outline-none focus:border-emerald-500 shadow-sm" />
-                    </div>
-                    <div>
-                      <select 
-                        ref={(el) => { piGstRefs.current[idx] = el; }} 
-                        value={isUnregistered ? '0' : item.gst_rate} 
-                        onChange={(e) => updatePiItem(idx, 'gst_rate', e.target.value)}
                         disabled={isUnregistered}
                         className={`w-full border border-gray-200 rounded-xl px-1 h-10 text-xs text-gray-900 outline-none focus:border-violet-500 font-semibold shadow-sm ${isUnregistered ? 'bg-gray-100 text-gray-400 opacity-75' : 'bg-white'}`}>
                         {isUnregistered ? <option value="0">0%</option> : GST_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
@@ -1759,7 +1860,7 @@ function PurchasesTab() {
                     </div>
                     <div className="pt-2">
                       <button onClick={() => clonePiItem(idx)} title="Add Multiple Batches"
-                        className="w-8 h-8 rounded-full text-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition-all">
+                        className={`w-8 h-8 rounded-full text-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition-all ${!isInventory && 'invisible'}`}>
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                       </button>
                     </div>
@@ -1854,7 +1955,12 @@ function PurchasesTab() {
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
                       <span className="font-bold text-gray-900">{p.supplier?.name ?? '—'}</span>
-                      <span className="text-[10px] text-gray-400 uppercase tracking-tight">{p.supplier ? 'Supplier' : 'Ad-hoc'}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-gray-400 uppercase tracking-tight">{p.supplier ? 'Supplier' : 'Ad-hoc'}</span>
+                        {!p.is_inventory && (
+                          <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase rounded tracking-tighter ring-1 ring-indigo-100">Other</span>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -4669,6 +4775,288 @@ pause
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  Chart of Accounts Tab (COA Setup)
+// ─────────────────────────────────────────────────────────────────────────────
+function ChartOfAccountsTab() {
+  const qc = useQueryClient();
+  const [showAdd, setShowAdd] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState('');
+  const [accountName, setAccountName] = useState('');
+  const [opBal, setOpBal] = useState('0');
+
+  const { data: groups, isLoading } = useQuery<AccountGroup[]>({
+    queryKey: ['coa-groups'],
+    queryFn: () => accountingApi.listAccountGroups().then(r => r.data.data)
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (d: any) => accountingApi.createChartOfAccount(d),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['coa-groups'] });
+      setShowAdd(false);
+      setAccountName('');
+      setOpBal('0');
+    }
+  });
+
+  const initMutation = useMutation({
+    mutationFn: () => accountingApi.initializeCOA(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['coa-groups'] })
+  });
+
+  if (isLoading) return <div className="p-20 text-center animate-pulse">Loading Ledger System...</div>;
+
+  const hasGroups = groups && groups.length > 0;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4 bg-white/70 backdrop-blur-xl p-4 rounded-3xl border border-gray-100 shadow-sm">
+        <div>
+          <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Chart of Accounts</h3>
+          <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">Organize your Business Ledgers</p>
+        </div>
+        <div className="flex gap-2">
+          {!hasGroups && (
+            <button 
+              onClick={() => initMutation.mutate()}
+              className="bg-violet-600 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-violet-200 hover:scale-105 active:scale-95 transition-all"
+            >
+              Initialize Default Accounts
+            </button>
+          )}
+          <button 
+            onClick={() => setShowAdd(!showAdd)}
+            className="bg-gray-900 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-gray-200 hover:scale-105 active:scale-95 transition-all"
+          >
+            {showAdd ? 'Close' : 'Add Ledger Head'}
+          </button>
+        </div>
+      </div>
+
+      {showAdd && (
+        <div className="bg-white p-8 rounded-[32px] shadow-2xl border border-violet-50 animate-in slide-in-from-top-4 duration-300">
+          <h4 className="text-xs font-black uppercase text-violet-600 tracking-widest mb-6">Create New Account Ledger</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Account Group</label>
+              <select 
+                value={selectedGroup} 
+                onChange={e => setSelectedGroup(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold text-gray-700"
+              >
+                <option value="">Select Group...</option>
+                {groups?.map(g => <option key={g.id} value={g.id}>{g.name} ({g.type.toUpperCase()})</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Ledger Name</label>
+              <input 
+                type="text" 
+                value={accountName} 
+                onChange={e => setAccountName(e.target.value)}
+                placeholder="e.g. HDFC Bank Account"
+                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold text-gray-900"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Opening Balance (₹)</label>
+              <input 
+                type="number" 
+                value={opBal} 
+                onChange={e => setOpBal(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold text-gray-900"
+              />
+            </div>
+          </div>
+          <div className="mt-8 flex justify-end gap-3">
+            <button onClick={() => setShowAdd(false)} className="px-6 py-2 text-sm font-bold text-gray-400 hover:text-gray-600">Cancel</button>
+            <button 
+              onClick={() => {
+                if(!selectedGroup || !accountName) return;
+                createMutation.mutate({ group_id: selectedGroup, name: accountName, opening_balance: parseFloat(opBal) });
+              }}
+              disabled={createMutation.isPending}
+              className="bg-violet-600 text-white px-10 py-3 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-violet-200 active:scale-95 transition-all"
+            >
+              {createMutation.isPending ? 'Saving...' : 'Authorize Ledger'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pb-20">
+        {groups?.map(group => (
+          <div key={group.id} className="bg-white rounded-[32px] p-8 shadow-sm border border-gray-50 hover:border-violet-100 transition-all group overflow-hidden relative">
+            <div className={`absolute top-0 right-0 w-1 px-1 h-full ${
+              group.type === 'income' ? 'bg-emerald-400' :
+              group.type === 'expense' ? 'bg-rose-400' :
+              group.type === 'asset' ? 'bg-blue-400' :
+              'bg-amber-400'
+            }`} />
+            
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h4 className="text-xs font-black text-gray-900 uppercase tracking-widest">{group.name}</h4>
+                <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">{group.type}</p>
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-gray-50 text-gray-400 flex items-center justify-center font-black text-xs">
+                {group.accounts?.length ?? 0}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {group.accounts?.length ? group.accounts.map(acc => (
+                <div key={acc.id} className="flex justify-between items-center p-4 bg-gray-50/50 rounded-2xl border border-transparent hover:border-gray-200 hover:bg-white transition-all">
+                  <div>
+                    <p className="text-xs font-black text-gray-800">{acc.name}</p>
+                    {acc.code && <p className="text-[10px] text-gray-400 font-mono">Code: {acc.code}</p>}
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-[10px] font-black text-gray-900">{acc.opening_balance ? fmt(Number(acc.opening_balance)) : '₹0'}</span>
+                    {acc.is_system_locked && (
+                      <svg className="w-3.5 h-3.5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
+                    )}
+                  </div>
+                </div>
+              )) : (
+                <p className="text-[10px] text-gray-400 font-bold uppercase text-center py-4 italic">No active ledgers in this group</p>
+              )}
+            </div>
+          </div>
+        ))}
+        {(!groups || groups.length === 0) && (
+          <div className="col-span-full py-40 flex flex-col items-center justify-center text-center bg-white/40 rounded-[3rem] border-2 border-dashed border-indigo-100">
+             <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-500 mb-6 scale-110">
+                <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75z" /></svg>
+             </div>
+             <h4 className="text-sm font-black text-gray-900 uppercase tracking-[0.2em] mb-2">Ledger System Not Initialized</h4>
+             <p className="text-[10px] font-bold text-gray-400 uppercase max-w-xs leading-relaxed">Click the "Initialize" button above to generate standard accounting groups for your shop.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  General Ledger Tab
+// ─────────────────────────────────────────────────────────────────────────────
+function GeneralLedgerTab() {
+  const [selectedAcc, setSelectedAcc] = useState('');
+  const [from, setFrom] = useState(FIRST_OF_MONTH);
+  const [to, setTo] = useState(TODAY_STR);
+
+  const { data: accounts } = useQuery<ChartOfAccount[]>({
+    queryKey: ['coa-accounts-all'],
+    queryFn: () => accountingApi.listChartOfAccounts().then(r => r.data.data)
+  });
+
+  const { data: statement, isLoading } = useQuery({
+    queryKey: ['gl-statement', selectedAcc, from, to],
+    queryFn: () => selectedAcc ? accountingApi.getGLStatement(selectedAcc, from, to).then(r => r.data.data) : null,
+    enabled: !!selectedAcc
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Header Filters */}
+      <div className="bg-white/70 backdrop-blur-xl p-4 rounded-3xl border border-gray-100 shadow-sm flex flex-col md:flex-row items-center gap-4">
+        <div className="flex-1 w-full relative">
+           <select 
+            value={selectedAcc} 
+            onChange={e => setSelectedAcc(e.target.value)}
+            className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-3 text-sm font-black text-gray-900 focus:ring-2 focus:ring-violet-500/20"
+           >
+             <option value="">Select Ledger Account...</option>
+             {accounts?.map(acc => <option key={acc.id} value={acc.id}>{acc.name} ({acc.group?.name})</option>)}
+           </select>
+           <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-violet-500">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+           </div>
+        </div>
+
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-tight" />
+          <span className="text-gray-300 font-bold">—</span>
+          <input type="date" value={to} onChange={e => setTo(e.target.value)} className="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-tight" />
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="py-20 text-center animate-pulse text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Preparing Statement...</div>
+      ) : statement ? (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+             <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Opening Balance</p>
+                <h4 className="text-2xl font-black text-gray-900 tracking-tight">{fmt(statement.opening_balance)}</h4>
+             </div>
+             <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Current Period Movement</p>
+                <h4 className={`text-2xl font-black tracking-tight ${statement.entries.reduce((s:any, e:any) => s + (e.type === 'debit' ? -e.amount : e.amount), 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {fmt(statement.entries.reduce((s:any, e:any) => s + (e.type === 'debit' ? -e.amount : e.amount), 0))}
+                </h4>
+             </div>
+             <div className="bg-indigo-600 p-6 rounded-[32px] shadow-lg shadow-indigo-100 text-white">
+                <p className="text-[10px] font-black opacity-60 uppercase tracking-widest mb-1">Total Closing Balance</p>
+                <h4 className="text-3xl font-black tracking-tight">
+                  {fmt(statement.opening_balance + statement.entries.reduce((s:any, e:any) => s + (e.type === 'debit' ? -e.amount : e.amount), 0))}
+                </h4>
+             </div>
+          </div>
+
+          <div className="bg-white rounded-[40px] shadow-sm border border-gray-50 overflow-hidden mb-20">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-[10px] font-black uppercase text-gray-400 tracking-widest border-b border-gray-100">
+                  <th className="text-left px-8 py-5 w-32">Date</th>
+                  <th className="text-left px-5 py-5">Particulars / Ref</th>
+                  <th className="text-right px-5 py-5">Debit</th>
+                  <th className="text-right px-5 py-5">Credit</th>
+                  <th className="text-right px-8 py-5">Balance</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                <tr className="bg-gray-50/50 italic opacity-60">
+                   <td className="px-8 py-4 font-black text-[10px]">{new Date(from).toLocaleDateString()}</td>
+                   <td className="px-5 py-4 font-bold text-xs uppercase tracking-widest">Balance Brought Forward</td>
+                   <td className="px-5 py-4" />
+                   <td className="px-5 py-4" />
+                   <td className="px-8 py-4 text-right font-black">{fmt(statement.opening_balance)}</td>
+                </tr>
+                {(() => {
+                  let running = statement.opening_balance;
+                  return statement.entries.map((entry: any, i: number) => {
+                    running += (entry.type === 'debit' ? -entry.amount : entry.amount);
+                    return (
+                      <tr key={i} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-8 py-5 font-black text-gray-900">{new Date(entry.date).toLocaleDateString()}</td>
+                        <td className="px-5 py-5 group">
+                           <p className="text-gray-800 font-bold text-sm tracking-tight">{entry.description}</p>
+                           <p className="text-[9px] text-gray-400 font-mono tracking-tighter uppercase">ID: {entry.ref.slice(0, 13)}...</p>
+                        </td>
+                        <td className="px-5 py-5 text-right font-black text-rose-500">{entry.type === 'debit' ? fmt(entry.amount) : ''}</td>
+                        <td className="px-5 py-5 text-right font-black text-emerald-500">{entry.type === 'credit' ? fmt(entry.amount) : ''}</td>
+                        <td className="px-8 py-5 text-right font-black text-gray-900">{fmt(running)}</td>
+                      </tr>
+                    );
+                  });
+                })()}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="py-40 text-center flex flex-col items-center gap-4 opacity-30 grayscale pointer-events-none">
+           <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}><path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75z" /></svg>
+           <p className="text-sm font-black uppercase tracking-[0.2em]">Select an account to view its ledger statement</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  Main page
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AccountingPage() {
@@ -4744,6 +5132,8 @@ export default function AccountingPage() {
         {activeTab === 'Contra' && <ContraTab />}
         {activeTab === 'Cashbook' && <CashbookTab />}
         {activeTab === 'Bankbook' && <BankbookTab />}
+        {activeTab === 'Ledger' && <GeneralLedgerTab />}
+        {activeTab === 'COA Setup' && <ChartOfAccountsTab />}
         {activeTab === 'Settings' && <SettingsTab />}
       </div>
 
