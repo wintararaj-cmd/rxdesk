@@ -3642,7 +3642,7 @@ export async function getGeneralLedgerStatement(userId: string, accountId: strin
   // In a real system, we'd have a JournalEntries table. 
   // For now, we simulate from Expense, Income, etc.
   
-  const [expenses, incomes, supplierPayments, paymentsReceived] = await Promise.all([
+  const [expenses, incomes, journalItems] = await Promise.all([
     prisma.expenseEntry.findMany({
       where: { 
         shop_id: shop.id, 
@@ -3654,23 +3654,44 @@ export async function getGeneralLedgerStatement(userId: string, accountId: strin
     prisma.incomeEntry.findMany({
       where: { 
         shop_id: shop.id, 
-        // Logic: if this is a sales income, it hits the Sales Account
         ...(account.name === 'Sales Account' ? { entry_type: 'sale_income' } : { id: 'none' }),
         entry_date: { gte: fromDate, lte: toDate }
       }
     }),
-    // ... we will expand this logic as the COA is deeply integrated
-    [], []
+    prisma.journalItem.findMany({
+      where: {
+        account_id: accountId,
+        journal: {
+          shop_id: shop.id,
+          entry_date: { gte: fromDate, lte: toDate }
+        }
+      },
+      include: { journal: true }
+    })
   ]);
 
   // Transform into common T-format
-  const entries = [
+  const entries: any[] = [
     ...expenses.map(e => ({
       date: e.entry_date,
-      ref: e.reference_no || e.id,
-      description: e.description || 'Expense',
+      ref: e.reference_no || `EXP-${e.id.slice(-4)}`,
+      description: e.description || 'Voucher (Payment)',
       type: 'debit',
       amount: Number(e.amount)
+    })),
+    ...incomes.map(i => ({
+      date: i.entry_date,
+      ref: i.reference_no || `INC-${i.id.slice(-4)}`,
+      description: i.notes || 'Voucher (Receipt)',
+      type: 'credit',
+      amount: Number(i.amount)
+    })),
+    ...journalItems.map(j => ({
+      date: j.journal.entry_date,
+      ref: j.journal.reference_no || `JV-${j.journal.id.slice(-4)}`,
+      description: j.journal.description || 'Journal Entry',
+      type: j.type,
+      amount: Number(j.amount)
     }))
   ];
 
@@ -3679,4 +3700,146 @@ export async function getGeneralLedgerStatement(userId: string, accountId: strin
     opening_balance: Number(account.opening_balance),
     entries: entries.sort((a,b) => a.date.getTime() - b.date.getTime())
   };
+}
+
+/**
+ * Journal Vouchers
+ */
+export async function createJournalEntry(userId: string, input: {
+  date: string;
+  description: string;
+  reference_no?: string;
+  items: { account_id: string; type: 'debit'|'credit'; amount: number }[]
+}) {
+  const shop = await getShopOrThrow(userId);
+  const totalDebit = input.items.filter(x => x.type === 'debit').reduce((s, x) => s + x.amount, 0);
+  const totalCredit = input.items.filter(x => x.type === 'credit').reduce((s, x) => s + x.amount, 0);
+  
+  if (Math.abs(totalDebit - totalCredit) > 0.1) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'Debits must equal Credits');
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const entry = await tx.journalEntry.create({
+      data: {
+        shop_id: shop.id,
+        entry_date: new Date(input.date),
+        description: input.description,
+        reference_no: input.reference_no,
+      }
+    });
+
+    for (const item of input.items) {
+      await tx.journalItem.create({
+        data: {
+          journal_id: entry.id,
+          account_id: item.account_id,
+          type: item.type as any,
+          amount: item.amount
+        }
+      });
+    }
+    return entry;
+  });
+}
+
+export async function listJournalEntries(userId: string, from?: string, to?: string) {
+  const shop = await getShopOrThrow(userId);
+  return prisma.journalEntry.findMany({
+    where: {
+      shop_id: shop.id,
+      ...(from && to ? { entry_date: { gte: new Date(from), lte: new Date(to) } } : {})
+    },
+    include: { items: { include: { account: true } } },
+    orderBy: { entry_date: 'desc' }
+  });
+}
+
+/**
+ * Financial Reports: Balance Sheet
+ */
+export async function getBalanceSheet(userId: string, date: string) {
+  const shop = await getShopOrThrow(userId);
+  const asOfDate = new Date(date);
+
+  // We fetch groups of type asset, liability, equity
+  const groups = await prisma.accountGroup.findMany({
+    where: {
+      OR: [{ shop_id: shop.id }, { shop_id: null }],
+      type: { in: ['asset', 'liability', 'equity'] }
+    },
+    include: {
+      accounts: {
+        where: { shop_id: shop.id },
+      }
+    }
+  });
+
+  // For each account, compute current balance
+  // This is a simplified version (OpenBal + Sum of Debits - Sum of Credits)
+  const report = await Promise.all(groups.map(async (group) => {
+    const accountsWithBalance = await Promise.all(group.accounts.map(async (acc) => {
+      // Get all movements up to this date
+      const [exP, inR, jvMs] = await Promise.all([
+        prisma.expenseEntry.aggregate({
+          where: { account_id: acc.id, entry_date: { lte: asOfDate } },
+          _sum: { amount: true }
+        }),
+        prisma.incomeEntry.findMany({
+          // Special logic for income affecting balance sheet accounts (rare but possible via Sales Account)
+          where: { entry_type: 'sale_income', entry_date: { lte: asOfDate } },
+          select: { amount: true }
+        }),
+        prisma.journalItem.aggregate({
+          where: { account_id: acc.id, journal: { entry_date: { lte: asOfDate } } },
+          _sum: { amount: true }
+        })
+      ]);
+
+      // Calculate Sum Debits and Credits for this specific account
+      // In professional accounting, we'd have a true Journal table. 
+      // Here we map our entities to the COA.
+      let debits = Number(exP._sum.amount || 0);
+      let credits = 0;
+      
+      // Journal impacts
+      const jvDebits = await prisma.journalItem.aggregate({
+        where: { account_id: acc.id, type: 'debit', journal: { entry_date: { lte: asOfDate } } },
+        _sum: { amount: true }
+      });
+      const jvCredits = await prisma.journalItem.aggregate({
+        where: { account_id: acc.id, type: 'credit', journal: { entry_date: { lte: asOfDate } } },
+        _sum: { amount: true }
+      });
+
+      debits += Number(jvDebits._sum.amount || 0);
+      credits += Number(jvCredits._sum.amount || 0);
+      
+      // If Sales account (Income), it's typically credit-heavy
+      if (acc.name === 'Sales Account') {
+         const saleSum = await prisma.bill.aggregate({
+           where: { shop_id: shop.id, created_at: { lte: asOfDate } },
+           _sum: { total_amount: true }
+         });
+         credits += Number(saleSum._sum.total_amount || 0);
+      }
+
+      const balance = Number(acc.opening_balance) + debits - credits;
+
+      return {
+        ...acc,
+        debits,
+        credits,
+        balance
+      };
+    }));
+
+    return {
+      ...group,
+      accounts: accountsWithBalance,
+      total: accountsWithBalance.reduce((sum, a) => sum + a.balance, 0)
+    };
+  }));
+
+  return report;
 }

@@ -651,4 +651,31 @@ router.get('/reports/gl-statement', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ─── Journal Entries (Phase 3) ─────────────────────────────────────────────
+
+router.get('/journal-entries', shopAuth, async (req, res, next) => {
+  try {
+    const { from, to } = req.query as { from: string; to: string };
+    const data = await service.listJournalEntries(req.user!.id, from, to);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/journal-entries', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.createJournalEntry(req.user!.id, req.body);
+    res.status(201).json({ success: true, data, message: 'Journal entry recorded' });
+  } catch (err) { next(err); }
+});
+
+// ─── Financial Reports: Balance Sheet (Phase 3) ──────────────────────────────
+
+router.get('/reports/balance-sheet', shopAuth, async (req, res, next) => {
+  try {
+    const { date } = req.query as { date: string };
+    const data = await service.getBalanceSheet(req.user!.id, date || new Date().toISOString().split('T')[0]);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 export default router;

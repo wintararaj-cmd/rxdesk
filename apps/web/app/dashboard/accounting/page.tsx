@@ -249,7 +249,7 @@ function HsnEntryModal({ medicineName, onSave, onCancel }: { medicineName: strin
 }
 
 // ── panel tabs ────────────────────────────────────────────────────────────────
-const TABS = ['P&L', 'Receipts & Payments', 'Suppliers', 'Purchases', 'Outstandings', 'GST', 'Sale Ret.', 'Pur. Ret.', 'Contra', 'Cashbook', 'Bankbook', 'Ledger', 'COA Setup', 'Settings'] as const;
+const TABS = ['P&L', 'Balance Sheet', 'Receipts & Payments', 'Suppliers', 'Purchases', 'Outstandings', 'GST', 'Sale Ret.', 'Pur. Ret.', 'Contra', 'Journal', 'Cashbook', 'Bankbook', 'Ledger', 'COA Setup', 'Settings'] as const;
 type Tab = (typeof TABS)[number];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -455,6 +455,592 @@ function PLTab() {
           )}
         </>
       ) : null}
+    </div>
+  );
+}
+
+// ── Phase 3: Financial Components ──────────────────────────────────────────
+function BalanceSheetTab() {
+  const [asOfDate, setAsOfDate] = useState(TODAY_STR);
+  const { data: report, isLoading } = useQuery<any[]>({
+    queryKey: ['balance-sheet', asOfDate],
+    queryFn: () => accountingApi.getBalanceSheet(asOfDate).then(r => r.data.data)
+  });
+
+  const totalAssets = report?.filter(g => g.type === 'asset').reduce((s, g) => s + g.total, 0) || 0;
+  const totalLiabsEquity = report?.filter(g => g.type !== 'asset').reduce((s, g) => s + g.total, 0) || 0;
+
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="bg-white rounded-[40px] p-10 border border-gray-100 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-violet-50/30 rounded-full blur-3xl -mr-32 -mt-32" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+          <div>
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight uppercase">Statement of Financial Position</h2>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Balance Sheet as on {asOfDate}</p>
+          </div>
+          <div className="flex items-center gap-4 bg-gray-50 p-2 rounded-2xl border border-gray-200/50">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-3">As of</span>
+            <input 
+              type="date" 
+              value={asOfDate} 
+              onChange={e => setAsOfDate(e.target.value)}
+              className="bg-white px-4 py-2 rounded-xl text-xs font-black text-gray-900 border-none shadow-sm focus:ring-2 focus:ring-violet-500" 
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full items-start">
+        {/* Assets Side */}
+        <div className="space-y-6">
+          <div className="flex items-center justify-between px-6">
+            <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Assets</h3>
+            <span className="text-xl font-black text-blue-600">{fmt(totalAssets)}</span>
+          </div>
+          <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm space-y-6">
+            {report?.filter(g => g.type === 'asset').map(group => (
+              <div key={group.id} className="space-y-3">
+                <div className="flex justify-between items-center pb-2 border-b border-gray-50">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{group.name}</span>
+                  <span className="text-xs font-black text-gray-900">{fmt(group.total)}</span>
+                </div>
+                <div className="space-y-2 pl-4">
+                  {group.accounts.map((acc: any) => (
+                    <div key={acc.id} className="flex justify-between text-[11px] font-bold text-gray-600">
+                      <span>{acc.name}</span>
+                      <span className="font-medium">{fmt(acc.balance)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Liabilities & Equity Side */}
+        <div className="space-y-6 h-full">
+          <div className="flex items-center justify-between px-6">
+            <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Liabilities & Equity</h3>
+            <span className="text-xl font-black text-rose-600">{fmt(Math.abs(totalLiabsEquity))}</span>
+          </div>
+          <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm space-y-6 h-full">
+             {report?.filter(g => g.type !== 'asset').map(group => (
+                <div key={group.id} className="space-y-3">
+                  <div className="flex justify-between items-center pb-2 border-b border-gray-50">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{group.name}</span>
+                    <span className="text-xs font-black text-gray-900">{fmt(Math.abs(group.total))}</span>
+                  </div>
+                  <div className="space-y-2 pl-4">
+                    {group.accounts.map((acc: any) => (
+                      <div key={acc.id} className="flex justify-between text-[11px] font-bold text-gray-600">
+                        <span>{acc.name}</span>
+                        <span className="font-medium">{fmt(Math.abs(acc.balance))}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+             ))}
+             {/* Balancing Check */}
+             <div className="mt-12 pt-8 border-t-2 border-dashed border-gray-100 flex justify-between items-center">
+                <span className="text-[10px] font-black text-gray-300 uppercase italic">Financial Balance Status</span>
+                <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase ${Math.abs(totalAssets + totalLiabsEquity) < 1 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600 animate-pulse'}`}>
+                    {Math.abs(totalAssets + totalLiabsEquity) < 1 ? 'Balanced' : 'Imbalance Detected'}
+                </span>
+             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function JournalTab() {
+  const qc = useQueryClient();
+  const [showAdd, setShowAdd] = useState(false);
+  const [date, setDate] = useState(TODAY_STR);
+  const [notes, setNotes] = useState('');
+  const [items, setItems] = useState<any[]>([
+    { account_id: '', type: 'debit', amount: '' },
+    { account_id: '', type: 'credit', amount: '' }
+  ]);
+
+  const { data: accounts } = useQuery<ChartOfAccount[]>({
+    queryKey: ['coa-accounts-all'],
+    queryFn: () => accountingApi.listChartOfAccounts().then(r => r.data.data)
+  });
+
+  const { data: entries, isLoading } = useQuery<any[]>({
+    queryKey: ['journal-entries'],
+    queryFn: () => accountingApi.listJournalEntries().then(r => r.data.data)
+  });
+
+  const mutation = useMutation({
+    mutationFn: (d: any) => accountingApi.createJournalEntry(d),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['journal-entries'] });
+      qc.invalidateQueries({ queryKey: ['web-pl'] });
+      qc.invalidateQueries({ queryKey: ['balance-sheet'] });
+      qc.invalidateQueries({ queryKey: ['coa-groups'] });
+      setShowAdd(false);
+      setNotes('');
+      setItems([{ account_id: '', type: 'debit', amount: '' }, { account_id: '', type: 'credit', amount: '' }]);
+    },
+    onError: (err: any) => alert(err.response?.data?.error?.message || 'Failed to save Journal Entry')
+  });
+
+  const toggleItemType = (idx: number) => {
+    const newItems = [...items];
+    newItems[idx].type = newItems[idx].type === 'debit' ? 'credit' : 'debit';
+    setItems(newItems);
+  };
+
+  const removeItem = (idx: number) => {
+    if (items.length <= 2) return;
+    setItems(items.filter((_, i) => i !== idx));
+  };
+
+  const totalDebit = items.filter(x => x.type === 'debit').reduce((s, x) => s + (Number(x.amount) || 0), 0);
+  const totalCredit = items.filter(x => x.type === 'credit').reduce((s, x) => s + (Number(x.amount) || 0), 0);
+  const isBalanced = Math.abs(totalDebit - totalCredit) < 0.1 && totalDebit > 0;
+
+  return (
+    <div className="space-y-8 pb-20">
+      <div className="flex justify-between items-center">
+        <div>
+           <h2 className="text-xl font-black text-gray-900 tracking-tight uppercase">Journal Vouchers</h2>
+           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Manual non-cash adjustments</p>
+        </div>
+        <button 
+          onClick={() => setShowAdd(!showAdd)}
+          className="bg-gray-900 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-gray-200 hover:scale-105 active:scale-95 transition-all"
+        >
+          {showAdd ? 'Close Editor' : 'New Journal Entry'}
+        </button>
+      </div>
+
+      {showAdd && (
+        <div className="bg-white rounded-[40px] p-10 border border-gray-100 shadow-sm animate-in zoom-in-95 duration-200">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+              <div className="space-y-4">
+                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Entry Date</label>
+                 <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full bg-gray-50/50 border-none rounded-2xl px-6 py-4 text-xs font-black shadow-inner focus:ring-2 focus:ring-violet-500" />
+              </div>
+              <div className="space-y-4">
+                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Reference/Narration</label>
+                 <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. Depreciating fixed assets for March" className="w-full bg-gray-50/50 border-none rounded-2xl px-6 py-4 text-xs font-black shadow-inner focus:ring-2 focus:ring-violet-500" />
+              </div>
+           </div>
+
+           <div className="space-y-3 mb-10">
+              {items.map((item, idx) => (
+                <div key={idx} className="flex gap-3 group">
+                   <div className="w-24">
+                      <button 
+                        onClick={() => toggleItemType(idx)}
+                        className={`w-full h-14 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${item.type === 'debit' ? 'bg-indigo-50 text-indigo-600' : 'bg-rose-50 text-rose-600'}`}
+                      >
+                         {item.type}
+                      </button>
+                   </div>
+                   <div className="flex-1">
+                      <select 
+                        value={item.account_id}
+                        onChange={e => {
+                          const newI = [...items];
+                          newI[idx].account_id = e.target.value;
+                          setItems(newI);
+                        }}
+                        className="w-full h-14 bg-gray-50 border-none rounded-2xl px-6 text-xs font-black"
+                      >
+                         <option value="">Select Account...</option>
+                         {accounts?.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                      </select>
+                   </div>
+                   <div className="w-40">
+                      <input 
+                        type="number"
+                        value={item.amount}
+                        onChange={e => {
+                          const newI = [...items];
+                          newI[idx].amount = e.target.value;
+                          setItems(newI);
+                        }}
+                        placeholder="0.00"
+                        className="w-full h-14 bg-gray-50 border-none rounded-2xl px-6 text-xs font-black text-right"
+                      />
+                   </div>
+                   <button onClick={() => removeItem(idx)} className="w-14 h-14 rounded-2xl bg-gray-50 text-gray-300 hover:text-rose-500 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                   </button>
+                </div>
+              ))}
+              <button 
+                onClick={() => setItems([...items, { account_id: '', type: 'debit', amount: '' }])}
+                className="w-full py-4 rounded-2xl border-2 border-dashed border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:border-violet-200 hover:text-violet-500 transition-all"
+              >
+                 + Add Line Entry
+              </button>
+           </div>
+
+           <div className="flex items-center justify-between p-6 bg-gray-50 rounded-[2rem] border border-gray-100">
+              <div className="flex gap-10">
+                 <div>
+                    <p className="text-[10px] text-gray-400 font-black uppercase mb-1">Total Debit</p>
+                    <p className="text-lg font-black text-indigo-600">{fmt(totalDebit)}</p>
+                 </div>
+                 <div>
+                    <p className="text-[10px] text-gray-400 font-black uppercase mb-1">Total Credit</p>
+                    <p className="text-lg font-black text-rose-600">{fmt(totalCredit)}</p>
+                 </div>
+              </div>
+              <button 
+                disabled={!isBalanced || mutation.isPending}
+                onClick={() => mutation.mutate({ date, description: notes, items: items.map(x => ({ ...x, amount: Number(x.amount) })) })}
+                className="bg-indigo-600 text-white px-10 py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-100 hover:scale-105 transition-all disabled:opacity-30"
+              >
+                 {mutation.isPending ? 'Saving...' : 'Authorize Journal Entry'}
+              </button>
+           </div>
+        </div>
+      )}
+
+      {/* List Recent Entries */}
+      <div className="bg-white rounded-[40px] p-1 border border-gray-100 shadow-sm overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-gray-50/50">
+            <tr>
+              <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
+              <th className="px-4 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Description</th>
+              <th className="px-4 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Debit</th>
+              <th className="px-4 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Credit</th>
+              <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {entries?.map(entry => {
+              const debit = entry.items.filter((i:any) => i.type === 'debit').reduce((s:any,i:any) => s + Number(i.amount), 0);
+              const credit = entry.items.filter((i:any) => i.type === 'credit').reduce((s:any,i:any) => s + Number(i.amount), 0);
+              return (
+                <tr key={entry.id} className="hover:bg-gray-50/50 transition-all group">
+                   <td className="px-8 py-6">
+                      <p className="text-xs font-black text-gray-800">{new Date(entry.entry_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</p>
+                      <p className="text-[10px] text-gray-400 font-mono mt-0.5">{entry.reference_no || `JV-${entry.id.slice(-4)}`}</p>
+                   </td>
+                   <td className="px-4 py-6">
+                      <p className="text-xs font-black text-gray-700">{entry.description}</p>
+                      <div className="flex gap-2 mt-2 flex-wrap">
+                         {entry.items.map((i:any) => (
+                           <span key={i.id} className="px-2 py-0.5 bg-gray-100 text-[9px] font-bold text-gray-500 rounded-md">
+                             {i.account.name} ({i.type === 'debit' ? 'Dr' : 'Cr'})
+                           </span>
+                         ))}
+                      </div>
+                   </td>
+                   <td className="px-4 py-6 text-right text-xs font-black text-gray-900">{fmt(debit)}</td>
+                   <td className="px-4 py-6 text-right text-xs font-black text-gray-900">{fmt(credit)}</td>
+                   <td className="px-8 py-6 text-right">
+                      <span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-full">Posted</span>
+                   </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Phase 3: Financial Components ──────────────────────────────────────────
+function BalanceSheetTab() {
+  const [asOfDate, setAsOfDate] = useState(TODAY_STR);
+  const { data: report, isLoading } = useQuery<any[]>({
+    queryKey: ['balance-sheet', asOfDate],
+    queryFn: () => accountingApi.getBalanceSheet(asOfDate).then(r => r.data.data)
+  });
+
+  const totalAssets = report?.filter(g => g.type === 'asset').reduce((s, g) => s + g.total, 0) || 0;
+  const totalLiabsEquity = report?.filter(g => g.type !== 'asset').reduce((s, g) => s + g.total, 0) || 0;
+
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="bg-white rounded-[40px] p-10 border border-gray-100 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-violet-50/30 rounded-full blur-3xl -mr-32 -mt-32" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+          <div>
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight uppercase">Statement of Financial Position</h2>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Balance Sheet as on {asOfDate}</p>
+          </div>
+          <div className="flex items-center gap-4 bg-gray-50 p-2 rounded-2xl border border-gray-200/50">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-3">As of</span>
+            <input 
+              type="date" 
+              value={asOfDate} 
+              onChange={e => setAsOfDate(e.target.value)}
+              className="bg-white px-4 py-2 rounded-xl text-xs font-black text-gray-900 border-none shadow-sm focus:ring-2 focus:ring-violet-500" 
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full items-start">
+        {/* Assets Side */}
+        <div className="space-y-6">
+          <div className="flex items-center justify-between px-6">
+            <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Assets</h3>
+            <span className="text-xl font-black text-blue-600">{fmt(totalAssets)}</span>
+          </div>
+          <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm space-y-6">
+            {report?.filter(g => g.type === 'asset').map(group => (
+              <div key={group.id} className="space-y-3">
+                <div className="flex justify-between items-center pb-2 border-b border-gray-50">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{group.name}</span>
+                  <span className="text-xs font-black text-gray-900">{fmt(group.total)}</span>
+                </div>
+                <div className="space-y-2 pl-4">
+                  {group.accounts.map((acc: any) => (
+                    <div key={acc.id} className="flex justify-between text-[11px] font-bold text-gray-600">
+                      <span>{acc.name}</span>
+                      <span className="font-medium">{fmt(acc.balance)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Liabilities & Equity Side */}
+        <div className="space-y-6 h-full">
+          <div className="flex items-center justify-between px-6">
+            <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Liabilities & Equity</h3>
+            <span className="text-xl font-black text-rose-600">{fmt(Math.abs(totalLiabsEquity))}</span>
+          </div>
+          <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm space-y-6 h-full">
+             {report?.filter(g => g.type !== 'asset').map(group => (
+                <div key={group.id} className="space-y-3">
+                  <div className="flex justify-between items-center pb-2 border-b border-gray-50">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{group.name}</span>
+                    <span className="text-xs font-black text-gray-900">{fmt(Math.abs(group.total))}</span>
+                  </div>
+                  <div className="space-y-2 pl-4">
+                    {group.accounts.map((acc: any) => (
+                      <div key={acc.id} className="flex justify-between text-[11px] font-bold text-gray-600">
+                        <span>{acc.name}</span>
+                        <span className="font-medium">{fmt(Math.abs(acc.balance))}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+             ))}
+             {/* Balancing Check */}
+             <div className="mt-12 pt-8 border-t-2 border-dashed border-gray-100 flex justify-between items-center">
+                <span className="text-[10px] font-black text-gray-300 uppercase italic">Financial Balance Status</span>
+                <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase ${Math.abs(totalAssets + totalLiabsEquity) < 1 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600 animate-pulse'}`}>
+                    {Math.abs(totalAssets + totalLiabsEquity) < 1 ? 'Balanced' : 'Imbalance Detected'}
+                </span>
+             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function JournalTab() {
+  const qc = useQueryClient();
+  const [showAdd, setShowAdd] = useState(false);
+  const [date, setDate] = useState(TODAY_STR);
+  const [notes, setNotes] = useState('');
+  const [items, setItems] = useState<any[]>([
+    { account_id: '', type: 'debit', amount: '' },
+    { account_id: '', type: 'credit', amount: '' }
+  ]);
+
+  const { data: accounts } = useQuery<ChartOfAccount[]>({
+    queryKey: ['coa-accounts-all'],
+    queryFn: () => accountingApi.listChartOfAccounts().then(r => r.data.data)
+  });
+
+  const { data: entries, isLoading } = useQuery<any[]>({
+    queryKey: ['journal-entries'],
+    queryFn: () => accountingApi.listJournalEntries().then(r => r.data.data)
+  });
+
+  const mutation = useMutation({
+    mutationFn: (d: any) => accountingApi.createJournalEntry(d),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['journal-entries'] });
+      qc.invalidateQueries({ queryKey: ['web-pl'] });
+      qc.invalidateQueries({ queryKey: ['balance-sheet'] });
+      qc.invalidateQueries({ queryKey: ['coa-groups'] });
+      setShowAdd(false);
+      setNotes('');
+      setItems([{ account_id: '', type: 'debit', amount: '' }, { account_id: '', type: 'credit', amount: '' }]);
+    },
+    onError: (err: any) => alert(err.response?.data?.error?.message || 'Failed to save Journal Entry')
+  });
+
+  const toggleItemType = (idx: number) => {
+    const newItems = [...items];
+    newItems[idx].type = newItems[idx].type === 'debit' ? 'credit' : 'debit';
+    setItems(newItems);
+  };
+
+  const removeItem = (idx: number) => {
+    if (items.length <= 2) return;
+    setItems(items.filter((_, i) => i !== idx));
+  };
+
+  const totalDebit = items.filter(x => x.type === 'debit').reduce((s, x) => s + (Number(x.amount) || 0), 0);
+  const totalCredit = items.filter(x => x.type === 'credit').reduce((s, x) => s + (Number(x.amount) || 0), 0);
+  const isBalanced = Math.abs(totalDebit - totalCredit) < 0.1 && totalDebit > 0;
+
+  return (
+    <div className="space-y-8 pb-20">
+      <div className="flex justify-between items-center">
+        <div>
+           <h2 className="text-xl font-black text-gray-900 tracking-tight uppercase">Journal Vouchers</h2>
+           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Manual non-cash adjustments</p>
+        </div>
+        <button 
+          onClick={() => setShowAdd(!showAdd)}
+          className="bg-gray-900 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-gray-200 hover:scale-105 active:scale-95 transition-all"
+        >
+          {showAdd ? 'Close Editor' : 'New Journal Entry'}
+        </button>
+      </div>
+
+      {showAdd && (
+        <div className="bg-white rounded-[40px] p-10 border border-gray-100 shadow-sm animate-in zoom-in-95 duration-200">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+              <div className="space-y-4">
+                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Entry Date</label>
+                 <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full bg-gray-50/50 border-none rounded-2xl px-6 py-4 text-xs font-black shadow-inner focus:ring-2 focus:ring-violet-500" />
+              </div>
+              <div className="space-y-4">
+                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Reference/Narration</label>
+                 <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. Depreciating fixed assets for March" className="w-full bg-gray-50/50 border-none rounded-2xl px-6 py-4 text-xs font-black shadow-inner focus:ring-2 focus:ring-violet-500" />
+              </div>
+           </div>
+
+           <div className="space-y-3 mb-10">
+              {items.map((item, idx) => (
+                <div key={idx} className="flex gap-3 group">
+                   <div className="w-24">
+                      <button 
+                        onClick={() => toggleItemType(idx)}
+                        className={`w-full h-14 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${item.type === 'debit' ? 'bg-indigo-50 text-indigo-600' : 'bg-rose-50 text-rose-600'}`}
+                      >
+                         {item.type}
+                      </button>
+                   </div>
+                   <div className="flex-1">
+                      <select 
+                        value={item.account_id}
+                        onChange={e => {
+                          const newI = [...items];
+                          newI[idx].account_id = e.target.value;
+                          setItems(newI);
+                        }}
+                        className="w-full h-14 bg-gray-50 border-none rounded-2xl px-6 text-xs font-black"
+                      >
+                         <option value="">Select Account...</option>
+                         {accounts?.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                      </select>
+                   </div>
+                   <div className="w-40">
+                      <input 
+                        type="number"
+                        value={item.amount}
+                        onChange={e => {
+                          const newI = [...items];
+                          newI[idx].amount = e.target.value;
+                          setItems(newI);
+                        }}
+                        placeholder="0.00"
+                        className="w-full h-14 bg-gray-50 border-none rounded-2xl px-6 text-xs font-black text-right"
+                      />
+                   </div>
+                   <button onClick={() => removeItem(idx)} className="w-14 h-14 rounded-2xl bg-gray-50 text-gray-300 hover:text-rose-500 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                   </button>
+                </div>
+              ))}
+              <button 
+                onClick={() => setItems([...items, { account_id: '', type: 'debit', amount: '' }])}
+                className="w-full py-4 rounded-2xl border-2 border-dashed border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:border-violet-200 hover:text-violet-500 transition-all"
+              >
+                 + Add Line Entry
+              </button>
+           </div>
+
+           <div className="flex items-center justify-between p-6 bg-gray-50 rounded-[2rem] border border-gray-100">
+              <div className="flex gap-10">
+                 <div>
+                    <p className="text-[10px] text-gray-400 font-black uppercase mb-1">Total Debit</p>
+                    <p className="text-lg font-black text-indigo-600">{fmt(totalDebit)}</p>
+                 </div>
+                 <div>
+                    <p className="text-[10px] text-gray-400 font-black uppercase mb-1">Total Credit</p>
+                    <p className="text-lg font-black text-rose-600">{fmt(totalCredit)}</p>
+                 </div>
+              </div>
+              <button 
+                disabled={!isBalanced || mutation.isPending}
+                onClick={() => mutation.mutate({ date, description: notes, items: items.map(x => ({ ...x, amount: Number(x.amount) })) })}
+                className="bg-indigo-600 text-white px-10 py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-100 hover:scale-105 transition-all disabled:opacity-30"
+              >
+                 {mutation.isPending ? 'Saving...' : 'Authorize Journal Entry'}
+              </button>
+           </div>
+        </div>
+      )}
+
+      {/* List Recent Entries */}
+      <div className="bg-white rounded-[40px] p-1 border border-gray-100 shadow-sm overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-gray-50/50">
+            <tr>
+              <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
+              <th className="px-4 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Description</th>
+              <th className="px-4 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Debit</th>
+              <th className="px-4 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Credit</th>
+              <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {entries?.map(entry => {
+              const debit = entry.items.filter((i:any) => i.type === 'debit').reduce((s:any,i:any) => s + Number(i.amount), 0);
+              const credit = entry.items.filter((i:any) => i.type === 'credit').reduce((s:any,i:any) => s + Number(i.amount), 0);
+              return (
+                <tr key={entry.id} className="hover:bg-gray-50/50 transition-all group">
+                   <td className="px-8 py-6">
+                      <p className="text-xs font-black text-gray-800">{new Date(entry.entry_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</p>
+                      <p className="text-[10px] text-gray-400 font-mono mt-0.5">{entry.reference_no || `JV-${entry.id.slice(-4)}`}</p>
+                   </td>
+                   <td className="px-4 py-6">
+                      <p className="text-xs font-black text-gray-700">{entry.description}</p>
+                      <div className="flex gap-2 mt-2 flex-wrap">
+                         {entry.items.map((i:any) => (
+                           <span key={i.id} className="px-2 py-0.5 bg-gray-100 text-[9px] font-bold text-gray-500 rounded-md">
+                             {i.account.name} ({i.type === 'debit' ? 'Dr' : 'Cr'})
+                           </span>
+                         ))}
+                      </div>
+                   </td>
+                   <td className="px-4 py-6 text-right text-xs font-black text-gray-900">{fmt(debit)}</td>
+                   <td className="px-4 py-6 text-right text-xs font-black text-gray-900">{fmt(credit)}</td>
+                   <td className="px-8 py-6 text-right">
+                      <span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-full">Posted</span>
+                   </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -5143,6 +5729,7 @@ export default function AccountingPage() {
 
         {/* Tab content */}
         {activeTab === 'P&L' && <PLTab />}
+        {activeTab === 'Balance Sheet' && <BalanceSheetTab />}
         {activeTab === 'Receipts & Payments' && <ExpensesTab />}
         {activeTab === 'Suppliers' && <SuppliersTab shopGstType={shop?.gst_type} />}
         {activeTab === 'Purchases' && <PurchasesTab />}
@@ -5151,6 +5738,7 @@ export default function AccountingPage() {
         {activeTab === 'Sale Ret.' && <SaleReturnTab setSelectedReturnId={setSelectedSaleReturnId} />}
         {activeTab === 'Pur. Ret.' && <PurchaseReturnTab setSelectedReturnId={setSelectedPurchaseReturnId} />}
         {activeTab === 'Contra' && <ContraTab />}
+        {activeTab === 'Journal' && <JournalTab />}
         {activeTab === 'Cashbook' && <CashbookTab />}
         {activeTab === 'Bankbook' && <BankbookTab />}
         {activeTab === 'Ledger' && <GeneralLedgerTab />}

@@ -347,6 +347,7 @@ model MedicalShop {
   recharges           SubscriptionPayment[]
   account_groups      AccountGroup[]
   chart_of_accounts   ChartOfAccount[]
+  journal_entries     JournalEntry[]
 
   @@map("medical_shops")
 }
@@ -1157,7 +1158,44 @@ model ChartOfAccount {
   shop            MedicalShop    @relation(fields: [shop_id], references: [id], onDelete: Cascade)
   group           AccountGroup   @relation(fields: [group_id], references: [id])
   expense_entries ExpenseEntry[] @relation("ExpenseAccount")
+  journal_items   JournalItem[]
 
   @@unique([shop_id, name], name: "shop_id_name")
   @@map("chart_of_accounts")
+}
+
+// ————————————————————————————————————————————————
+//  Journal Entries (Phase 3)
+// ————————————————————————————————————————————————
+
+enum JournalItemType {
+  debit
+  credit
+}
+
+model JournalEntry {
+  id           String        @id @default(uuid())
+  shop_id      String
+  entry_date   DateTime      @db.Date @default(now())
+  description  String
+  reference_no String?
+  created_at   DateTime      @default(now())
+
+  shop         MedicalShop   @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  items        JournalItem[]
+
+  @@map("journal_entries")
+}
+
+model JournalItem {
+  id          String          @id @default(uuid())
+  journal_id  String
+  account_id  String
+  type        JournalItemType
+  amount      Decimal         @db.Decimal(12, 2)
+
+  journal     JournalEntry   @relation(fields: [journal_id], references: [id], onDelete: Cascade)
+  account     ChartOfAccount @relation(fields: [account_id], references: [id])
+
+  @@map("journal_items")
 }

@@ -269,6 +269,12 @@ export const accountingApi = {
   initializeCOA: () => apiClient.post('/accounting/initialize-coa'),
   getGLStatement: (id: string, from: string, to: string) =>
     apiClient.get('/accounting/reports/gl-statement', { params: { id, from, to } }),
+
+  // Journal & Balance Sheet (Phase 3)
+  listJournalEntries: (from?: string, to?: string) =>
+    apiClient.get('/accounting/journal-entries', { params: { from, to } }),
+  createJournalEntry: (data: object) => apiClient.post('/accounting/journal-entries', data),
+  getBalanceSheet: (date: string) => apiClient.get('/accounting/reports/balance-sheet', { params: { date } }),
 };
 
 export const doctorApi = {
