@@ -100,6 +100,7 @@ interface Purchase {
   supplier: { id?: string; name: string } | null;
   supplier_id?: string | null;
   notes?: string | null;
+  is_inventory: boolean;
   items?: any[];
 }
 
