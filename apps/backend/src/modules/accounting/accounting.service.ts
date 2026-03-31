@@ -3681,7 +3681,7 @@ export async function getGeneralLedgerStatement(userId: string, accountId: strin
     })),
     ...incomes.map(i => ({
       date: i.entry_date,
-      ref: i.reference_no || `INC-${i.id.slice(-4)}`,
+      ref: i.reference_bill_id || `INC-${i.id.slice(-4)}`,
       description: i.notes || 'Voucher (Receipt)',
       type: 'credit',
       amount: Number(i.amount)
