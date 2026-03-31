@@ -668,6 +668,13 @@ router.post('/journal-entries', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.delete('/journal-entries/:id', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.deleteJournalEntry(req.user!.id, req.params.id);
+    res.json({ success: true, data, message: 'Journal entry deleted' });
+  } catch (err) { next(err); }
+});
+
 // ─── Financial Reports: Balance Sheet (Phase 3) ──────────────────────────────
 
 router.get('/reports/balance-sheet', shopAuth, async (req, res, next) => {

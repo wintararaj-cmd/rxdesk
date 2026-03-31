@@ -249,7 +249,7 @@ function HsnEntryModal({ medicineName, onSave, onCancel }: { medicineName: strin
 }
 
 // ── panel tabs ────────────────────────────────────────────────────────────────
-const TABS = ['P&L', 'Balance Sheet', 'Receipts & Payments', 'Suppliers', 'Purchases', 'Outstandings', 'Returns', 'GST', 'Contra', 'Journal', 'Cashbook', 'Bankbook', 'Ledger', 'COA Setup', 'Settings'] as const;
+const TABS = ['Reports', 'Vouchers', 'Purchases', 'Returns', 'Books', 'Outstandings', 'Setup'] as const;
 type Tab = (typeof TABS)[number];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -558,6 +558,8 @@ function BalanceSheetTab() {
 function JournalTab() {
   const qc = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
+  const [from, setFrom] = useState(FIRST_OF_MONTH);
+  const [to, setTo] = useState(TODAY_STR);
   const [date, setDate] = useState(TODAY_STR);
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<any[]>([
@@ -571,8 +573,8 @@ function JournalTab() {
   });
 
   const { data: entries, isLoading } = useQuery<any[]>({
-    queryKey: ['journal-entries'],
-    queryFn: () => accountingApi.listJournalEntries().then(r => r.data.data)
+    queryKey: ['journal-entries', from, to],
+    queryFn: () => accountingApi.listJournalEntries(from, to).then(r => r.data.data)
   });
 
   const mutation = useMutation({
@@ -587,6 +589,15 @@ function JournalTab() {
       setItems([{ account_id: '', type: 'debit', amount: '' }, { account_id: '', type: 'credit', amount: '' }]);
     },
     onError: (err: any) => alert(err.response?.data?.error?.message || 'Failed to save Journal Entry')
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => accountingApi.deleteJournalEntry(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['journal-entries'] });
+      qc.invalidateQueries({ queryKey: ['web-pl'] });
+      qc.invalidateQueries({ queryKey: ['balance-sheet'] });
+    },
   });
 
   const toggleItemType = (idx: number) => {
@@ -606,17 +617,26 @@ function JournalTab() {
 
   return (
     <div className="space-y-8 pb-20">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
            <h2 className="text-xl font-black text-gray-900 tracking-tight uppercase">Journal Vouchers</h2>
            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Manual non-cash adjustments</p>
         </div>
-        <button 
-          onClick={() => setShowAdd(!showAdd)}
-          className="bg-gray-900 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-gray-200 hover:scale-105 active:scale-95 transition-all"
-        >
-          {showAdd ? 'Close Editor' : 'New Journal Entry'}
-        </button>
+        
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-gray-100 shadow-sm">
+            <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="bg-transparent border-0 p-0 text-[10px] font-black text-gray-600 focus:ring-0" />
+            <span className="text-gray-300">—</span>
+            <input type="date" value={to} onChange={e => setTo(e.target.value)} className="bg-transparent border-0 p-0 text-[10px] font-black text-gray-600 focus:ring-0" />
+          </div>
+          
+          <button 
+            onClick={() => setShowAdd(!showAdd)}
+            className="bg-gray-900 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-gray-200 hover:scale-105 active:scale-95 transition-all"
+          >
+            {showAdd ? 'Close Editor' : 'New Journal Entry'}
+          </button>
+        </div>
       </div>
 
       {showAdd && (
@@ -651,7 +671,7 @@ function JournalTab() {
                           newI[idx].account_id = e.target.value;
                           setItems(newI);
                         }}
-                        className="w-full h-14 bg-gray-50 border-none rounded-2xl px-6 text-xs font-black"
+                        className="w-full h-14 bg-gray-50 border-none rounded-2xl px-6 text-xs font-black text-gray-900"
                       >
                          <option value="">Select Account...</option>
                          {accounts?.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
@@ -667,7 +687,7 @@ function JournalTab() {
                           setItems(newI);
                         }}
                         placeholder="0.00"
-                        className="w-full h-14 bg-gray-50 border-none rounded-2xl px-6 text-xs font-black text-right"
+                        className="w-full h-14 bg-gray-50 border-none rounded-2xl px-6 text-xs font-black text-right text-gray-900 font-mono"
                       />
                    </div>
                    <button onClick={() => removeItem(idx)} className="w-14 h-14 rounded-2xl bg-gray-50 text-gray-300 hover:text-rose-500 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100">
@@ -714,11 +734,15 @@ function JournalTab() {
               <th className="px-4 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Description</th>
               <th className="px-4 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Debit</th>
               <th className="px-4 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Credit</th>
-              <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Status</th>
+              <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {entries?.map(entry => {
+            {isLoading ? (
+              <tr><td colSpan={5} className="py-20 text-center text-xs font-black text-gray-300 uppercase tracking-widest">Loading Ledger...</td></tr>
+            ) : entries?.length === 0 ? (
+              <tr><td colSpan={5} className="py-20 text-center text-xs font-black text-gray-300 uppercase tracking-widest">No entries found for period</td></tr>
+            ) : entries?.map(entry => {
               const debit = entry.items.filter((i:any) => i.type === 'debit').reduce((s:any,i:any) => s + Number(i.amount), 0);
               const credit = entry.items.filter((i:any) => i.type === 'credit').reduce((s:any,i:any) => s + Number(i.amount), 0);
               return (
@@ -731,16 +755,24 @@ function JournalTab() {
                       <p className="text-xs font-black text-gray-700">{entry.description}</p>
                       <div className="flex gap-2 mt-2 flex-wrap">
                          {entry.items.map((i:any) => (
-                           <span key={i.id} className="px-2 py-0.5 bg-gray-100 text-[9px] font-bold text-gray-500 rounded-md">
+                           <span key={i.id} className="px-2 py-0.5 bg-gray-100 text-[9px] font-bold text-gray-500 rounded-md whitespace-nowrap">
                              {i.account.name} ({i.type === 'debit' ? 'Dr' : 'Cr'})
                            </span>
                          ))}
                       </div>
                    </td>
-                   <td className="px-4 py-6 text-right text-xs font-black text-gray-900">{fmt(debit)}</td>
-                   <td className="px-4 py-6 text-right text-xs font-black text-gray-900">{fmt(credit)}</td>
+                   <td className="px-4 py-6 text-right text-xs font-black text-gray-900 font-mono">{fmt(debit)}</td>
+                   <td className="px-4 py-6 text-right text-xs font-black text-gray-900 font-mono">{fmt(credit)}</td>
                    <td className="px-8 py-6 text-right">
-                      <span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-full">Posted</span>
+                      <div className="flex items-center justify-end gap-2">
+                        <span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-full">Posted</span>
+                        <button 
+                          onClick={() => { if(confirm('Delete this journal entry?')) deleteMutation.mutate(entry.id); }}
+                          className="p-2 text-gray-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      </div>
                    </td>
                 </tr>
               )
@@ -3718,6 +3750,104 @@ function ReturnsTab({ setSelectedSaleReturnId, setSelectedPurchaseReturnId }: { 
   );
 }
 
+function ReportsTab() {
+  const [sub, setSub] = useState<'pl' | 'bs' | 'gst'>('pl');
+  return (
+    <div className="space-y-6">
+      <div className="flex gap-2 bg-white/50 p-1.5 rounded-2xl border border-gray-100 shadow-sm w-fit">
+        {[{id:'pl', l:'P&L'}, {id:'bs', l:'Balance Sheet'}, {id:'gst', l:'GST Report'}].map(s => (
+          <button key={s.id} onClick={() => setSub(s.id as any)} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sub === s.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-gray-400 hover:text-indigo-600 hover:bg-white'}`}>
+            {s.l}
+          </button>
+        ))}
+      </div>
+      <div className="animate-in fade-in zoom-in-95 duration-300">
+        {sub === 'pl' && <PLTab />}
+        {sub === 'bs' && <BalanceSheetTab />}
+        {sub === 'gst' && <GSTTab />}
+      </div>
+    </div>
+  );
+}
+
+function VouchersTab() {
+  const [sub, setSub] = useState<'v' | 'j' | 'c'>('v');
+  return (
+    <div className="space-y-6">
+      <div className="flex gap-2 bg-white/50 p-1.5 rounded-2xl border border-gray-100 shadow-sm w-fit">
+        {[{id:'v', l:'Receipts & Payments'}, {id:'j', l:'Journal'}, {id:'c', l:'Contra'}].map(s => (
+          <button key={s.id} onClick={() => setSub(s.id as any)} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sub === s.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-gray-400 hover:text-indigo-600 hover:bg-white'}`}>
+            {s.l}
+          </button>
+        ))}
+      </div>
+      <div className="animate-in fade-in zoom-in-95 duration-300">
+        {sub === 'v' && <ExpensesTab />}
+        {sub === 'j' && <JournalTab />}
+        {sub === 'c' && <ContraTab />}
+      </div>
+    </div>
+  );
+}
+
+function PurchasesGroupTab({ shopGstType }: { shopGstType?: string }) {
+  const [sub, setSub] = useState<'p' | 's'>('p');
+  return (
+    <div className="space-y-6">
+      <div className="flex gap-2 bg-white/50 p-1.5 rounded-2xl border border-gray-100 shadow-sm w-fit">
+        {[{id:'p', l:'Purchase Invoices'}, {id:'s', l:'Suppliers List'}].map(s => (
+          <button key={s.id} onClick={() => setSub(s.id as any)} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sub === s.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-gray-400 hover:text-indigo-600 hover:bg-white'}`}>
+            {s.l}
+          </button>
+        ))}
+      </div>
+      <div className="animate-in fade-in zoom-in-95 duration-300">
+        {sub === 'p' && <PurchasesTab />}
+        {sub === 's' && <SuppliersTab shopGstType={shopGstType} />}
+      </div>
+    </div>
+  );
+}
+
+function BooksTab() {
+  const [sub, setSub] = useState<'c' | 'b' | 'l'>('c');
+  return (
+    <div className="space-y-6">
+      <div className="flex gap-2 bg-white/50 p-1.5 rounded-2xl border border-gray-100 shadow-sm w-fit">
+        {[{id:'c', l:'Cashbook'}, {id:'b', l:'Bankbook'}, {id:'l', l:'General Ledger'}].map(s => (
+          <button key={s.id} onClick={() => setSub(s.id as any)} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sub === s.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-gray-400 hover:text-indigo-600 hover:bg-white'}`}>
+            {s.l}
+          </button>
+        ))}
+      </div>
+      <div className="animate-in fade-in zoom-in-95 duration-300">
+        {sub === 'c' && <CashbookTab />}
+        {sub === 'b' && <BankbookTab />}
+        {sub === 'l' && <GeneralLedgerTab />}
+      </div>
+    </div>
+  );
+}
+
+function SetupTab() {
+  const [sub, setSub] = useState<'coa' | 'settings'>('coa');
+  return (
+    <div className="space-y-6">
+      <div className="flex gap-2 bg-white/50 p-1.5 rounded-2xl border border-gray-100 shadow-sm w-fit">
+        {[{id:'coa', l:'Charts of Accounts'}, {id:'settings', l:'Financial Setup'}].map(s => (
+          <button key={s.id} onClick={() => setSub(s.id as any)} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sub === s.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-gray-400 hover:text-indigo-600 hover:bg-white'}`}>
+            {s.l}
+          </button>
+        ))}
+      </div>
+      <div className="animate-in fade-in zoom-in-95 duration-300">
+        {sub === 'coa' && <ChartOfAccountsTab />}
+        {sub === 'settings' && <SettingsTab />}
+      </div>
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  Sale Return Tab
 // ─────────────────────────────────────────────────────────────────────────────
@@ -5419,7 +5549,7 @@ function GeneralLedgerTab() {
 //  Main page
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AccountingPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('P&L');
+  const [activeTab, setActiveTab] = useState<Tab>('Reports');
   const [selectedSaleReturnId, setSelectedSaleReturnId] = useState<string | null>(null);
   const [selectedPurchaseReturnId, setSelectedPurchaseReturnId] = useState<string | null>(null);
   const { data: shopRes } = useQuery({ queryKey: ['shop-profile'], queryFn: () => shopApi.getMyShop() });
@@ -5468,9 +5598,9 @@ export default function AccountingPage() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 ${activeTab === tab
+                className={`px-6 py-2.5 rounded-xl text-sm font-black whitespace-nowrap transition-all duration-200 ${activeTab === tab
                   ? 'bg-violet-600 text-white shadow-lg shadow-violet-200 ring-2 ring-violet-100'
-                  : 'text-gray-500 hover:bg-white hover:text-gray-900'
+                  : 'text-gray-500 hover:bg-violet-50 hover:text-violet-600'
                   }`}
               >
                 {tab}
@@ -5480,26 +5610,20 @@ export default function AccountingPage() {
         </div>
 
         {/* Tab content */}
-        {activeTab === 'P&L' && <PLTab />}
-        {activeTab === 'Balance Sheet' && <BalanceSheetTab />}
-        {activeTab === 'Receipts & Payments' && <ExpensesTab />}
-        {activeTab === 'Suppliers' && <SuppliersTab shopGstType={shop?.gst_type} />}
-        {activeTab === 'Purchases' && <PurchasesTab />}
-        {activeTab === 'Outstandings' && <OutstandingsTab />}
-        {activeTab === 'GST' && <GSTTab />}
-        {activeTab === 'Returns' && (
-          <ReturnsTab
-            setSelectedSaleReturnId={setSelectedSaleReturnId}
-            setSelectedPurchaseReturnId={setSelectedPurchaseReturnId}
-          />
-        )}
-        {activeTab === 'Contra' && <ContraTab />}
-        {activeTab === 'Journal' && <JournalTab />}
-        {activeTab === 'Cashbook' && <CashbookTab />}
-        {activeTab === 'Bankbook' && <BankbookTab />}
-        {activeTab === 'Ledger' && <GeneralLedgerTab />}
-        {activeTab === 'COA Setup' && <ChartOfAccountsTab />}
-        {activeTab === 'Settings' && <SettingsTab />}
+        <div className="mt-8">
+          {activeTab === 'Reports' && <ReportsTab />}
+          {activeTab === 'Vouchers' && <VouchersTab />}
+          {activeTab === 'Purchases' && <PurchasesGroupTab shopGstType={shop?.gst_type} />}
+          {activeTab === 'Returns' && (
+            <ReturnsTab
+              setSelectedSaleReturnId={setSelectedSaleReturnId}
+              setSelectedPurchaseReturnId={setSelectedPurchaseReturnId}
+            />
+          )}
+          {activeTab === 'Books' && <BooksTab />}
+          {activeTab === 'Outstandings' && <OutstandingsTab />}
+          {activeTab === 'Setup' && <SetupTab />}
+        </div>
       </div>
 
       {/* Modals - Rendered outside print-hidden content */}

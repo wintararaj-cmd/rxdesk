@@ -274,6 +274,7 @@ export const accountingApi = {
   listJournalEntries: (from?: string, to?: string) =>
     apiClient.get('/accounting/journal-entries', { params: { from, to } }),
   createJournalEntry: (data: object) => apiClient.post('/accounting/journal-entries', data),
+  deleteJournalEntry: (id: string) => apiClient.delete(`/accounting/journal-entries/${id}`),
   getBalanceSheet: (date: string) => apiClient.get('/accounting/reports/balance-sheet', { params: { date } }),
 };
 

@@ -3972,3 +3972,15 @@ export async function getBalanceSheet(userId: string, date: string) {
 
   return report;
 }
+
+/**
+ * Journal entries delete
+ */
+export async function deleteJournalEntry(userId: string, entryId: string) {
+  const shop = await getShopOrThrow(userId);
+  const entry = await prisma.journalEntry.findFirst({
+    where: { id: entryId, shop_id: shop.id },
+  });
+  if (!entry) throw new AppError(404, 'NOT_FOUND', 'Journal entry not found');
+  return prisma.journalEntry.delete({ where: { id: entryId } });
+}
