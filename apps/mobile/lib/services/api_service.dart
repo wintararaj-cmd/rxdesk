@@ -25,6 +25,67 @@ class ApiService {
     return h;
   }
 
+  static Future<bool> _refresh() async {
+    try {
+      final rt = await AuthService.getRefreshToken();
+      if (rt == null) return false;
+      final r = await http.post(
+        Uri.parse('$_base/auth/token/refresh'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refresh_token': rt}),
+      );
+      if (r.statusCode == 200) {
+        final body = jsonDecode(r.body);
+        final data = body['data'];
+        final newRT = data['refresh_token'] ?? rt; // Keep old one if not rotated
+        await AuthService.saveSession(
+          accessToken: data['access_token'],
+          refreshToken: newRT,
+          role: await AuthService.getRole() ?? '',
+        );
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  static Future<Map<String, dynamic>> _request(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+    Map<String, String>? query,
+    bool auth = true,
+  }) async {
+    final uri = Uri.parse('$_base$path').replace(queryParameters: query);
+    
+    Future<http.Response> doReq(String token) async {
+      final h = <String, String>{'Content-Type': 'application/json'};
+      if (auth) h['Authorization'] = 'Bearer $token';
+      
+      final b = body != null ? jsonEncode(body) : null;
+      switch (method.toUpperCase()) {
+        case 'POST': return http.post(uri, headers: h, body: b);
+        case 'PUT': return http.put(uri, headers: h, body: b);
+        case 'PATCH': return http.patch(uri, headers: h, body: b);
+        case 'DELETE': return http.delete(uri, headers: h);
+        default: return http.get(uri, headers: h);
+      }
+    }
+
+    String? token = auth ? await AuthService.getAccessToken() : null;
+    var r = await doReq(token ?? '');
+
+    if (r.statusCode == 401 && auth) {
+      final ok = await _refresh();
+      if (ok) {
+        token = await AuthService.getAccessToken();
+        r = await doReq(token ?? '');
+      }
+    }
+
+    return _decode(r);
+  }
+
   static Map<String, dynamic> _decode(http.Response r) {
     final body = jsonDecode(r.body) as Map<String, dynamic>;
     if (r.statusCode >= 200 && r.statusCode < 300) return body;
@@ -35,281 +96,208 @@ class ApiService {
 
   // ── AUTH ─────────────────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> sendOtp(String phone) async {
-    final r = await http.post(Uri.parse('$_base/auth/otp/send'),
-        headers: await _headers(auth: false), body: jsonEncode({'phone': phone}));
-    return _decode(r);
+    return _request('POST', '/auth/otp/send', body: {'phone': phone}, auth: false);
   }
 
-  static Future<Map<String, dynamic>> verifyOtp(
-      String phone, String otp, String otpRef) async {
-    final r = await http.post(Uri.parse('$_base/auth/otp/verify'),
-        headers: await _headers(auth: false),
-        body: jsonEncode({'phone': phone, 'otp': otp, 'otp_ref': otpRef}));
-    return _decode(r);
+  static Future<Map<String, dynamic>> verifyOtp(String phone, String otp, String otpRef) async {
+    return _request('POST', '/auth/otp/verify', body: {'phone': phone, 'otp': otp, 'otp_ref': otpRef}, auth: false);
   }
 
-  static Future<Map<String, dynamic>> loginWithPassword(
-      String phone, String password) async {
-    final r = await http.post(Uri.parse('$_base/auth/login'),
-        headers: await _headers(auth: false),
-        body: jsonEncode({'phone': phone, 'password': password}));
-    return _decode(r);
+  static Future<Map<String, dynamic>> loginWithPassword(String phone, String password) async {
+    return _request('POST', '/auth/login', body: {'phone': phone, 'password': password}, auth: false);
   }
 
-  static Future<Map<String, dynamic>> setPassword(
-      String password, String confirm) async {
-    final r = await http.post(Uri.parse('$_base/auth/password/set'),
-        headers: await _headers(),
-        body: jsonEncode({'password': password, 'confirm_password': confirm}));
-    return _decode(r);
+  static Future<Map<String, dynamic>> setPassword(String password, String confirm) async {
+    return _request('POST', '/auth/password/set', body: {'password': password, 'confirm_password': confirm});
   }
 
   static Future<void> logout() async {
     try {
-      await http.post(Uri.parse('$_base/auth/logout'), headers: await _headers());
+      await _request('POST', '/auth/logout');
     } catch (_) {}
     await AuthService.clearSession();
   }
 
   // ── SHOP ─────────────────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> getMyShop() async {
-    final r = await http.get(Uri.parse('$_base/shops/me'), headers: await _headers());
-    return _decode(r);
+    return _request('GET', '/shops/me');
   }
 
   static Future<Map<String, dynamic>> getShopDashboard() async {
-    final r = await http.get(Uri.parse('$_base/shops/me/dashboard'), headers: await _headers());
-    return _decode(r);
+    return _request('GET', '/shops/me/dashboard');
   }
 
   static Future<Map<String, dynamic>> updateShopProfile(Map<String, dynamic> data) async {
-    final r = await http.put(Uri.parse('$_base/shops/me'),
-        headers: await _headers(), body: jsonEncode(data));
-    return _decode(r);
+    return _request('PUT', '/shops/me', body: data);
   }
 
   static Future<List<dynamic>> getTodayAppointments({String? date}) async {
-    final uri = Uri.parse('$_base/appointments/today')
-        .replace(queryParameters: date != null ? {'date': date} : null);
-    final r = await http.get(uri, headers: await _headers());
-    return _decode(r)['data'] as List;
+    final res = await _request('GET', '/appointments/today', query: date != null ? {'date': date} : null);
+    return res['data'] as List;
   }
 
   // ── INVENTORY ────────────────────────────────────────────────────────────
-  static Future<Map<String, dynamic>> getInventory(
-      {int page = 1, String? q, bool lowStock = false, int limit = 20}) async {
-    final params = <String, String>{
-      'page': page.toString(),
-      'limit': limit.toString(),
-    };
-    if (q != null && q.isNotEmpty) params['q'] = q;
-    if (lowStock) params['low_stock'] = 'true';
-    final uri = Uri.parse('$_base/inventory').replace(queryParameters: params);
-    final r = await http.get(uri, headers: await _headers());
-    return _decode(r);
+  static Future<Map<String, dynamic>> getInventory({int page = 1, String? q, bool lowStock = false, int limit = 20}) async {
+    final query = {'page': page.toString(), 'limit': limit.toString()};
+    if (q != null && q.isNotEmpty) query['q'] = q;
+    if (lowStock) query['low_stock'] = 'true';
+    return _request('GET', '/inventory', query: query);
   }
 
   static Future<Map<String, dynamic>> getInventoryMaster({String? q}) async {
-    final Map<String, String> params = {};
-    if (q != null && q.isNotEmpty) params['q'] = q;
-    final uri = Uri.parse('$_base/inventory/master').replace(queryParameters: params);
-    final r = await http.get(uri, headers: await _headers());
-    return _decode(r);
+    return _request('GET', '/inventory/master', query: q != null && q.isNotEmpty ? {'q': q} : null);
   }
 
   static Future<List<dynamic>> getMasterBatches(String masterId) async {
-    final uri = Uri.parse('$_base/inventory/master/$masterId/batches');
-    final r = await http.get(uri, headers: await _headers());
-    return (_decode(r)['data'] as List?) ?? [];
+    final res = await _request('GET', '/inventory/master/$masterId/batches');
+    return (res['data'] as List?) ?? [];
   }
   
   static Future<Map<String, dynamic>> addInventoryItem(Map<String, dynamic> data) async {
-    final r = await http.post(Uri.parse('$_base/inventory'),
-        headers: await _headers(), body: jsonEncode(data));
-    return _decode(r);
+    return _request('POST', '/inventory', body: data);
   }
 
   static Future<Map<String, dynamic>> updateInventoryItem(String id, Map<String, dynamic> data) async {
-    final r = await http.put(Uri.parse('$_base/inventory/$id'),
-        headers: await _headers(), body: jsonEncode(data));
-    return _decode(r);
+    return _request('PUT', '/inventory/$id', body: data);
   }
 
   static Future<Map<String, dynamic>> patchInventoryMaster(String id, Map<String, dynamic> data) async {
-    final r = await http.patch(Uri.parse('$_base/inventory/master/$id'),
-        headers: await _headers(), body: jsonEncode(data));
-    return _decode(r);
+    return _request('PATCH', '/inventory/master/$id', body: data);
   }
 
   static Future<void> deleteInventoryItem(String id) async {
-    await http.delete(Uri.parse('$_base/inventory/$id'), headers: await _headers());
+    await _request('DELETE', '/inventory/$id');
   }
 
   static Future<List<dynamic>> searchInventory(String q) async {
-    final uri = Uri.parse('$_base/inventory').replace(queryParameters: {'q': q, 'limit': '10'});
-    final r = await http.get(uri, headers: await _headers());
-    return (_decode(r)['data'] as List?) ?? [];
+    final res = await _request('GET', '/inventory', query: {'q': q, 'limit': '10'});
+    return (res['data'] as List?) ?? [];
   }
 
   // ── BILLING ──────────────────────────────────────────────────────────────
   static Future<List<dynamic>> searchCustomers(String phone) async {
-    final uri = Uri.parse('$_base/bills/customers/search')
-        .replace(queryParameters: {'phone': phone});
-    final r = await http.get(uri, headers: await _headers());
-    return (_decode(r)['data'] as List?) ?? [];
+    final res = await _request('GET', '/bills/customers/search', query: {'phone': phone});
+    return (res['data'] as List?) ?? [];
   }
 
-  static Future<Map<String, dynamic>> createManualBill(
-      Map<String, dynamic> payload) async {
-    final r = await http.post(Uri.parse('$_base/bills/manual'),
-        headers: await _headers(), body: jsonEncode(payload));
-    return _decode(r);
+  static Future<Map<String, dynamic>> createManualBill(Map<String, dynamic> payload) async {
+    return _request('POST', '/bills/manual', body: payload);
   }
 
   static Future<List<dynamic>> getBills({int page = 1}) async {
-    final uri = Uri.parse('$_base/bills')
-        .replace(queryParameters: {'page': page.toString(), 'limit': '20'});
-    final r = await http.get(uri, headers: await _headers());
-    return (_decode(r)['data'] as List?) ?? [];
+    final res = await _request('GET', '/bills', query: {'page': page.toString(), 'limit': '20'});
+    return (res['data'] as List?) ?? [];
   }
 
   static Future<Map<String, dynamic>> voidBill(String id) async {
-    // Assuming voiding means updating status or deleting
-    final r = await http.delete(Uri.parse('$_base/bills/$id'), headers: await _headers());
-    return _decode(r);
+    return _request('DELETE', '/bills/$id');
   }
 
   // ── DOCTOR ───────────────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> getDoctorProfile() async {
-    final r = await http.get(Uri.parse('$_base/doctors/me'), headers: await _headers());
-    return _decode(r);
+    return _request('GET', '/doctors/me');
   }
 
   static Future<Map<String, dynamic>> updateDoctorProfile(Map<String, dynamic> data) async {
-    final r = await http.put(Uri.parse('$_base/doctors/me'),
-        headers: await _headers(), body: jsonEncode(data));
-    return _decode(r);
+    return _request('PUT', '/doctors/me', body: data);
   }
 
   static Future<List<dynamic>> getDoctorAppointments() async {
-    final r = await http.get(Uri.parse('$_base/appointments/today'), headers: await _headers());
-    return (_decode(r)['data'] as List?) ?? [];
+    final res = await _request('GET', '/appointments/today');
+    return (res['data'] as List?) ?? [];
   }
 
   static Future<Map<String, dynamic>> updateAppointmentStatus(String id, String status, {String? reason}) async {
-    final r = await http.patch(Uri.parse('$_base/appointments/$id/status'),
-        headers: await _headers(),
-        body: jsonEncode({'status': status, if (reason != null) 'cancel_reason': reason}));
-    return _decode(r);
+    return _request('PATCH', '/appointments/$id/status', body: {'status': status, if (reason != null) 'cancel_reason': reason});
   }
 
   static Future<List<dynamic>> getDoctorIssuedPrescriptions() async {
-    final r = await http.get(Uri.parse('$_base/prescriptions/my-issued'), headers: await _headers());
-    return (_decode(r)['data'] as List?) ?? [];
+    final res = await _request('GET', '/prescriptions/my-issued');
+    return (res['data'] as List?) ?? [];
   }
 
   static Future<Map<String, dynamic>> searchDoctors({String? q, String? spec, String? city}) async {
-    final params = <String, String>{};
-    if (q != null && q.isNotEmpty) params['q'] = q;
-    if (spec != null && spec.isNotEmpty) params['specialization'] = spec;
-    if (city != null && city.isNotEmpty) params['city'] = city;
-    final uri = Uri.parse('$_base/doctors/search').replace(queryParameters: params);
-    final r = await http.get(uri, headers: await _headers(auth: false));
-    return _decode(r);
+    final query = <String, String>{};
+    if (q != null && q.isNotEmpty) query['q'] = q;
+    if (spec != null && spec.isNotEmpty) query['specialization'] = spec;
+    if (city != null && city.isNotEmpty) query['city'] = city;
+    return _request('GET', '/doctors/search', query: query, auth: false);
   }
 
   // ── PATIENT ──────────────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> getPatientProfile() async {
-    final r = await http.get(Uri.parse('$_base/patients/me'), headers: await _headers());
-    return _decode(r);
+    return _request('GET', '/patients/me');
   }
 
   static Future<List<dynamic>> getPatientAppointments() async {
-    final r = await http.get(Uri.parse('$_base/patients/me/appointments'), headers: await _headers());
-    return (_decode(r)['data'] as List?) ?? [];
+    final res = await _request('GET', '/patients/me/appointments');
+    return (res['data'] as List?) ?? [];
   }
 
   static Future<List<dynamic>> getPatientPrescriptions() async {
-    final r = await http.get(Uri.parse('$_base/prescriptions/my'), headers: await _headers());
-    return (_decode(r)['data'] as List?) ?? [];
+    final res = await _request('GET', '/prescriptions/my');
+    return (res['data'] as List?) ?? [];
   }
 
   static Future<Map<String, dynamic>> updatePatientProfile(Map<String, dynamic> data) async {
-    final r = await http.put(Uri.parse('$_base/patients/me'),
-        headers: await _headers(), body: jsonEncode(data));
-    return _decode(r);
+    return _request('PUT', '/patients/me', body: data);
   }
 
   static Future<Map<String, dynamic>> cancelAppointment(String id, {String? reason}) async {
-    final r = await http.patch(Uri.parse('$_base/appointments/$id/status'),
-        headers: await _headers(),
-        body: jsonEncode({'status': 'cancelled', if (reason != null) 'cancel_reason': reason}));
-    return _decode(r);
+    return _request('PATCH', '/appointments/$id/status', body: {'status': 'cancelled', if (reason != null) 'cancel_reason': reason});
   }
 
   // ── PRESCRIPTIONS ───────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> createPrescription(Map<String, dynamic> payload) async {
-    final r = await http.post(Uri.parse('$_base/prescriptions'),
-        headers: await _headers(), body: jsonEncode(payload));
-    return _decode(r);
+    return _request('POST', '/prescriptions', body: payload);
   }
   
   static Future<void> deletePrescription(String id) async {
-    await http.delete(Uri.parse('$_base/prescriptions/$id'), headers: await _headers());
+    await _request('DELETE', '/prescriptions/$id');
   }
 
   // ── TEMPLATES ────────────────────────────────────────────────────────────
   static Future<List<dynamic>> getDoctorTemplates() async {
-    final r = await http.get(Uri.parse('$_base/prescriptions/templates'), headers: await _headers());
-    return (_decode(r)['data'] as List?) ?? [];
+    final res = await _request('GET', '/prescriptions/templates');
+    return (res['data'] as List?) ?? [];
   }
 
   static Future<Map<String, dynamic>> createDoctorTemplate(Map<String, dynamic> payload) async {
-    final r = await http.post(Uri.parse('$_base/prescriptions/templates'),
-        headers: await _headers(), body: jsonEncode(payload));
-    return _decode(r);
+    return _request('POST', '/prescriptions/templates', body: payload);
   }
 
   static Future<void> deleteDoctorTemplate(String id) async {
-    await http.delete(Uri.parse('$_base/prescriptions/templates/$id'), headers: await _headers());
+    await _request('DELETE', '/prescriptions/templates/$id');
   }
 
   static Future<List<dynamic>> searchPatients(String q) async {
-    final uri = Uri.parse('$_base/patients/search').replace(queryParameters: {'q': q});
-    final r = await http.get(uri, headers: await _headers());
-    return (_decode(r)['data'] as List?) ?? [];
+    final res = await _request('GET', '/patients/search', query: {'q': q});
+    return (res['data'] as List?) ?? [];
   }
 
   static Future<List<dynamic>> searchMedicines(String q) async {
-    final uri = Uri.parse('$_base/medicines/search').replace(queryParameters: {'q': q, 'limit': '10'});
-    final r = await http.get(uri, headers: await _headers());
-    return (_decode(r)['data'] as List?) ?? [];
+    final res = await _request('GET', '/medicines/search', query: {'q': q, 'limit': '10'});
+    return (res['data'] as List?) ?? [];
   }
 
   static Future<Map<String, dynamic>> searchShops({String? q, String? city}) async {
-    final params = <String, String>{};
-    if (q != null && q.isNotEmpty) params['q'] = q;
-    if (city != null && city.isNotEmpty) params['city'] = city;
-    final uri = Uri.parse('$_base/shops/search').replace(queryParameters: params);
-    final r = await http.get(uri, headers: await _headers(auth: false));
-    return _decode(r);
+    final query = <String, String>{};
+    if (q != null && q.isNotEmpty) query['q'] = q;
+    if (city != null && city.isNotEmpty) query['city'] = city;
+    return _request('GET', '/shops/search', query: query, auth: false);
   }
 
   // ── NEW TOOLS ────────────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> searchComposition(String q) async {
-    final uri = Uri.parse('$_base/medicines/composition-search').replace(queryParameters: {'q': q});
-    final r = await http.get(uri, headers: await _headers());
-    return _decode(r);
+    return _request('GET', '/medicines/composition-search', query: {'q': q});
   }
 
   static Future<List<dynamic>> getNearbyShops({double? lat, double? lng, double radius = 5}) async {
-    final params = <String, String>{'radius': radius.toString()};
-    if (lat != null) params['lat'] = lat.toString();
-    if (lng != null) params['lng'] = lng.toString();
-    
-    final uri = Uri.parse('$_base/shops/nearby').replace(queryParameters: params);
-    final r = await http.get(uri, headers: await _headers(auth: false));
-    return (_decode(r)['data'] as List?) ?? [];
+    final query = {'radius': radius.toString()};
+    if (lat != null) query['lat'] = lat.toString();
+    if (lng != null) query['lng'] = lng.toString();
+    final res = await _request('GET', '/shops/nearby', query: query, auth: false);
+    return (res['data'] as List?) ?? [];
   }
 }
 

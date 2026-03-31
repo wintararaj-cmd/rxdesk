@@ -313,8 +313,18 @@ export async function refreshAccessToken(
     throw new AppError(401, 'UNAUTHORIZED', 'User account is inactive');
   }
 
+  // Rotate refresh token
+  await redis.del(key);
+  const newRefreshToken = generateRefreshToken();
+  const newTokenId = uuidv4();
+  await redis.setex(
+    RedisKeys.refreshToken(userId, newTokenId),
+    30 * 24 * 60 * 60,
+    newRefreshToken
+  );
+
   const newAccessToken = generateAccessToken(userId, user.role);
-  return { access_token: newAccessToken };
+  return { access_token: newAccessToken, refresh_token: `${newTokenId}:${newRefreshToken}` };
 }
 
 export async function logout(userId: string): Promise<void> {

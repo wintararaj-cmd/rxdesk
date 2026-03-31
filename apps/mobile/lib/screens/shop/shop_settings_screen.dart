@@ -20,7 +20,8 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
   bool _showHsnCode = true;
   bool _showBatchNo = true;
   String _printerType = 'thermal';
-  bool _saving = false;
+  bool _savingInvoice = false;
+  bool _detectingLocation = false;
 
   @override
   void initState() {
@@ -48,7 +49,7 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
   }
 
   Future<void> _saveInvoiceSettings() async {
-    setState(() => _saving = true);
+    setState(() => _savingInvoice = true);
     try {
       await ApiService.updateShopProfile({
         'show_hsn_code': _showHsnCode,
@@ -73,12 +74,12 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) setState(() => _savingInvoice = false);
     }
   }
 
   Future<void> _updateLocation() async {
-    setState(() => _saving = true);
+    setState(() => _detectingLocation = true);
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) throw 'Location services are disabled';
@@ -117,7 +118,7 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) setState(() => _detectingLocation = false);
     }
   }
 
@@ -258,7 +259,7 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: _saving ? null : _saveInvoiceSettings,
+                          onPressed: (_savingInvoice || _detectingLocation) ? null : _saveInvoiceSettings,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF7C3AED),
                             foregroundColor: Colors.white,
@@ -267,7 +268,7 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          child: _saving
+                          child: _savingInvoice
                               ? const SizedBox(
                                   height: 20,
                                   width: 20,
@@ -345,9 +346,11 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
-                          onPressed: _saving ? null : _updateLocation,
-                          icon: const Icon(Icons.my_location),
-                          label: const Text('DETECT & UPDATE LOCATION'),
+                          onPressed: (_savingInvoice || _detectingLocation) ? null : _updateLocation,
+                          icon: _detectingLocation 
+                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF7C3AED)))
+                            : const Icon(Icons.my_location),
+                          label: Text(_detectingLocation ? 'DETECTING...' : 'DETECT & UPDATE LOCATION'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFF7C3AED),
                             side: const BorderSide(color: Color(0xFF7C3AED)),
