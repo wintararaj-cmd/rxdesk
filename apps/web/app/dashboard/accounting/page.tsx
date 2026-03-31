@@ -2339,7 +2339,7 @@ function PurchasesTab() {
       )}
 
       {selectedPurchaseId && (
-        <PurchaseDetailModal id={selectedPurchaseId} onClose={() => setSelectedPurchaseId(null)} onEdit={(p) => { setSelectedPurchaseId(null); loadPurchaseForEdit(p); }} />
+        <PurchaseDetailModal id={selectedPurchaseId} onClose={() => setSelectedPurchaseId(null)} onEdit={(p) => { setSelectedPurchaseId(null); handleEdit(p); }} />
       )}
 
       {activeHsnIdx !== null && (
