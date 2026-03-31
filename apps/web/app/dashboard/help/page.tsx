@@ -15,31 +15,48 @@ export default function HelpPage() {
             title: 'Getting Started',
             icon: <LayoutDashboard className="w-5 h-5 text-blue-500" />,
             desc: 'New to RxDesk? Learn the basics of setting up your shop and managing your first patient.',
-            links: ['Shop Profile Setup', 'Subscription Plans', 'Adding your first Doctor']
+            links: [
+                { label: 'Shop Profile Setup', href: '/dashboard/settings' },
+                { label: 'Subscription Plans', href: '/dashboard/settings' },
+                { label: 'Adding your first Doctor', href: '/dashboard/appointments' }
+            ]
         },
         {
             title: 'Pharmacy & Billing',
             icon: <Receipt className="w-5 h-5 text-amber-500" />,
             desc: 'Master the POS. Search medicines, generate GST bills, and manage customer credit/outstandings.',
-            links: ['Creating an Invoice', 'Batch & Expiry Entry', 'Return & Credit Notes']
+            links: [
+                { label: 'Creating an Invoice', href: '/dashboard/billing' },
+                { label: 'Batch & Expiry Entry', href: '/dashboard/inventory' },
+                { label: 'Return & Credit Notes', href: '/dashboard/accounting' }
+            ]
         },
         {
             title: 'Stock Management',
             icon: <Package className="w-5 h-5 text-emerald-500" />,
             desc: 'Keep your inventory accurate. Track purchase entries, low stock alerts, and rack locations.',
-            links: ['Purchase Inward', 'Stock Adjustments', 'Expiry Tracking']
+            links: [
+                { label: 'Purchase Inward', href: '/dashboard/accounting' },
+                { label: 'Stock Adjustments', href: '/dashboard/inventory' },
+                { label: 'Expiry Tracking', href: '/dashboard/inventory' }
+            ]
         },
         {
             title: 'Accounting & GST',
             icon: <Calculator className="w-5 h-5 text-violet-500" />,
             desc: 'File your taxes with ease. Generate GSTR-1, 2, and 3B summaries and track supplier payments.',
-            links: ['GST Summary Guide', 'Expense Records', 'Cash & Bank Books']
+            links: [
+                { label: 'Financial SOP Guide', href: '/dashboard/help/accounting-sop' },
+                { label: 'GST Summary Guide', href: '/dashboard/accounting' },
+                { label: 'Expense Records', href: '/dashboard/accounting' },
+                { label: 'Cash & Bank Books', href: '/dashboard/accounting' }
+            ]
         }
     ];
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* Hero Section */}
+            {/* ... (Hero section same) ... */}
             <div className="bg-gradient-to-br from-violet-600 to-indigo-700 rounded-[2.5rem] p-8 sm:p-12 text-white relative overflow-hidden shadow-2xl shadow-indigo-200">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20" />
                 <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-400/20 rounded-full blur-2xl -ml-20 -mb-20" />
@@ -104,10 +121,10 @@ export default function HelpPage() {
                         </p>
                         <div className="space-y-3">
                             {cat.links.map((link, lidx) => (
-                                <button key={lidx} className="w-full flex items-center justify-between text-left px-4 py-2 bg-gray-50 rounded-xl text-xs font-semibold text-gray-700 hover:bg-violet-50 hover:text-violet-700 transition-colors">
-                                    {link}
+                                <Link key={lidx} href={link.href} className="w-full flex items-center justify-between text-left px-4 py-2 bg-gray-50 rounded-xl text-xs font-semibold text-gray-700 hover:bg-violet-50 hover:text-violet-700 transition-colors">
+                                    {link.label}
                                     <ExternalLink className="w-3 h-3 opacity-50" />
-                                </button>
+                                </Link>
                             ))}
                         </div>
                     </div>
