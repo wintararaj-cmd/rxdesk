@@ -200,6 +200,8 @@ export default function SettingsPage() {
       gst_number: shop?.gst_number ?? '',
       opening_cash_balance: shop?.opening_cash_balance ?? 0,
       opening_bank_balance: shop?.opening_bank_balance ?? 0,
+      latitude: shop?.latitude ?? null,
+      longitude: shop?.longitude ?? null,
     };
 
   const updateMutation = useMutation({
@@ -501,6 +503,22 @@ export default function SettingsPage() {
             <div className="grid grid-cols-2 gap-4">
               <Field label="Opening Cash Balance" field="opening_cash_balance" type="number" placeholder="0" form={activeForm} onChange={handleChange} />
               <Field label="Opening Bank Balance" field="opening_bank_balance" type="number" placeholder="0" form={activeForm} onChange={handleChange} />
+            </div>
+
+            {/* Shop Coordinates (Set via Mobile) */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Latitude (Set via Mobile)</label>
+                <div className="px-3 py-2 border border-gray-100 rounded-lg text-sm bg-gray-50 text-gray-500 font-mono">
+                  {activeForm.latitude ?? 'Not Set'}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Longitude (Set via Mobile)</label>
+                <div className="px-3 py-2 border border-gray-100 rounded-lg text-sm bg-gray-50 text-gray-500 font-mono">
+                  {activeForm.longitude ?? 'Not Set'}
+                </div>
+              </div>
             </div>
 
             {/* GST Settings */}

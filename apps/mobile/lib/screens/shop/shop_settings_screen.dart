@@ -2,6 +2,7 @@
 // Shop settings screen with invoice settings
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../services/api_service.dart';
 
 class ShopSettingsScreen extends StatefulWidget {
@@ -67,6 +68,50 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to save settings: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _updateLocation() async {
+    setState(() => _saving = true);
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) throw 'Location services are disabled';
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) throw 'Location permissions are denied';
+      }
+      if (permission == LocationPermission.deniedForever) throw 'Location permissions are permanently denied';
+
+      Position position = await Geolocator.getCurrentPosition();
+      
+      await ApiService.updateShopProfile({
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+      });
+
+      await _loadSettings(); // Refresh UI with new coords
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Location updated: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update location: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -243,6 +288,80 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 16),
+
+                // Shop Location Section
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Shop Location',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1F2937),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Update your exact shop coordinates for better discoverability by patients.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      if (_shop != null && _shop?['latitude'] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 20),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.location_on, color: Color(0xFF7C3AED), size: 20),
+                              const SizedBox(width: 8),
+                              Text(
+                                "Currently marked at: ${_shop?['latitude'].toString().substring(0, 7)}, ${_shop?['longitude'].toString().substring(0, 7)}",
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151)),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        const Padding(
+                          padding: const EdgeInsets.only(bottom: 20),
+                          child: Text(
+                            "Location not yet set. Detection highly recommended.",
+                            style: TextStyle(fontSize: 13, color: Colors.orange, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _saving ? null : _updateLocation,
+                          icon: const Icon(Icons.my_location),
+                          label: const Text('DETECT & UPDATE LOCATION'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF7C3AED),
+                            side: const BorderSide(color: Color(0xFF7C3AED)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 40),
               ],
             ),
     );
