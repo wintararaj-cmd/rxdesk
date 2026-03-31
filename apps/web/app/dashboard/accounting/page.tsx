@@ -119,10 +119,12 @@ interface GstSummary {
     taxable_value: number;
     gst_collected: { cgst: number; sgst: number; igst: number };
     total_gst_collected: number;
+    manual_adjustment: number;
   };
   inward_supplies: {
     itc_available: { cgst: number; sgst: number; igst: number };
     total_itc: number;
+    manual_adjustment: number;
     itc_utilised: number;
     itc_carry_forward: number;
   };
@@ -3605,8 +3607,20 @@ function GSTTab() {
           {/* Summary cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard label="Taxable Outward Supplies" value={fmt(data.outward_supplies.taxable_value)} color="bg-violet-50" textColor="text-violet-700" />
-            <StatCard label="GST Collected (Output)" value={fmt(data.outward_supplies.total_gst_collected)} sub={`${data.outward_supplies.gst_collected.igst > 0 ? `IGST ${fmt(data.outward_supplies.gst_collected.igst)}` : `CGST ${fmt(data.outward_supplies.gst_collected.cgst)} + SGST ${fmt(data.outward_supplies.gst_collected.sgst)}`}`} color="bg-blue-50" textColor="text-blue-700" />
-            <StatCard label="ITC (Input Tax Credit)" value={fmt(data.inward_supplies.total_itc)} sub={`${data.inward_supplies.itc_available.igst > 0 ? `IGST ${fmt(data.inward_supplies.itc_available.igst)}` : `CGST ${fmt(data.inward_supplies.itc_available.cgst)} + SGST ${fmt(data.inward_supplies.itc_available.sgst)}`}`} color="bg-green-50" textColor="text-green-700" />
+            <StatCard 
+              label="GST Collected (Output)" 
+              value={fmt(data.outward_supplies.total_gst_collected)} 
+              sub={`${data.outward_supplies.gst_collected.igst > 0 ? `IGST ${fmt(data.outward_supplies.gst_collected.igst)}` : `CGST ${fmt(data.outward_supplies.gst_collected.cgst)} + SGST ${fmt(data.outward_supplies.gst_collected.sgst)}`}${data.outward_supplies.manual_adjustment !== 0 ? ` (${data.outward_supplies.manual_adjustment > 0 ? '+' : ''}${fmt(data.outward_supplies.manual_adjustment)} Adj)` : ''}`} 
+              color="bg-blue-50" 
+              textColor="text-blue-700" 
+            />
+            <StatCard 
+              label="ITC (Input Tax Credit)" 
+              value={fmt(data.inward_supplies.total_itc)} 
+              sub={`${data.inward_supplies.itc_available.igst > 0 ? `IGST ${fmt(data.inward_supplies.itc_available.igst)}` : `CGST ${fmt(data.inward_supplies.itc_available.cgst)} + SGST ${fmt(data.inward_supplies.itc_available.sgst)}`}${data.inward_supplies.manual_adjustment !== 0 ? ` (${data.inward_supplies.manual_adjustment > 0 ? '+' : ''}${fmt(data.inward_supplies.manual_adjustment)} Adj)` : ''}`} 
+              color="bg-green-50" 
+              textColor="text-green-700" 
+            />
             <StatCard label="Net GST Payable" value={fmt(data.net_tax_payable)} sub={data.net_tax_payable === 0 && data.inward_supplies.itc_carry_forward > 0 ? `Excess ITC: ${fmt(data.inward_supplies.itc_carry_forward)}` : `Output − ITC`} color="bg-indigo-50" textColor="text-indigo-700" />
           </div>
 

@@ -1847,31 +1847,58 @@ export async function getGstSummary(userId: string, month: number, year: number)
     }
   }
 
-  const totalITC = totalItcIgst + totalItcCgst + totalItcSgst;
+  const totalInvITC = totalItcIgst + totalItcCgst + totalItcSgst;
+
+  // ── JOURNAL ADJUSTMENTS (New) ──────────────────────────────────────────────
+  const jvItems = await prisma.journalItem.findMany({
+    where: {
+      account: { shop_id: shop.id, name: { in: ['GST Input Tax', 'GST Output Tax'] } },
+      journal: { entry_date: { gte: start, lte: end } }
+    },
+    include: { account: true }
+  });
+
+  let jvOutputAdj = 0;
+  let jvInputAdj = 0;
+
+  for (const jv of jvItems) {
+    if (jv.account.name === 'GST Output Tax') {
+      // Credit increases liability (collected tax), Debit reduces it
+      jvOutputAdj += (jv.type === 'credit' ? Number(jv.amount) : -Number(jv.amount));
+    } else if (jv.account.name === 'GST Input Tax') {
+      // Debit increases asset (ITC), Credit reduces it
+      jvInputAdj += (jv.type === 'debit' ? Number(jv.amount) : -Number(jv.amount));
+    }
+  }
+
+  const finalGstCollected = totalGstCollected + jvOutputAdj;
+  const finalITC = totalInvITC + jvInputAdj;
   
   // ITC Utilization logic
-  const itcUtilised = Math.min(totalGstCollected, totalITC);
-  const netTaxPayable = Math.max(0, totalGstCollected - totalITC);
-  const itcCarryForward = Math.max(0, totalITC - totalGstCollected);
+  const itcUtilised = Math.min(finalGstCollected, finalITC);
+  const netTaxPayable = Math.max(0, finalGstCollected - finalITC);
+  const itcCarryForward = Math.max(0, finalITC - finalGstCollected);
 
   return {
     period: { month, year },
     outward_supplies: {
       taxable_value: Math.round(totalOutwardTaxable * 100) / 100,
       gst_collected: {
-        cgst: Math.round(totalCgstCollected * 100) / 100,
-        sgst: Math.round(totalSgstCollected * 100) / 100,
+        cgst: Math.round((totalCgstCollected + (jvOutputAdj / 2)) * 100) / 100,
+        sgst: Math.round((totalSgstCollected + (jvOutputAdj / 2)) * 100) / 100,
         igst: Math.round(totalIgstCollected * 100) / 100,
       },
-      total_gst_collected: Math.round(totalGstCollected * 100) / 100,
+      total_gst_collected: Math.round(finalGstCollected * 100) / 100,
+      manual_adjustment: Math.round(jvOutputAdj * 100) / 100,
     },
     inward_supplies: {
       itc_available: {
-        cgst: Math.round(totalItcCgst * 100) / 100,
-        sgst: Math.round(totalItcSgst * 100) / 100,
+        cgst: Math.round((totalItcCgst + (jvInputAdj / 2)) * 100) / 100,
+        sgst: Math.round((totalItcSgst + (jvInputAdj / 2)) * 100) / 100,
         igst: Math.round(totalItcIgst * 100) / 100,
       },
-      total_itc: Math.round(totalITC * 100) / 100,
+      total_itc: Math.round(finalITC * 100) / 100,
+      manual_adjustment: Math.round(jvInputAdj * 100) / 100,
       itc_utilised: Math.round(itcUtilised * 100) / 100,
       itc_carry_forward: Math.round(itcCarryForward * 100) / 100,
     },
