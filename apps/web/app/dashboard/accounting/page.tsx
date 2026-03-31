@@ -249,7 +249,7 @@ function HsnEntryModal({ medicineName, onSave, onCancel }: { medicineName: strin
 }
 
 // ── panel tabs ────────────────────────────────────────────────────────────────
-const TABS = ['P&L', 'Balance Sheet', 'Receipts & Payments', 'Suppliers', 'Purchases', 'Outstandings', 'GST', 'Sale Ret.', 'Pur. Ret.', 'Contra', 'Journal', 'Cashbook', 'Bankbook', 'Ledger', 'COA Setup', 'Settings'] as const;
+const TABS = ['P&L', 'Balance Sheet', 'Receipts & Payments', 'Suppliers', 'Purchases', 'Outstandings', 'Returns', 'GST', 'Contra', 'Journal', 'Cashbook', 'Bankbook', 'Ledger', 'COA Setup', 'Settings'] as const;
 type Tab = (typeof TABS)[number];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3674,6 +3674,51 @@ function GSTTab() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  Returns Unified Tab
+// ─────────────────────────────────────────────────────────────────────────────
+function ReturnsTab({ setSelectedSaleReturnId, setSelectedPurchaseReturnId }: { setSelectedSaleReturnId: (id: string) => void; setSelectedPurchaseReturnId: (id: string) => void }) {
+  const [subTab, setSubTab] = useState<'sale' | 'purchase'>('sale');
+
+  return (
+    <div className="space-y-6">
+      {/* Sub-navigation for Returns */}
+      <div className="flex items-center gap-3 bg-white p-2 rounded-3xl border border-gray-100 shadow-sm w-fit">
+        <button
+          onClick={() => setSubTab('sale')}
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-300 ${
+            subTab === 'sale'
+              ? 'bg-orange-600 text-white shadow-lg shadow-orange-100 ring-2 ring-orange-50'
+              : 'text-gray-400 hover:text-orange-600 hover:bg-orange-50'
+          }`}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
+          Sale Returns
+        </button>
+        <button
+          onClick={() => setSubTab('purchase')}
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-300 ${
+            subTab === 'purchase'
+              ? 'bg-rose-600 text-white shadow-lg shadow-rose-100 ring-2 ring-rose-50'
+              : 'text-gray-400 hover:text-rose-600 hover:bg-rose-50'
+          }`}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.129-1.125V3.375c0-.621-.508-1.125-1.129-1.125H16.125M16.125 14.25h2.25m-2.25 0H6.75m0 0V4.875c0-.621.504-1.125 1.125-1.125h12.75c.621 0 1.125.504 1.125 1.125v12.75c0 .621-.504 1.125-1.125 1.125h-4.5" /></svg>
+          Purchase Returns
+        </button>
+      </div>
+
+      <div className="animate-in fade-in slide-in-from-top-4 duration-500">
+        {subTab === 'sale' ? (
+          <SaleReturnTab setSelectedReturnId={setSelectedSaleReturnId} />
+        ) : (
+          <PurchaseReturnTab setSelectedReturnId={setSelectedPurchaseReturnId} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  Sale Return Tab
 // ─────────────────────────────────────────────────────────────────────────────
 const EMPTY_SR_ITEM = { medicine_name: '', unit: 'strip', batch_number: '', quantity: '1', mrp: '', discount_pct: '0', gst_rate: '12' };
@@ -5442,8 +5487,12 @@ export default function AccountingPage() {
         {activeTab === 'Purchases' && <PurchasesTab />}
         {activeTab === 'Outstandings' && <OutstandingsTab />}
         {activeTab === 'GST' && <GSTTab />}
-        {activeTab === 'Sale Ret.' && <SaleReturnTab setSelectedReturnId={setSelectedSaleReturnId} />}
-        {activeTab === 'Pur. Ret.' && <PurchaseReturnTab setSelectedReturnId={setSelectedPurchaseReturnId} />}
+        {activeTab === 'Returns' && (
+          <ReturnsTab
+            setSelectedSaleReturnId={setSelectedSaleReturnId}
+            setSelectedPurchaseReturnId={setSelectedPurchaseReturnId}
+          />
+        )}
         {activeTab === 'Contra' && <ContraTab />}
         {activeTab === 'Journal' && <JournalTab />}
         {activeTab === 'Cashbook' && <CashbookTab />}
