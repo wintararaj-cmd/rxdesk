@@ -3558,7 +3558,10 @@ function LedgerPanel({ data, type, ledger, payAmount, setPayAmount, payMethod, s
 //  GST Tab
 // ─────────────────────────────────────────────────────────────────────────────
 function GSTTab() {
-  const { data: shopRes } = useQuery({ queryKey: ['shop-profile'] });
+  const { data: shopRes } = useQuery<any>({ 
+    queryKey: ['shop-profile'], 
+    queryFn: () => shopApi.getMyShop() 
+  });
   const shop = shopRes?.data?.data;
   const isComposite = shop?.gst_type === 'composite';
 
@@ -4939,7 +4942,7 @@ function BankbookTab() {
 function SettingsTab() {
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { data: shopRes } = useQuery({ queryKey: ['shop-profile'], queryFn: () => shopApi.getMyShop() });
+  const { data: shopRes } = useQuery<any>({ queryKey: ['shop-profile'], queryFn: () => shopApi.getMyShop() });
   const shop = shopRes?.data?.data;
 
   const { data: accStatus, isLoading: statLoading } = useQuery({
@@ -5734,7 +5737,7 @@ export default function AccountingPage() {
   const [activeTab, setActiveTab] = useState<Tab>('Reports');
   const [selectedSaleReturnId, setSelectedSaleReturnId] = useState<string | null>(null);
   const [selectedPurchaseReturnId, setSelectedPurchaseReturnId] = useState<string | null>(null);
-  const { data: shopRes } = useQuery({ queryKey: ['shop-profile'], queryFn: () => shopApi.getMyShop() });
+  const { data: shopRes } = useQuery<any>({ queryKey: ['shop-profile'], queryFn: () => shopApi.getMyShop() });
   const shop = shopRes?.data?.data;
 
   const { data: statusRes, isLoading: statLoading } = useQuery({
