@@ -51,8 +51,23 @@ function normalizeState(s?: string | null): string {
 
 async function generateBillNumber(tx: any): Promise<string> {
   const year = new Date().getFullYear();
-  const count = await tx.bill.count();
-  return `DN-${year}-${String(count + 1).padStart(6, '0')}`;
+  
+  // Find the bill with the highest bill_number for the current year
+  const lastBill = await tx.bill.findFirst({
+    where: { bill_number: { startsWith: `DN-${year}-` } },
+    orderBy: { bill_number: 'desc' },
+  });
+
+  let nextNum = 1;
+  if (lastBill) {
+    const lastNumStr = lastBill.bill_number.split('-').pop();
+    const lastNum = lastNumStr ? parseInt(lastNumStr, 10) : 0;
+    if (!isNaN(lastNum)) {
+      nextNum = lastNum + 1;
+    }
+  }
+
+  return `DN-${year}-${String(nextNum).padStart(6, '0')}`;
 }
 
 export async function generateBillFromPrescription(
