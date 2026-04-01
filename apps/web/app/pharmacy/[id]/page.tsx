@@ -1,6 +1,7 @@
 import { Metadata, ResolvingMetadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import ShareButtons from '../../../components/ShareButtons';
 
 async function getShop(id: string) {
   const res = await fetch(`https://backend.rxdesk.in/api/v1/shops/${id}`, {
@@ -208,14 +209,7 @@ export default async function ShopProfilePage({ params }: Props) {
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 text-center">
                 <h4 className="font-bold text-slate-900 mb-2 italic text-lg">Save this profile for emergency</h4>
                 <p className="text-slate-500 text-sm mb-4 italic">Get live stocks and pricing on WhatsApp</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <button className="flex items-center justify-center gap-2 p-2 rounded-xl bg-slate-50 text-slate-600 font-bold text-sm hover:bg-slate-100">
-                    WhatsApp
-                  </button>
-                  <button className="flex items-center justify-center gap-2 p-2 rounded-xl bg-slate-50 text-slate-600 font-bold text-sm hover:bg-slate-100">
-                    Copy Link
-                  </button>
-                </div>
+                <ShareButtons shopName={shop.shop_name} id={shop.id} />
               </div>
 
               {/* Trust Badge */}
