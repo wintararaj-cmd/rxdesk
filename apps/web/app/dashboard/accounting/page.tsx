@@ -3721,24 +3721,57 @@ function GSTTab() {
               </button>
             </>
           ) : (
-            <button
-              onClick={async () => {
-                try {
-                  const res = await accountingApi.getCompositionGstExcel(quarter, year);
-                  const url = window.URL.createObjectURL(new Blob([res.data]));
-                  const link = document.createElement('a');
-                  link.href = url;
-                  link.setAttribute('download', `CMP08_Q${quarter}_${year}.xlsx`);
-                  document.body.appendChild(link);
-                  link.click();
-                  link.remove();
-                } catch (err) { alert('Failed to download CMP-08'); }
-              }}
-              className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-100 hover:scale-[1.02] active:scale-95 transition-all"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-              Download CMP-08 (Excel)
-            </button>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-100">
+                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">FY</span>
+                <select 
+                  className="bg-transparent border-none p-0 text-xs font-black text-indigo-700 focus:ring-0"
+                  defaultValue={TODAY.getMonth() < 3 ? TODAY.getFullYear() - 1 : TODAY.getFullYear()}
+                  id="gstr4-fy-gsttab"
+                >
+                  <option value={2024}>2024-25</option>
+                  <option value={2025}>2025-26</option>
+                  <option value={2026}>2026-27</option>
+                </select>
+              </div>
+              <button
+                onClick={async () => {
+                  const fy = (document.getElementById('gstr4-fy-gsttab') as HTMLSelectElement)?.value || year;
+                  try {
+                    const res = await accountingApi.getGstr4Excel(Number(fy));
+                    const url = window.URL.createObjectURL(new Blob([res.data]));
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', `GSTR4_FY${fy}.xlsx`);
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                  } catch (err) { alert('Failed to download GSTR-4'); }
+                }}
+                className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-emerald-100 hover:scale-[1.05] active:scale-95 transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                GSTR-4 (Annual)
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await accountingApi.getCompositionGstExcel(quarter, year);
+                    const url = window.URL.createObjectURL(new Blob([res.data]));
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', `CMP08_Q${quarter}_${year}.xlsx`);
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                  } catch (err) { alert('Failed to download CMP-08'); }
+                }}
+                className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-100 hover:scale-[1.05] active:scale-95 transition-all"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                CMP-08 (Quarterly)
+              </button>
+            </div>
           )}
         </div>
       </div>
