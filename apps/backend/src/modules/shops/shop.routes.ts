@@ -111,4 +111,11 @@ router.get('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/public/list', async (req, res, next) => {
+  try {
+    const shops = await service.getAllPublicShops();
+    res.json({ success: true, data: shops });
+  } catch (err) { next(err); }
+});
+
 export default router;

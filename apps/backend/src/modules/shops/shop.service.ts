@@ -395,3 +395,11 @@ export async function getShopAnalytics(userId: string, days = 30) {
     top_medicines: topMedicines,
   };
 }
+
+export async function getAllPublicShops() {
+  return prisma.medicalShop.findMany({
+    where: { is_active: true, verification_status: 'approved' },
+    select: { id: true, shop_name: true, city: true, updated_at: true },
+    orderBy: { created_at: 'desc' },
+  });
+}

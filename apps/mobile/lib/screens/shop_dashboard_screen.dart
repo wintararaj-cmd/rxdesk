@@ -1,11 +1,52 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 import 'new_sale_screen.dart';
 
-class ShopDashboardScreen extends StatelessWidget {
+class ShopDashboardScreen extends StatefulWidget {
   const ShopDashboardScreen({Key? key}) : super(key: key);
 
   @override
+  State<ShopDashboardScreen> createState() => _ShopDashboardScreenState();
+}
+
+class _ShopDashboardScreenState extends State<ShopDashboardScreen> {
+  bool _isLoading = true;
+  Map<String, dynamic> _data = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    try {
+      final res = await ApiService.getShopDashboard();
+      setState(() {
+        _data = res['data'] ?? {};
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading dashboard: $e')),
+        );
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final appointments = _data['appointments'] as List? ?? [];
+    
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -15,8 +56,8 @@ class ShopDashboardScreen extends StatelessWidget {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {},
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadData,
           ),
           IconButton(
             icon: const Icon(Icons.account_circle_outlined),
@@ -24,69 +65,79 @@ class ShopDashboardScreen extends StatelessWidget {
           )
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Overview',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(child: _buildSummaryCard('Today\'s Sales', '₹12,450', Icons.currency_rupee, Colors.green)),
-                const SizedBox(width: 16),
-                Expanded(child: _buildSummaryCard('New Orders', '24', Icons.shopping_cart, Colors.blue)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(child: _buildSummaryCard('Low Stock', '12', Icons.warning_amber_rounded, Colors.orange)),
-                const SizedBox(width: 16),
-                Expanded(child: _buildSummaryCard('Total Items', '850', Icons.inventory_2_outlined, Colors.purple)),
-              ],
-            ),
-            const SizedBox(height: 32),
-            const Text(
-              'Quick Actions',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 1.5,
-              children: [
-                _buildActionCard(context, 'Manage Inventory', Icons.inventory, Colors.indigo),
-                _buildActionCard(context, 'View Orders', Icons.receipt_long, Colors.teal),
-                _buildActionCard(context, 'Add Medicine', Icons.add_box, Colors.blueAccent),
-                _buildActionCard(context, 'Payments', Icons.account_balance_wallet, Colors.green),
-              ],
-            ),
-            const SizedBox(height: 32),
-            const Text(
-              'Recent Orders',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            _buildRecentOrderList(),
-          ],
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Overview',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: _buildSummaryCard('Today\'s Sales', '₹${_data['today_sales'] ?? 0}', Icons.currency_rupee, Colors.green)),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildSummaryCard('Pending Bills', '${_data['pending_bills'] ?? 0}', Icons.shopping_cart, Colors.blue)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: _buildSummaryCard('Low Stock', '${_data['low_stock_count'] ?? 0}', Icons.warning_amber_rounded, Colors.orange)),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildSummaryCard('Total Inventory', '${_data['total_inventory'] ?? 0}', Icons.inventory_2_outlined, Colors.purple)),
+                ],
+              ),
+              const SizedBox(height: 32),
+              const Text(
+                'Quick Actions',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 1.5,
+                children: [
+                  _buildActionCard(context, 'Manage Inventory', Icons.inventory, Colors.indigo),
+                  _buildActionCard(context, 'Account Reports', Icons.receipt_long, Colors.teal),
+                  _buildActionCard(context, 'Shop Settings', Icons.settings, Colors.blueAccent),
+                  _buildActionCard(context, 'Payments', Icons.account_balance_wallet, Colors.green),
+                ],
+              ),
+              const SizedBox(height: 32),
+              const Text(
+                'Today\'s Appointments',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              if (appointments.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: Text('No appointments today', style: TextStyle(color: Colors.grey))),
+                )
+              else
+                _buildAppointmentList(appointments),
+            ],
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => const NewSaleScreen(),
             ),
           );
+          _loadData();
         },
         icon: const Icon(Icons.add),
         label: const Text('New Sale'),
@@ -165,12 +216,17 @@ class ShopDashboardScreen extends StatelessWidget {
     );
   }
   
-  Widget _buildRecentOrderList() {
+  Widget _buildAppointmentList(List appointments) {
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: 3,
+      itemCount: appointments.length,
       itemBuilder: (context, index) {
+        final apt = appointments[index];
+        final patient = apt['patient'] ?? {};
+        final chamber = apt['chamber'] ?? {};
+        final doctor = chamber['doctor'] ?? {};
+
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           elevation: 0,
@@ -182,26 +238,18 @@ class ShopDashboardScreen extends StatelessWidget {
             contentPadding: const EdgeInsets.all(16),
             leading: CircleAvatar(
               backgroundColor: Colors.blue.withOpacity(0.1),
-              child: const Icon(Icons.shopping_bag, color: Colors.blue),
+              child: const Icon(Icons.person, color: Colors.blue),
             ),
-            title: Text('Order #${1024 + index}', style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('${index * 2 + 1} items • Paracetamol, Vitamin C...'),
+            title: Text(patient['full_name'] ?? 'Walk-in', style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text('Doctor: ${doctor['full_name'] ?? 'N/A'}\nTime: ${apt['slot_start_time'] ?? ''}'),
             trailing: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text('₹${(index + 1) * 250}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    'Pending',
-                    style: TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.bold),
-                  ),
-                ),
+                Text(apt['status']?.toString().toUpperCase() ?? '', 
+                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blueAccent)),
+                const SizedBox(height: 4),
+                Text(apt['token_number'] != null ? '#${apt['token_number']}' : '', style: const TextStyle(color: Colors.grey)),
               ],
             ),
           ),

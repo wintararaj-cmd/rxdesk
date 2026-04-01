@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
+import '../services/api_service.dart';
 
 class NewSaleScreen extends StatefulWidget {
   const NewSaleScreen({Key? key}) : super(key: key);
@@ -12,6 +12,7 @@ class NewSaleScreen extends StatefulWidget {
 
 class _NewSaleScreenState extends State<NewSaleScreen> {
   bool _isLoading = false;
+  Map<String, dynamic>? _shopProfile;
 
   final TextEditingController _nameController = TextEditingController(text: 'Walk-in customer');
   final TextEditingController _discountController = TextEditingController();
@@ -23,6 +24,7 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
   
   double _subtotal = 0.0;
   double _total = 0.0;
+  double _gstAmount = 0.0;
   
   // Track phone globally
   String _customerPhone = '';
@@ -30,6 +32,7 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
   @override
   void initState() {
     super.initState();
+    _fetchShopProfile();
     _discountController.addListener(_calculateTotals);
     _addItem(); // Add first empty row by default
   }
@@ -39,23 +42,30 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
     _nameController.dispose();
     _discountController.dispose();
     for (var item in _items) {
-      item['medicine_name'].dispose();
+      item['medicine_name_ctrl'].dispose();
       item['qty'].dispose();
       item['mrp'].dispose();
     }
     super.dispose();
   }
 
+  Future<void> _fetchShopProfile() async {
+    try {
+      final res = await ApiService.getMyShop();
+      if (mounted) {
+        setState(() {
+          _shopProfile = res['data'];
+        });
+        _calculateTotals();
+      }
+    } catch (_) {}
+  }
+
   Future<Iterable<Map<String, dynamic>>> _searchCustomers(String query) async {
     if (query.isEmpty) return const Iterable.empty();
     try {
-      final response = await http.get(
-        Uri.parse('https://backend.rxdesk.in/api/bills/customers/search?phone=$query'),
-      );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body)['data'] as List;
-        return data.cast<Map<String, dynamic>>();
-      }
+      final data = await ApiService.searchCustomers(query);
+      return data.cast<Map<String, dynamic>>();
     } catch (_) {}
     return const Iterable.empty();
   }
@@ -63,56 +73,34 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
   Future<Iterable<Map<String, dynamic>>> _searchMedicines(String query) async {
     if (query.isEmpty) return const Iterable.empty();
     try {
-      final response = await http.get(
-        Uri.parse('https://backend.rxdesk.in/api/inventory?q=$query'),
-      );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body)['data'] as List;
-        final invItems = data.cast<Map<String, dynamic>>();
-        
-        // Group by medicine name
-        final Map<String, Map<String, dynamic>> grouped = {};
-        for (var inv in invItems) {
-          final name = (inv['medicine_name'] ?? '').toString().toLowerCase().trim();
-          if (!grouped.containsKey(name)) {
-            grouped[name] = {
-              'medicine_name': inv['medicine_name'],
-              'total_stock': 0,
-              'batches': [],
-              'mrp': inv['mrp'], // fallback
-            };
-          }
-          grouped[name]!['total_stock'] += (inv['stock_qty'] ?? 0);
-          grouped[name]!['batches'].add(inv);
-        }
-
-        final results = grouped.values.map((g) {
-          final batches = g['batches'] as List;
-          // Sort by expiry (FEFO)
-          batches.sort((a, b) {
-            final expA = a['expiry_date'];
-            final expB = b['expiry_date'];
-            if (expA == null) return 1;
-            if (expB == null) return -1;
-            return expA.toString().compareTo(expB.toString());
-          });
-          return g;
-        }).toList();
-
-        return results;
-      }
+      // Use the master inventory search for total stock visibility
+      final res = await ApiService.getInventoryMaster(q: query);
+      final data = res['data'] as List;
+      return data.cast<Map<String, dynamic>>();
     } catch (_) {}
     return const Iterable.empty();
   }
 
   void _calculateTotals() {
     double sub = 0;
+    double gst = 0;
+    
+    // Check if we should calculate GST (only for regular shops)
+    final bool isRegularShop = _shopProfile?['gst_type'] == 'regular';
+
     for (var item in _items) {
       final qtyText = item['qty'].text;
       final mrpText = item['mrp'].text;
       final int qty = int.tryParse(qtyText) ?? 0;
       final double mrp = double.tryParse(mrpText) ?? 0.0;
-      sub += (qty * mrp);
+      final double lineSubtotal = (qty * mrp);
+      sub += lineSubtotal;
+      
+      if (isRegularShop) {
+        // Assume 12% as medicine default for local calculation if not specified
+        final double rate = (item['gst_rate'] ?? 12.0) / 100.0;
+        gst += (lineSubtotal * rate);
+      }
     }
     
     final discountText = _discountController.text;
@@ -120,7 +108,8 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
 
     setState(() {
       _subtotal = sub;
-      _total = (sub - discount).clamp(0, double.infinity).roundToDouble();
+      _gstAmount = gst;
+      _total = (sub - discount + gst).clamp(0, double.infinity).roundToDouble();
     });
   }
 
@@ -134,12 +123,13 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
       mrpCtrl.addListener(_calculateTotals);
 
       _items.add({
-        'medicine_name': nameCtrl,
+        'medicine_name_ctrl': nameCtrl, // Avoid shadowing 'medicine_name' key later
         'qty': qtyCtrl,
         'mrp': mrpCtrl,
         'batch_number': '',
         'inventory_id': '',
         'available_batches': [],
+        'gst_rate': 12.0, // Default for medicine
       });
       _calculateTotals();
     });
@@ -148,7 +138,7 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
   void _removeItem(int index) {
     if (_items.length == 1) return; // leave at least one
     setState(() {
-      _items[index]['medicine_name'].dispose();
+      _items[index]['medicine_name_ctrl'].dispose();
       _items[index]['qty'].dispose();
       _items[index]['mrp'].dispose();
       _items.removeAt(index);
@@ -156,11 +146,41 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
     });
   }
 
+  void _reset() {
+    // AGGRESSIVE CLEAR: Hard clear of focus and overlays
+    FocusManager.instance.primaryFocus?.unfocus();
+    
+    // NUCLEAR RESET: Re-push the screen to kill all ghost overlays
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const NewSaleScreen()),
+    );
+  }
+
+  Future<void> _fetchBatches(int itemIndex, String masterId) async {
+    try {
+      final batches = await ApiService.getMasterBatches(masterId);
+      if (mounted) {
+        setState(() {
+          _items[itemIndex]['available_batches'] = batches;
+          if (batches.isNotEmpty) {
+            // Select first batch by default if none selected
+            final first = batches[0];
+            _items[itemIndex]['inventory_id'] = first['id'] ?? '';
+            _items[itemIndex]['batch_number'] = first['batch_number'] ?? '';
+            _items[itemIndex]['mrp'].text = (first['mrp'] ?? 0).toString();
+          }
+        });
+        _calculateTotals();
+      }
+    } catch (_) {}
+  }
+
   Future<void> _generateBill() async {
     // validation
     List<Map<String, dynamic>> payloadItems = [];
     for (var item in _items) {
-      final name = item['medicine_name'].text.trim();
+      final name = item['medicine_name_ctrl'].text.trim();
       final qty = int.tryParse(item['qty'].text) ?? 0;
       final mrp = double.tryParse(item['mrp'].text) ?? 0.0;
       
@@ -201,31 +221,18 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
         "payment_method": pm,
       };
 
-      final response = await http.post(
-        Uri.parse('https://backend.rxdesk.in/api/bills/manual'),
-        headers: {
-          'Content-Type': 'application/json',
-          // 'Authorization': 'Bearer <YOUR_TOKEN_HERE>' 
-        },
-        body: jsonEncode(payload),
-      );
+      await ApiService.createManualBill(payload);
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bill generated!')),
-        );
-        Navigator.pop(context);
-      } else {
-         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Saved offline (API returned ${response.statusCode})')),
+          const SnackBar(content: Text('Bill generated successfully!')),
         );
         Navigator.pop(context);
       }
     } catch (e) {
        ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Network error. Saved offline. $e')),
+        SnackBar(content: Text('Error generating bill: $e')),
       );
-      Navigator.pop(context);
     } finally {
       if (mounted) {
         setState(() {
@@ -239,6 +246,13 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
     final item = _items[itemIndex];
     final batches = item['available_batches'] as List;
     
+    if (batches.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No batches found in inventory. Please add stock in inventory first.')),
+      );
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -253,7 +267,7 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
             const Text("Select Batch", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             ...batches.map((b) => ListTile(
-              title: Text("Batch: ${b['batch_number']}"),
+              title: Text("Batch: ${b['batch_number'] ?? 'N/A'}"),
               subtitle: Text("Stock: ${b['stock_qty']} | Exp: ${b['expiry_date']?.toString().split('T')[0] ?? 'N/A'}"),
               trailing: Text("₹${b['mrp']}", style: const TextStyle(fontWeight: FontWeight.bold)),
               selected: item['inventory_id'] == b['id'],
@@ -296,13 +310,22 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final String gstType = _shopProfile?['gst_type'] ?? 'unregistered';
+    final String headerType = gstType == 'regular' ? 'TAX INVOICE' : 'BILL OF SUPPLY';
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Walk-in Sale'),
+        title: Text(headerType, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 1,
+        actions: [
+          TextButton(
+            onPressed: _reset,
+            child: const Text('Reset', style: TextStyle(color: Colors.deepPurple)),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -321,61 +344,19 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: Autocomplete<Map<String, dynamic>>(
-                      optionsBuilder: (TextEditingValue textEditingValue) {
-                        _customerPhone = textEditingValue.text; // Store ongoing changes manually
-                        return _searchCustomers(textEditingValue.text);
-                      },
-                      displayStringForOption: (option) {
-                        return option['customer_phone'] ?? '';
-                      },
+                    child: CustomerSearchField(
+                      initialValue: _customerPhone,
                       onSelected: (option) {
-                        _customerPhone = option['customer_phone'] ?? '';
-                        if (option['customer_name'] != null && option['customer_name'].toString().isNotEmpty) {
-                           _nameController.text = option['customer_name'];
-                        }
+                        setState(() {
+                          _customerPhone = option['customer_phone'] ?? '';
+                          final String? name = option['customer_name'];
+                          _nameController.text = (name != null && name.isNotEmpty) ? name : 'Walk-in customer';
+                        });
                       },
-                      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                        return TextField(
-                          controller: controller,
-                          focusNode: focusNode,
-                          keyboardType: TextInputType.phone,
-                          decoration: const InputDecoration(
-                            labelText: 'Phone (search by number)',
-                            hintText: '9XXXXXXXXX',
-                            border: OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          ),
-                          onChanged: (val) {
-                             _customerPhone = val;
-                          },
-                        );
-                      },
-                      optionsViewBuilder: (context, onSelected, options) {
-                        return Align(
-                          alignment: Alignment.topLeft,
-                          child: Material(
-                            elevation: 4,
-                            child: SizedBox(
-                              width: 300,
-                              child: ListView.builder(
-                                padding: const EdgeInsets.all(0),
-                                shrinkWrap: true,
-                                itemCount: options.length,
-                                itemBuilder: (BuildContext context, int index) {
-                                  final option = options.elementAt(index);
-                                  return ListTile(
-                                    title: Text(option['customer_phone'] ?? ''),
-                                    subtitle: Text(option['customer_name'] ?? ''),
-                                    onTap: () {
-                                      onSelected(option);
-                                    },
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                        );
+                      onChanged: (val) {
+                        setState(() {
+                          _customerPhone = val;
+                        });
                       },
                     ),
                   ),
@@ -414,99 +395,32 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                     children: [
                       Expanded(
                         flex: 3,
-                        child: Autocomplete<Map<String, dynamic>>(
-                          optionsBuilder: (TextEditingValue textEditingValue) {
-                            return _searchMedicines(textEditingValue.text);
-                          },
-                          displayStringForOption: (option) => option['medicine_name'] ?? '',
+                        child: MedicineSearchField(
+                          key: ValueKey("med_${index}_${item['inventory_id']}"),
+                          initialValue: item['medicine_name_ctrl'].text,
                           onSelected: (option) {
-                             final batches = (option['batches'] as List);
-                             final bestBatch = batches.firstWhere((b) => (b['stock_qty'] ?? 0) > 0, orElse: () => batches[0]);
-                             
-                             setState(() {
-                               item['mrp'].text = (bestBatch['mrp'] ?? 0).toString();
-                               item['batch_number'] = bestBatch['batch_number'] ?? '';
-                               item['inventory_id'] = bestBatch['id'] ?? '';
-                               item['available_batches'] = batches;
-                             });
-                             _calculateTotals();
+                            setState(() {
+                              item['medicine_name_ctrl'].text = option['medicine_name'] ?? '';
+                              _fetchBatches(index, option['id']);
+                            });
                           },
-                          fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                            // Link inner controller state to dynamic outer reference
-                            item['medicine_name'] = controller;
-                            return TextField(
-                              controller: controller,
-                              focusNode: focusNode,
-                              decoration: const InputDecoration(
-                                hintText: 'Medicine name',
-                                border: OutlineInputBorder(),
-                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                              ),
-                            );
-                          },
-                          optionsViewBuilder: (context, onSelected, options) {
-                            return Align(
-                              alignment: Alignment.topLeft,
-                              child: Material(
-                                elevation: 8,
-                                shadowColor: Colors.black45,
-                                borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  width: 320,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: ListView.builder(
-                                    padding: EdgeInsets.zero,
-                                    shrinkWrap: true,
-                                    itemCount: options.length,
-                                    itemBuilder: (BuildContext context, int index) {
-                                      final option = options.elementAt(index);
-                                      final totalStock = option['total_stock'] ?? 0;
-                                      final batchesCount = (option['batches'] as List).length;
-                                      
-                                      return ListTile(
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                        title: Text(option['medicine_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                        subtitle: Text(
-                                          "Total Stock: $totalStock | $batchesCount Batches\n"
-                                          "Soonest Exp: ${option['batches'][0]['expiry_date']?.toString().split('T')[0] ?? 'N/A'}",
-                                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                        ),
-                                        trailing: Text("₹${option['mrp']}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
-                                        onTap: () {
-                                          onSelected(option);
-                                        },
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                            );
+                          onChanged: (val) {
+                             item['medicine_name_ctrl'].text = val;
                           },
                         ),
                       ),
-                      if (item['batch_number'].toString().isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4, left: 4),
-                            child: InkWell(
-                              onTap: () {
-                                _showBatchSelector(index);
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.shade50,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  "Batch: ${item['batch_number']} ▼",
-                                  style: TextStyle(fontSize: 10, color: Colors.blue.shade700, fontWeight: FontWeight.bold),
-                                ),
-                              ),
+                      if (item['batch_number']?.toString().isNotEmpty ?? false)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4, left: 4),
+                          child: InkWell(
+                            onTap: () => _showBatchSelector(index),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(4)),
+                              child: Text("${item['batch_number']} ▼", style: TextStyle(fontSize: 10, color: Colors.blue.shade700, fontWeight: FontWeight.bold)),
                             ),
                           ),
+                        ),
                       const SizedBox(width: 8),
                       Expanded(
                         flex: 1,
@@ -514,10 +428,7 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                           controller: item['qty'],
                           keyboardType: TextInputType.number,
                           textAlign: TextAlign.center,
-                          decoration: const InputDecoration(
-                            border: OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          ),
+                          decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -526,11 +437,7 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                         child: TextField(
                           controller: item['mrp'],
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          decoration: const InputDecoration(
-                            hintText: '0.00',
-                            border: OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          ),
+                          decoration: const InputDecoration(hintText: '0.00', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
                         ),
                       ),
                       SizedBox(
@@ -633,6 +540,17 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                         Text('₹${_subtotal.toStringAsFixed(2)}', style: const TextStyle(color: Colors.grey)),
                       ],
                     ),
+                    if (gstType == 'regular')
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Estimated GST', style: TextStyle(color: Colors.grey)),
+                          Text('₹${_gstAmount.toStringAsFixed(2)}', style: const TextStyle(color: Colors.grey)),
+                        ],
+                      ),
+                    ),
                     const Divider(height: 32),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -661,13 +579,124 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                   icon: _isLoading 
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                     : const Icon(Icons.receipt_long, color: Colors.white),
-                  label: Text('Generate Bill', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  label: const Text('Generate Bill', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               )
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Future<Iterable<Map<String, dynamic>>> _searchCustomers(String query) async {
+    if (query.isEmpty) return const Iterable.empty();
+    try {
+      final data = await ApiService.searchCustomers(query);
+      return data.cast<Map<String, dynamic>>();
+    } catch (_) {}
+    return const Iterable.empty();
+  }
+
+  Future<Iterable<Map<String, dynamic>>> _searchMedicines(String query) async {
+    if (query.isEmpty) return const Iterable.empty();
+    try {
+      final res = await ApiService.getInventoryMaster(q: query);
+      final data = (res['data'] as List?) ?? [];
+      return data.cast<Map<String, dynamic>>();
+    } catch (_) {}
+    return const Iterable.empty();
+  }
+}
+
+class MedicineSearchField extends StatefulWidget {
+  final String initialValue;
+  final Function(Map<String, dynamic>) onSelected;
+  final Function(String) onChanged;
+
+  const MedicineSearchField({
+    Key? key,
+    required this.initialValue,
+    required this.onSelected,
+    required this.onChanged,
+  }) : super(key: key);
+
+  @override
+  State<MedicineSearchField> createState() => _MedicineSearchFieldState();
+}
+
+class _MedicineSearchFieldState extends State<MedicineSearchField> {
+  String? _lastSelectedName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Autocomplete<Map<String, dynamic>>(
+      optionsBuilder: (TextEditingValue textEditingValue) async {
+        final query = textEditingValue.text.trim();
+        if (query.length < 2 || query == _lastSelectedName) return const Iterable.empty();
+        
+        try {
+          final res = await ApiService.getInventoryMaster(q: query);
+          final data = (res['data'] as List?) ?? [];
+          return data.cast<Map<String, dynamic>>();
+        } catch (_) {
+          return const Iterable.empty();
+        }
+      },
+      displayStringForOption: (option) => (option['medicine_name'] ?? '').toString(),
+      onSelected: (option) {
+        FocusScope.of(context).unfocus();
+        setState(() {
+          _lastSelectedName = option['medicine_name']?.toString();
+        });
+        widget.onSelected(option);
+      },
+      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+        if (controller.text != widget.initialValue && widget.initialValue.isNotEmpty && controller.text.isEmpty) {
+          controller.text = widget.initialValue;
+        }
+        return TextField(
+          controller: controller,
+          focusNode: focusNode,
+          onChanged: (val) {
+            if (val != _lastSelectedName) {
+              setState(() => _lastSelectedName = null);
+            }
+            widget.onChanged(val);
+          },
+          decoration: const InputDecoration(
+            hintText: 'Medicine name',
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          ),
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 8,
+            borderRadius: BorderRadius.circular(12),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 300, maxWidth: 320),
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: options.length,
+                itemBuilder: (BuildContext context, int index) {
+                  final option = options.elementAt(index);
+                  return ListTile(
+                    title: Text(option['medicine_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text("Stock: ${option['total_stock'] ?? 0}"),
+                    trailing: Text("₹${option['min_mrp'] ?? '0'}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                    onTap: () => onSelected(option),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
