@@ -3558,12 +3558,19 @@ function LedgerPanel({ data, type, ledger, payAmount, setPayAmount, payMethod, s
 //  GST Tab
 // ─────────────────────────────────────────────────────────────────────────────
 function GSTTab() {
+  const { data: shopRes } = useQuery({ queryKey: ['shop-profile'] });
+  const shop = shopRes?.data?.data;
+  const isComposite = shop?.gst_type === 'composite';
+
   const [month, setMonth] = useState(TODAY.getMonth() + 1);
+  const [quarter, setQuarter] = useState(Math.floor((TODAY.getMonth()) / 3) + 1);
   const [year, setYear] = useState(TODAY.getFullYear());
 
-  const { data, isLoading } = useQuery<GstSummary>({
-    queryKey: ['web-gst-detail', month, year],
-    queryFn: () => accountingApi.getGstSummary(month, year).then((r) => r.data.data),
+  const { data, isLoading } = useQuery({
+    queryKey: isComposite ? ['web-gst-composition', quarter, year] : ['web-gst-detail', month, year],
+    queryFn: () => isComposite
+      ? accountingApi.getCompositionGstReport(quarter, year).then((r) => r.data.data)
+      : accountingApi.getGstSummary(month, year).then((r) => r.data.data),
   });
 
   const months = [
@@ -3571,85 +3578,128 @@ function GSTTab() {
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
 
+  const quarters = [
+    { id: 1, label: 'Q1 (Apr-Jun)', months: [4, 5, 6] },
+    { id: 2, label: 'Q2 (Jul-Sep)', months: [7, 8, 9] },
+    { id: 3, label: 'Q3 (Oct-Dec)', months: [10, 11, 12] },
+    { id: 4, label: 'Q4 (Jan-Mar)', months: [1, 2, 3] },
+  ];
+
   return (
     <div className="space-y-4">
       {/* Period selector */}
       <div className="bg-white rounded-xl p-4 shadow-sm flex items-center gap-4">
-        <div>
-          <label className="text-gray-500 text-xs block mb-1">Month</label>
-          <select
-            value={month}
-            onChange={(e) => setMonth(Number(e.target.value))}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400"
-          >
-            {months.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-          </select>
-        </div>
+        {!isComposite ? (
+          <div>
+            <label className="text-gray-500 text-xs block mb-1">Month</label>
+            <select
+              value={month}
+              onChange={(e) => setMonth(Number(e.target.value))}
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400"
+            >
+              {months.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+            </select>
+          </div>
+        ) : (
+          <div>
+            <label className="text-gray-500 text-xs block mb-1">Quarter</label>
+            <select
+              value={quarter}
+              onChange={(e) => setQuarter(Number(e.target.value))}
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400 font-bold"
+            >
+              {quarters.map((q) => <option key={q.id} value={q.id}>{q.label}</option>)}
+            </select>
+          </div>
+        )}
         <div>
           <label className="text-gray-500 text-xs block mb-1">Year</label>
           <input
             type="number"
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 w-24 focus:outline-none focus:ring-2 focus:ring-violet-400"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 w-24 focus:outline-none focus:ring-2 focus:ring-violet-400 font-bold"
           />
         </div>
         <div className="flex-1" />
         <div className="flex gap-3">
-          <button
-            onClick={async () => {
-              try {
-                const res = await accountingApi.getGstr1Excel(month, year);
-                const url = window.URL.createObjectURL(new Blob([res.data]));
-                const link = document.createElement('a');
-                link.href = url;
-                link.setAttribute('download', `GSTR1_${month}_${year}.xlsx`);
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-              } catch (err) { alert('Failed to download GSTR-1'); }
-            }}
-            className="flex items-center gap-2 bg-violet-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-violet-100 hover:scale-[1.02] active:scale-95 transition-all"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-            GSTR-1 (Sales)
-          </button>
-          <button
-            onClick={async () => {
-              try {
-                const res = await accountingApi.getGstr2Excel(month, year);
-                const url = window.URL.createObjectURL(new Blob([res.data]));
-                const link = document.createElement('a');
-                link.href = url;
-                link.setAttribute('download', `GSTR2_${month}_${year}.xlsx`);
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-              } catch (err) { alert('Failed to download GSTR-2'); }
-            }}
-            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-emerald-100 hover:scale-[1.02] active:scale-95 transition-all"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-            GSTR-2A (Purchase)
-          </button>
-          <button
-            onClick={async () => {
-              try {
-                const res = await accountingApi.getGstr3bExcel(month, year);
-                const url = window.URL.createObjectURL(new Blob([res.data]));
-                const link = document.createElement('a');
-                link.href = url;
-                link.setAttribute('download', `GSTR3B_${month}_${year}.xlsx`);
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-              } catch (err) { alert('Failed to download GSTR-3B'); }
-            }}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-100 hover:scale-[1.02] active:scale-95 transition-all"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-            GSTR-3B (Summary)
-          </button>
+          {!isComposite ? (
+            <>
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await accountingApi.getGstr1Excel(month, year);
+                    const url = window.URL.createObjectURL(new Blob([res.data]));
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', `GSTR1_${month}_${year}.xlsx`);
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                  } catch (err) { alert('Failed to download GSTR-1'); }
+                }}
+                className="flex items-center gap-2 bg-violet-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-violet-100 hover:scale-[1.02] active:scale-95 transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                GSTR-1 (Sales)
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await accountingApi.getGstr2Excel(month, year);
+                    const url = window.URL.createObjectURL(new Blob([res.data]));
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', `GSTR2_${month}_${year}.xlsx`);
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                  } catch (err) { alert('Failed to download GSTR-2'); }
+                }}
+                className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-emerald-100 hover:scale-[1.02] active:scale-95 transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                GSTR-2A (Purchase)
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await accountingApi.getGstr3bExcel(month, year);
+                    const url = window.URL.createObjectURL(new Blob([res.data]));
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', `GSTR3B_${month}_${year}.xlsx`);
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                  } catch (err) { alert('Failed to download GSTR-3B'); }
+                }}
+                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-100 hover:scale-[1.02] active:scale-95 transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                GSTR-3B (Summary)
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={async () => {
+                try {
+                  const res = await accountingApi.getCompositionGstExcel(quarter, year);
+                  const url = window.URL.createObjectURL(new Blob([res.data]));
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.setAttribute('download', `CMP08_Q${quarter}_${year}.xlsx`);
+                  document.body.appendChild(link);
+                  link.click();
+                  link.remove();
+                } catch (err) { alert('Failed to download CMP-08'); }
+              }}
+              className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-100 hover:scale-[1.02] active:scale-95 transition-all"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              Download CMP-08 (Excel)
+            </button>
+          )}
         </div>
       </div>
 
@@ -3661,113 +3711,176 @@ function GSTTab() {
         <>
           {/* Summary cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard label="Taxable Outward Supplies" value={fmt(data.outward_supplies.taxable_value)} color="bg-violet-50" textColor="text-violet-700" />
-            <StatCard 
-              label="GST Collected (Output)" 
-              value={fmt(data.outward_supplies.total_gst_collected)} 
-              sub={`${data.outward_supplies.gst_collected.igst > 0 ? `IGST ${fmt(data.outward_supplies.gst_collected.igst)}` : `CGST ${fmt(data.outward_supplies.gst_collected.cgst)} + SGST ${fmt(data.outward_supplies.gst_collected.sgst)}`}${data.outward_supplies.manual_adjustment !== 0 ? ` (${data.outward_supplies.manual_adjustment > 0 ? '+' : ''}${fmt(data.outward_supplies.manual_adjustment)} Adj)` : ''}`} 
-              color="bg-blue-50" 
-              textColor="text-blue-700" 
-            />
-            <StatCard 
-              label="ITC (Input Tax Credit)" 
-              value={fmt(data.inward_supplies.total_itc)} 
-              sub={`${data.inward_supplies.itc_available.igst > 0 ? `IGST ${fmt(data.inward_supplies.itc_available.igst)}` : `CGST ${fmt(data.inward_supplies.itc_available.cgst)} + SGST ${fmt(data.inward_supplies.itc_available.sgst)}`}${data.inward_supplies.manual_adjustment !== 0 ? ` (${data.inward_supplies.manual_adjustment > 0 ? '+' : ''}${fmt(data.inward_supplies.manual_adjustment)} Adj)` : ''}`} 
-              color="bg-green-50" 
-              textColor="text-green-700" 
-            />
-            <StatCard label="Net GST Payable" value={fmt(data.net_tax_payable)} sub={data.net_tax_payable === 0 && data.inward_supplies.itc_carry_forward > 0 ? `Excess ITC: ${fmt(data.inward_supplies.itc_carry_forward)}` : `Output − ITC`} color="bg-indigo-50" textColor="text-indigo-700" />
+            {!isComposite ? (
+              <>
+                <StatCard label="Taxable Outward Supplies" value={fmt(data.outward_supplies.taxable_value)} color="bg-violet-50" textColor="text-violet-700" />
+                <StatCard 
+                  label="GST Collected (Output)" 
+                  value={fmt(data.outward_supplies.total_gst_collected)} 
+                  sub={`${data.outward_supplies.gst_collected.igst > 0 ? `IGST ${fmt(data.outward_supplies.gst_collected.igst)}` : `CGST ${fmt(data.outward_supplies.gst_collected.cgst)} + SGST ${fmt(data.outward_supplies.gst_collected.sgst)}`}${data.outward_supplies.manual_adjustment !== 0 ? ` (${data.outward_supplies.manual_adjustment > 0 ? '+' : ''}${fmt(data.outward_supplies.manual_adjustment)} Adj)` : ''}`} 
+                  color="bg-blue-50" 
+                  textColor="text-blue-700" 
+                />
+                <StatCard 
+                  label="ITC (Input Tax Credit)" 
+                  value={fmt(data.inward_supplies.total_itc)} 
+                  sub={`${data.inward_supplies.itc_available.igst > 0 ? `IGST ${fmt(data.inward_supplies.itc_available.igst)}` : `CGST ${fmt(data.inward_supplies.itc_available.cgst)} + SGST ${fmt(data.inward_supplies.itc_available.sgst)}`}${data.inward_supplies.manual_adjustment !== 0 ? ` (${data.inward_supplies.manual_adjustment > 0 ? '+' : ''}${fmt(data.inward_supplies.manual_adjustment)} Adj)` : ''}`} 
+                  color="bg-green-50" 
+                  textColor="text-green-700" 
+                />
+                <StatCard label="Net GST Payable" value={fmt(data.net_tax_payable)} sub={data.net_tax_payable === 0 && data.inward_supplies.itc_carry_forward > 0 ? `Excess ITC: ${fmt(data.inward_supplies.itc_carry_forward)}` : `Output − ITC`} color="bg-indigo-50" textColor="text-indigo-700" />
+              </>
+            ) : (
+              <>
+                <StatCard label="Quarterly Taxable Turnover" value={fmt(data.total_turnover)} color="bg-indigo-50" textColor="text-indigo-700" />
+                <StatCard label="Tax Payable (1% of Sale)" value={fmt(data.tax_payable)} color="bg-rose-50" textColor="text-rose-700" />
+                <StatCard label="Quarter Start" value={new Date(data.period_start).toLocaleDateString()} color="bg-gray-50" textColor="text-gray-600" />
+                <StatCard label="Quarter End" value={new Date(data.period_end).toLocaleDateString()} color="bg-gray-50" textColor="text-gray-600" />
+              </>
+            )}
           </div>
 
-          {/* Outward supplies rate-wise */}
-          <div className="bg-white rounded-xl p-5 shadow-sm">
-            <h3 className="font-semibold text-gray-700 mb-1">Outward Supplies — Rate-wise (GSTR-1 / 3B)</h3>
-            <p className="text-gray-400 text-xs mb-4">Tax on sales collected from customers</p>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-gray-500 text-xs uppercase border-b border-gray-100">
-                  <th className="text-left py-2">GST Rate</th>
-                  <th className="text-right py-2">Taxable Value</th>
-                  <th className="text-right py-2">CGST</th>
-                  <th className="text-right py-2">SGST</th>
-                  <th className="text-right py-2">Total GST</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {(data.rate_wise_summary ?? []).map((row) => (
-                  <tr key={row.gst_rate} className="hover:bg-gray-50/50">
-                    <td className="py-3 font-medium text-gray-700">{row.gst_rate}%</td>
-                    <td className="py-3 text-right text-gray-600">{fmt(row.taxable_value)}</td>
-                    <td className="py-3 text-right text-gray-600">{fmt(row.gst_amount / 2)}</td>
-                    <td className="py-3 text-right text-gray-600">{fmt(row.gst_amount / 2)}</td>
-                    <td className="py-3 text-right font-semibold text-gray-800">{fmt(row.gst_amount)}</td>
-                  </tr>
-                ))}
-                {(data.rate_wise_summary ?? []).length === 0 && (
-                  <tr><td colSpan={5} className="py-6 text-center text-gray-400 text-xs">No sales recorded for this period</td></tr>
-                )}
-              </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-gray-200">
-                  <td className="pt-3 font-bold text-gray-800">Total</td>
-                  <td className="pt-3 text-right font-bold text-gray-800">{fmt(data.outward_supplies.taxable_value)}</td>
-                  <td className="pt-3 text-right font-bold text-gray-800">{fmt(data.outward_supplies.gst_collected.cgst)}</td>
-                  <td className="pt-3 text-right font-bold text-gray-800">{fmt(data.outward_supplies.gst_collected.sgst)}</td>
-                  <td className="pt-3 text-right font-bold text-violet-700">{fmt(data.outward_supplies.total_gst_collected)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          {!isComposite ? (
+            <>
+              {/* Outward supplies rate-wise */}
+              <div className="bg-white rounded-xl p-5 shadow-sm">
+                <h3 className="font-semibold text-gray-700 mb-1">Outward Supplies — Rate-wise (GSTR-1 / 3B)</h3>
+                <p className="text-gray-400 text-xs mb-4">Tax on sales collected from customers</p>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-gray-500 text-xs uppercase border-b border-gray-100">
+                      <th className="text-left py-2">GST Rate</th>
+                      <th className="text-right py-2">Taxable Value</th>
+                      <th className="text-right py-2">CGST</th>
+                      <th className="text-right py-2">SGST</th>
+                      <th className="text-right py-2">Total GST</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {(data.rate_wise_summary ?? []).map((row: any) => (
+                      <tr key={row.gst_rate} className="hover:bg-gray-50/50">
+                        <td className="py-3 font-medium text-gray-700">{row.gst_rate}%</td>
+                        <td className="py-3 text-right text-gray-600">{fmt(row.taxable_value)}</td>
+                        <td className="py-3 text-right text-gray-600">{fmt(row.gst_amount / 2)}</td>
+                        <td className="py-3 text-right text-gray-600">{fmt(row.gst_amount / 2)}</td>
+                        <td className="py-3 text-right font-semibold text-gray-800">{fmt(row.gst_amount)}</td>
+                      </tr>
+                    ))}
+                    {(data.rate_wise_summary ?? []).length === 0 && (
+                      <tr><td colSpan={5} className="py-6 text-center text-gray-400 text-xs">No sales recorded for this period</td></tr>
+                    )}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-gray-200">
+                      <td className="pt-3 font-bold text-gray-800">Total</td>
+                      <td className="pt-3 text-right font-bold text-gray-800">{fmt(data.outward_supplies.taxable_value)}</td>
+                      <td className="pt-3 text-right font-bold text-gray-800">{fmt(data.outward_supplies.gst_collected.cgst)}</td>
+                      <td className="pt-3 text-right font-bold text-gray-800">{fmt(data.outward_supplies.gst_collected.sgst)}</td>
+                      <td className="pt-3 text-right font-bold text-violet-700">{fmt(data.outward_supplies.total_gst_collected)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
 
-          {/* Inward supplies (ITC) */}
-          <div className="bg-white rounded-xl p-5 shadow-sm">
-            <h3 className="font-semibold text-gray-700 mb-1">Inward Supplies — Input Tax Credit (ITC)</h3>
-            <p className="text-gray-400 text-xs mb-4">GST paid on purchases — eligible to offset output tax</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-green-50 rounded-xl p-4">
-                <p className="text-xs text-gray-500 mb-1">CGST (ITC)</p>
-                <p className="text-lg font-bold text-green-700">{fmt(data.inward_supplies.itc_available.cgst)}</p>
-              </div>
-              <div className="bg-green-50 rounded-xl p-4">
-                <p className="text-xs text-gray-500 mb-1">SGST (ITC)</p>
-                <p className="text-lg font-bold text-green-700">{fmt(data.inward_supplies.itc_available.sgst)}</p>
-              </div>
-              <div className="bg-green-50 rounded-xl p-4">
-                <p className="text-xs text-gray-500 mb-1">IGST (ITC)</p>
-                <p className="text-lg font-bold text-green-700">{fmt(data.inward_supplies.itc_available.igst)}</p>
-              </div>
-              <div className="bg-green-100 rounded-xl p-4">
-                <p className="text-xs text-gray-500 mb-1">Total ITC Available</p>
-                <p className="text-lg font-bold text-green-800">{fmt(data.inward_supplies.total_itc)}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Net payable summary */}
-          <div className="bg-indigo-50 rounded-xl p-5">
-            <h3 className="font-semibold text-gray-700 mb-3">Net GST Payable</h3>
-            <div className="flex flex-wrap gap-6 text-sm items-center">
-              <div>
-                <span className="text-gray-500">Output GST </span>
-                <span className="font-bold text-blue-700">{fmt(data.outward_supplies.total_gst_collected)}</span>
-              </div>
-              <span className="text-gray-400 font-bold text-lg">−</span>
-              <div>
-                <span className="text-gray-500">Utilized ITC </span>
-                <span className="font-bold text-green-700">{fmt(data.inward_supplies.itc_utilised)}</span>
-              </div>
-              <span className="text-gray-400 font-bold text-lg">=</span>
-              <div>
-                <span className="text-gray-500">Net Payable </span>
-                <span className="font-bold text-indigo-700 text-base">{fmt(data.net_tax_payable)}</span>
-              </div>
-              {data.inward_supplies.itc_carry_forward > 0 && (
-                <div className="ml-auto bg-green-100 px-3 py-1 rounded-full text-green-700 font-bold text-xs">
-                  Net ITC Available: {fmt(data.inward_supplies.itc_carry_forward)}
+              {/* Inward supplies (ITC) */}
+              <div className="bg-white rounded-xl p-5 shadow-sm">
+                <h3 className="font-semibold text-gray-700 mb-1">Inward Supplies — Input Tax Credit (ITC)</h3>
+                <p className="text-gray-400 text-xs mb-4">GST paid on purchases — eligible to offset output tax</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-green-50 rounded-xl p-4">
+                    <p className="text-xs text-gray-500 mb-1">CGST (ITC)</p>
+                    <p className="text-lg font-bold text-green-700">{fmt(data.inward_supplies.itc_available.cgst)}</p>
+                  </div>
+                  <div className="bg-green-50 rounded-xl p-4">
+                    <p className="text-xs text-gray-500 mb-1">SGST (ITC)</p>
+                    <p className="text-lg font-bold text-green-700">{fmt(data.inward_supplies.itc_available.sgst)}</p>
+                  </div>
+                  <div className="bg-green-50 rounded-xl p-4">
+                    <p className="text-xs text-gray-500 mb-1">IGST (ITC)</p>
+                    <p className="text-lg font-bold text-green-700">{fmt(data.inward_supplies.itc_available.igst)}</p>
+                  </div>
+                  <div className="bg-green-100 rounded-xl p-4">
+                    <p className="text-xs text-gray-500 mb-1">Total ITC Available</p>
+                    <p className="text-lg font-bold text-green-800">{fmt(data.inward_supplies.total_itc)}</p>
+                  </div>
                 </div>
-              )}
+              </div>
+
+              {/* Net payable summary */}
+              <div className="bg-indigo-50 rounded-xl p-5">
+                <h3 className="font-semibold text-gray-700 mb-3">Net GST Payable</h3>
+                <div className="flex flex-wrap gap-6 text-sm items-center">
+                  <div>
+                    <span className="text-gray-500">Output GST </span>
+                    <span className="font-bold text-blue-700">{fmt(data.outward_supplies.total_gst_collected)}</span>
+                  </div>
+                  <span className="text-gray-400 font-bold text-lg">−</span>
+                  <div>
+                    <span className="text-gray-500">Utilized ITC </span>
+                    <span className="font-bold text-green-700">{fmt(data.inward_supplies.itc_utilised)}</span>
+                  </div>
+                  <span className="text-gray-400 font-bold text-lg">=</span>
+                  <div>
+                    <span className="text-gray-500">Net Payable </span>
+                    <span className="font-bold text-indigo-700 text-base">{fmt(data.net_tax_payable)}</span>
+                  </div>
+                  {data.inward_supplies.itc_carry_forward > 0 && (
+                    <div className="ml-auto bg-green-100 px-3 py-1 rounded-full text-green-700 font-bold text-xs">
+                      Net ITC Available: {fmt(data.inward_supplies.itc_carry_forward)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-indigo-50">
+              <div className="flex items-center justify-between mb-8">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Composition Scheme Summary (CMP-08)</h3>
+                  <p className="text-sm text-gray-500 mt-1">Quarterly Statement for {quarters.find(q => q.id === quarter)?.label}</p>
+                </div>
+                <div className="bg-indigo-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">
+                  Rate: 1%
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center pb-4 border-b border-gray-50">
+                    <span className="text-sm font-bold text-gray-500 uppercase tracking-wider">Total Sales Turnover</span>
+                    <span className="text-xl font-black text-gray-900">{fmt(data.total_turnover)}</span>
+                  </div>
+                  <div className="flex justify-between items-center pb-4 border-b border-gray-50">
+                    <span className="text-sm font-bold text-gray-500 uppercase tracking-wider">CGST (0.5%)</span>
+                    <span className="text-lg font-bold text-rose-600">{fmt(data.tax_payable / 2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center pb-4 border-b border-gray-50">
+                    <span className="text-sm font-bold text-gray-500 uppercase tracking-wider">SGST (0.5%)</span>
+                    <span className="text-lg font-bold text-rose-600">{fmt(data.tax_payable / 2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2">
+                    <span className="text-sm font-black text-indigo-600 uppercase tracking-[0.2em]">Total Tax Payable</span>
+                    <span className="text-2xl font-black text-indigo-700">{fmt(data.tax_payable)}</span>
+                  </div>
+                </div>
+
+                <div className="bg-indigo-50/50 rounded-[2rem] p-6 border border-indigo-100 flex flex-col justify-center gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 shrink-0 font-bold text-xs">i</div>
+                    <p className="text-xs text-indigo-800 leading-relaxed font-medium">As a Composition Dealer, you are required to pay tax at 1% on your total quarterly turnover (0.5% CGST + 0.5% SGST).</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 shrink-0 font-bold text-xs">i</div>
+                    <p className="text-xs text-indigo-800 leading-relaxed font-medium">You cannot claim Input Tax Credit (ITC) or charge GST from customers on your invoices.</p>
+                  </div>
+                  <div className="mt-4">
+                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1 ml-1">Filing Due Date</p>
+                    <p className="text-sm font-bold text-indigo-900">18th of the month following the quarter</p>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </>
       ) : null}
     </div>
