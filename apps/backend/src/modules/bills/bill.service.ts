@@ -329,7 +329,7 @@ export async function createManualBill(
         data: {
           shop_id: shop.id,
           entry_type: 'sale_income' as any,
-          amount: totalAmount,
+          amount: totalAmount.toFixed(2),
           payment_method: paymentMethod as any,
           reference_bill_id: created.id,
           entry_date: new Date(),
@@ -365,7 +365,7 @@ export async function createManualBill(
           customer_id: creditCustomer.id,
           shop_id: shop.id,
           type: 'credit_given',
-          amount: totalAmount,
+          amount: totalAmount.toFixed(2),
           bill_id: created.id,
           transaction_date: new Date(),
           notes: `Bill ${created.bill_number}`,
@@ -374,7 +374,7 @@ export async function createManualBill(
       });
       await tx.creditCustomer.update({
         where: { id: creditCustomer.id },
-        data: { total_outstanding: { increment: totalAmount } }
+        data: { total_outstanding: { increment: Number(totalAmount.toFixed(2)) } }
       });
     }
 
