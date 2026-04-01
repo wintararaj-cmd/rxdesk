@@ -517,7 +517,83 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* FOOTER */}
+      {/* HOW IT WORKS */}
+      <section id="how-it-works" className="py-24 px-4 bg-[#09090f]">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-3 py-1 text-xs text-gray-400 mb-4 font-medium uppercase tracking-widest">
+              Journey
+            </div>
+            <h2 className="text-3xl sm:text-5xl font-bold mb-4">Simple. Professional. <span className="text-emerald-400">Effective.</span></h2>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-12 lg:gap-20 relative">
+            {/* Center divider for desktop */}
+            <div className="hidden lg:block absolute left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-white/5 to-transparent" />
+
+            {/* FOR PHARMACIES */}
+            <div className="space-y-12">
+               <div className="flex items-center gap-3 mb-8">
+                  <Store className="w-6 h-6 text-emerald-400" />
+                  <h3 className="text-xl font-bold uppercase tracking-wider text-emerald-400/80">For Pharmacies</h3>
+               </div>
+
+               {[
+                 { title: 'Register Shop', desc: 'Enter your shop details and drug license to get verified in minutes.', icon: Building2 },
+                 { title: 'Setup Chambers', desc: 'Add doctors, set their weekly sitting timings to attract more patients.', icon: Stethoscope },
+                 { title: 'Scale Digitally', desc: 'Generate GST invoices and manage inventory with high-speed tools.', icon: TrendingUp },
+               ].map((step, i) => (
+                 <div key={i} className="flex gap-6 group">
+                    <div className="flex flex-col items-center">
+                       <div className="w-12 h-12 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center text-xl font-black text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)] group-hover:bg-emerald-500/20 transition-all">
+                          {i + 1}
+                       </div>
+                       {i < 2 && <div className="w-0.5 h-full bg-gradient-to-b from-emerald-500/20 to-transparent my-2" />}
+                    </div>
+                    <div className="pt-2">
+                       <h4 className="text-lg font-bold text-white mb-2">{step.title}</h4>
+                       <p className="text-sm text-gray-500 leading-relaxed">{step.desc}</p>
+                    </div>
+                 </div>
+               ))}
+            </div>
+
+            {/* FOR PATIENTS */}
+            <div className="space-y-12">
+               <div className="flex items-center gap-3 mb-8">
+                  <Users className="w-6 h-6 text-blue-400" />
+                  <h3 className="text-xl font-bold uppercase tracking-wider text-blue-400/80">For Patients</h3>
+               </div>
+
+               {[
+                 { title: 'Smart Search', desc: 'Use GPS to find verified medical shops and specialists near you.', icon: Search },
+                 { title: 'Verify Timings', desc: 'Check live doctor schedules, consultation fees, and shop status.', icon: Clock },
+                 { title: 'Direct Visit', desc: 'Contact the pharmacy or book an appointment for a direct consultation.', icon: MapPin },
+               ].map((step, i) => (
+                 <div key={i} className="flex gap-6 group">
+                    <div className="flex flex-col items-center">
+                       <div className="w-12 h-12 bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center justify-center text-xl font-black text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.1)] group-hover:bg-blue-500/20 transition-all">
+                          {i + 1}
+                       </div>
+                       {i < 2 && <div className="w-0.5 h-full bg-gradient-to-b from-blue-500/20 to-transparent my-2" />}
+                    </div>
+                    <div className="pt-2">
+                       <h4 className="text-lg font-bold text-white mb-2">{step.title}</h4>
+                       <p className="text-sm text-gray-500 leading-relaxed">{step.desc}</p>
+                    </div>
+                 </div>
+               ))}
+            </div>
+          </div>
+
+          <div className="mt-20 text-center">
+            <Link href="/login?register=1" className="inline-flex items-center gap-3 px-8 py-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-2xl text-sm font-bold transition-all group">
+               <span className="text-emerald-400">Join the RxDesk Network Today</span>
+               <ArrowRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </div>
+        </div>
+      </section>
       <footer className="py-12 px-4 border-t border-white/[0.06]">
         <div className="max-w-6xl mx-auto text-center">
           <Link href="/" className="flex items-center justify-center gap-2 mb-3">
