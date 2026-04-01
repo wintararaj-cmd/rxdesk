@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { shopApi, subscriptionApi, chamberApi, accountingApi } from '../../../lib/apiClient';
 import { useAuthStore } from '../../../store/authStore';
-import { Phone, Mail, Clock, X, Database, Download, Upload, AlertCircle, Check, Printer, HelpCircle, LayoutDashboard, Calendar, Users, Package, Receipt, BarChart3, Calculator, Settings as SettingsIcon } from 'lucide-react';
+import { Search, Phone, Mail, Clock, X, Database, Download, Upload, AlertCircle, Check, Printer, HelpCircle, LayoutDashboard, Calendar, Users, Package, Receipt, BarChart3, Calculator, Settings as SettingsIcon } from 'lucide-react';
 
 type GstType = 'unregistered' | 'composite' | 'regular';
 
