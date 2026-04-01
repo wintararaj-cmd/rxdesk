@@ -507,12 +507,94 @@ export default function LandingPage() {
           </div>
 
           <div className="mt-16 text-center">
-            <Link href="/login?register=1" className="inline-flex items-center gap-3 px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-sm font-bold transition-all group">
-               <span>Ready to digitize your pharmacy?</span>
-               <span className="text-emerald-400 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                 Get Started Now <ArrowRight className="w-4 h-4" />
+            <button onClick={() => document.querySelector('#appointments')?.scrollIntoView({ behavior: 'smooth' })} className="inline-flex items-center gap-3 px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-sm font-bold transition-all group">
+               <span>Need more than just billing?</span>
+               <span className="text-violet-400 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                 See Appointment Features <ArrowRight className="w-4 h-4" />
                </span>
-            </Link>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* SMART APPOINTMENTS SHOWCASE */}
+      <section id="appointments" className="py-24 px-4 bg-gradient-to-b from-[#09090f] to-[#0d0d16]">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+             
+             {/* CONTENT */}
+             <div>
+                <div className="inline-flex items-center gap-2 bg-violet-500/10 border border-violet-500/20 rounded-full px-3 py-1 text-xs text-violet-400 mb-6 font-medium uppercase tracking-widest">
+                  Queue Management
+                </div>
+                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-6 leading-tight">
+                  Manage Chambers with <span className="bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">Zero Conflict.</span>
+                </h2>
+                <p className="text-gray-500 text-base lg:text-lg mb-8 leading-relaxed">
+                  Eliminate long waiting times and phone call hassles. Our intelligent booking system handles everything from slot allocation to WhatsApp reminders.
+                </p>
+
+                <div className="space-y-4">
+                   {[
+                     { title: 'Live Queue Status', desc: 'Patients can check their token number live from their phones.', icon: Clock },
+                     { title: 'Automated Reminders', desc: 'Send bulk WhatsApp alerts for schedule changes or delays.', icon: CheckCircle },
+                     { title: 'Payment Integration', desc: 'Collect consultation fees digitally before the visit.', icon: IndianRupee },
+                   ].map((f, i) => (
+                     <div key={i} className="flex items-start gap-4 p-4 bg-white/[0.02] border border-white/[0.05] rounded-2xl hover:bg-white/[0.04] transition-colors">
+                        <f.icon className="w-5 h-5 text-violet-400 mt-1 shrink-0" />
+                        <div>
+                           <h4 className="font-bold text-white text-sm">{f.title}</h4>
+                           <p className="text-gray-500 text-xs mt-0.5">{f.desc}</p>
+                        </div>
+                     </div>
+                   ))}
+                </div>
+             </div>
+
+             {/* INTERACTIVE MOCKUP */}
+             <div className="relative group">
+                <div className="absolute -inset-4 bg-gradient-to-br from-violet-600/20 to-transparent blur-2xl opacity-50 group-hover:opacity-70 transition-opacity" />
+                <div className="relative bg-[#11111d] border border-white/[0.1] rounded-[2rem] p-8 shadow-2xl">
+                   <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/[0.05]">
+                      <div>
+                         <h4 className="font-bold text-white text-lg">Dr. Amit Sharma</h4>
+                         <p className="text-xs text-gray-500">General Physician Â· Apollo Clinic</p>
+                      </div>
+                      <div className="bg-emerald-500/10 text-emerald-400 text-[10px] font-black px-2 py-1 rounded-md uppercase">LIVE NOW</div>
+                   </div>
+
+                   <div className="flex items-center justify-between mb-6">
+                      <span className="text-sm font-bold text-gray-400">Select Time Slot</span>
+                      <span className="text-[10px] text-gray-600 uppercase font-bold">MON, 01 APR</span>
+                   </div>
+
+                   <div className="grid grid-cols-3 gap-3 mb-8">
+                      {['10:00', '10:15', '10:30', '10:45', '11:00', '11:15'].map((time, i) => (
+                        <div key={time} className={`p-3 rounded-xl border text-center transition-all ${
+                          i === 2 ? 'bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-500/20' 
+                          : i === 0 ? 'bg-white/5 border-white/5 text-gray-600 cursor-not-allowed opacity-50'
+                          : 'bg-white/[0.03] border-white/[0.1] text-gray-400 hover:border-violet-500/50'
+                        }`}>
+                           <div className="text-xs font-bold">{time}</div>
+                           <div className="text-[8px] mt-0.5 uppercase opacity-60">
+                             {i === 2 ? 'Selected' : i === 0 ? 'Booked' : 'Available'}
+                           </div>
+                        </div>
+                      ))}
+                   </div>
+
+                   <div className="p-4 bg-violet-500/5 border border-violet-500/10 rounded-2xl">
+                      <div className="flex items-center justify-between mb-3 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                         <span>Live Queue Status</span>
+                         <span className="text-violet-400">Token #14 / 25</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                         <div className="w-[60%] h-full bg-violet-500" />
+                      </div>
+                   </div>
+                </div>
+             </div>
+
           </div>
         </div>
       </section>
