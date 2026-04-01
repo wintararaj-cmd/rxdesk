@@ -31,13 +31,28 @@ export default function LandingPage() {
   const [showModal, setShowModal] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const locate = useCallback(() => {
-    if (!navigator.geolocation) { setLocStatus('denied'); return; }
-    setLocStatus('loading');
-    navigator.geolocation.getCurrentPosition(
-      (p) => { setCoords({ lat: p.coords.latitude, lng: p.coords.longitude }); setLocStatus('ok'); },
-      () => setLocStatus('denied'),
-    );
+  const locate = useCallback((): Promise<{ lat: number; lng: number }> => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        setLocStatus('denied');
+        reject(new Error('Geolocation not supported'));
+        return;
+      }
+      setLocStatus('loading');
+      navigator.geolocation.getCurrentPosition(
+        (p) => {
+          const fresh = { lat: p.coords.latitude, lng: p.coords.longitude };
+          setCoords(fresh);
+          setLocStatus('ok');
+          resolve(fresh);
+        },
+        (err) => {
+          setLocStatus('denied');
+          reject(err);
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+    });
   }, []);
 
   const runSearch = async (overrideQuery?: string) => {
@@ -46,7 +61,14 @@ export default function LandingPage() {
     try {
       const params: Record<string, string | number> = {};
       if (q.trim()) params.q = q.trim();
-      if (coords) { params.lat = coords.lat; params.lng = coords.lng; }
+
+      // If no coords but we have a query, maybe we don't NEED location,
+      // but let's try to get it if "Near Me" was intentioned.
+      if (coords) {
+        params.lat = coords.lat;
+        params.lng = coords.lng;
+      }
+
       const res = await axios.get(`${API_URL}/doctors/search`, { params });
       setDoctors(res.data.data ?? []);
     } catch {
@@ -58,26 +80,23 @@ export default function LandingPage() {
     setSearching(true); setSearchErr(''); setHasSearched(false); setHasSearchedShops(true);
     try {
       const params: Record<string, string | number> = { radius: 10 };
-      if (coords) { 
-        params.lat = coords.lat; 
-        params.lng = coords.lng; 
-      } else {
-        // Fallback or ask for location
-        locate();
-        setSearchErr('Please allow location access to find nearby pharmacies.');
-        setSearching(false);
-        return;
+      let currentCoords = coords;
+
+      if (!currentCoords) {
+        try {
+          currentCoords = await locate();
+        } catch (err) {
+          setSearchErr('Please allow location access to find nearby pharmacies.');
+          setSearching(false);
+          return;
+        }
       }
+
+      params.lat = currentCoords.lat;
+      params.lng = currentCoords.lng;
+
       const res = await axios.get(`${API_URL}/shops/nearby`, { params });
-      
-      // Calculate distances manually if needed, or just set them
       let data = res.data.data ?? [];
-      if (coords) {
-        data = data.map((s: Shop) => {
-          // simple haversine could be here, but let's just show them for now
-          return s;
-        });
-      }
       setShops(data);
     } catch {
       setSearchErr('Unable to fetch pharmacies. Please try again.'); setShops([]);
