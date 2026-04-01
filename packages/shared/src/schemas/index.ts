@@ -101,6 +101,8 @@ export const createShopSchema = z.object({
   gst_number: z
     .string()
     .regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/, 'Invalid GST number')
+    .or(z.literal(''))
+    .nullable()
     .optional(),
   drug_license_no: z.string().min(5).max(50),
   address_line: z.string().min(5).max(300),
@@ -108,10 +110,10 @@ export const createShopSchema = z.object({
   district: z.string().max(100).optional(),
   state: z.string().min(2).max(100),
   pin_code: pinCodeSchema,
-  latitude: z.number().min(-90).max(90).optional(),
-  longitude: z.number().min(-180).max(180).optional(),
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
   contact_phone: phoneSchema,
-  contact_email: z.string().email().optional(),
+  contact_email: z.string().email().or(z.literal('')).nullable().optional(),
   opening_time: z
     .string()
     .regex(/^\d{2}:\d{2}$/)
