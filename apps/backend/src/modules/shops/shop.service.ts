@@ -8,17 +8,17 @@ export async function registerShop(
   data: {
     shop_name: string;
     shop_type?: 'medical_shop' | 'clinic' | 'pharmacy' | 'dispensary';
-    gst_number?: string;
+    gst_number?: string | null;
     drug_license_no: string;
     address_line: string;
     city: string;
     district?: string;
     state: string;
     pin_code: string;
-    latitude?: number;
-    longitude?: number;
+    latitude?: number | null;
+    longitude?: number | null;
     contact_phone: string;
-    contact_email?: string;
+    contact_email?: string | null;
     opening_time?: string;
     closing_time?: string;
     working_days?: string[];
@@ -257,9 +257,9 @@ export async function updateShop(
     opening_time?: string;
     closing_time?: string;
     working_days?: string[];
-    latitude?: number;
-    longitude?: number;
-    gst_number?: string;
+    latitude?: number | null;
+    longitude?: number | null;
+    gst_number?: string | null;
     gst_type?: 'unregistered' | 'composite' | 'regular';
     auto_backup_enabled?: boolean;
     backup_time?: string;
