@@ -3,7 +3,7 @@ import prisma from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import path from 'path';
 import logger from '../../utils/logger';
-import { clearInventorySearchCache } from '../../config/redis';
+import redis, { RedisKeys, clearInventorySearchCache, clearCustomerSearchCache } from '../../config/redis';
 
 const STATE_MAP: Record<string, string> = {
   'wb': 'west bengal',
@@ -216,6 +216,7 @@ export async function generateBillFromPrescription(
 
   // Invalidate search cache
   clearInventorySearchCache(shop.id);
+  clearCustomerSearchCache(shop.id);
 
   return bill;
 }
@@ -399,6 +400,7 @@ export async function createManualBill(
 
     // Invalidate search cache
     clearInventorySearchCache(shop.id);
+    clearCustomerSearchCache(shop.id);
 
     return created;
   }, {
@@ -647,6 +649,11 @@ export async function searchCustomers(userId: string, query: string) {
   const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId }, select: { id: true } });
   if (!shop || !query) return [];
 
+  // ── Redis Cache Check ───────────────────────────────────────────────────
+  const cacheKey = RedisKeys.customerSearch(shop.id, query.toLowerCase());
+  const cached = await redis.get(cacheKey);
+  if (cached) return JSON.parse(cached);
+
   const master = await prisma.creditCustomer.findMany({
     where: {
       shop_id: shop.id,
@@ -692,7 +699,12 @@ export async function searchCustomers(userId: string, query: string) {
     source: 'history'
   }));
 
-  return [...masterResults, ...billResults].slice(0, 15);
+  const result = [...masterResults, ...billResults].slice(0, 15);
+  
+  // Store in Redis (15 minutes)
+  await redis.setex(cacheKey, 15 * 60, JSON.stringify(result));
+  
+  return result;
 }
 
 export async function voidBill(billId: string, userId: string) {

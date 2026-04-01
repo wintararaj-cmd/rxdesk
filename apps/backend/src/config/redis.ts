@@ -40,6 +40,7 @@ export const RedisKeys = {
   inventorySearch: (shopId: string, q: string) => `inventory:search:${shopId}:${q}`,
   medicineSearch: (q: string) => `medicine:search:${q}`,
   medicineCompSearch: (q: string) => `medicine:comp:${q}`,
+  customerSearch: (shopId: string, q: string) => `customer:search:${shopId}:${q}`,
 } as const;
 
 /**
@@ -65,3 +66,6 @@ export async function clearCacheByPattern(pattern: string): Promise<number> {
 
 export const clearInventorySearchCache = (shopId: string) => 
   clearCacheByPattern(`inventory:search:${shopId}:*`);
+
+export const clearCustomerSearchCache = (shopId: string) =>
+  clearCacheByPattern(`customer:search:${shopId}:*`);
