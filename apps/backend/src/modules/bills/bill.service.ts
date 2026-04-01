@@ -215,8 +215,10 @@ export async function createManualBill(
     discount_amount?: number;
   },
 ) {
-  const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });
-  if (!shop) throw new AppError(403, 'FORBIDDEN', 'Only shop owners can create bills');
+  logger.info(`Creating manual bill for user ${userId}`, { itemsCount: data.items?.length });
+  try {
+    const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });
+    if (!shop) throw new AppError(403, 'FORBIDDEN', 'Only shop owners can create bills');
 
   const isTaxInvoice = shop.gst_type === 'regular';
   const billItems: any[] = [];
@@ -374,6 +376,10 @@ export async function createManualBill(
   });
 
   return bill;
+  } catch (error: any) {
+    logger.error('createManualBill failed:', { error: error?.message, stack: error?.stack, data });
+    throw error;
+  }
 }
 
 export async function getBillById(billId: string, userId: string, userRole: string) {
