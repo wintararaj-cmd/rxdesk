@@ -281,7 +281,7 @@ function PLTab() {
   const { data: gst } = useQuery<GstSummary>({
     queryKey: ['web-gst', month, year],
     queryFn: () => accountingApi.getGstSummary(month, year).then((r) => r.data.data),
-    enabled: !!myShop && myShop.gst_type !== 'composite'
+    enabled: !!myShop && myShop.gst_type === 'regular'
   });
 
   const { data: compositionGst } = useQuery({
@@ -456,7 +456,7 @@ function PLTab() {
           </div>
 
           {/* GST Insights */}
-          {(isComposite ? compositionGst : gst) && (
+          {myShop?.gst_type !== 'unregistered' && (isComposite ? compositionGst : gst) && (
             <div className="bg-indigo-900 rounded-[40px] p-8 shadow-2xl relative overflow-hidden">
                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32 pointer-events-none" />
                <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/5 rounded-full -ml-32 -mb-32 pointer-events-none" />
@@ -3935,12 +3935,19 @@ function ReturnsTab({ setSelectedSaleReturnId, setSelectedPurchaseReturnId }: { 
   );
 }
 
-function ReportsTab() {
+function ReportsTab({ shopGstType }: { shopGstType?: string }) {
   const [sub, setSub] = useState<'pl' | 'bs' | 'gst'>('pl');
+  
+  const SUB_TABS = [
+    { id: 'pl', l: 'P&L' },
+    { id: 'bs', l: 'Balance Sheet' },
+    ...(shopGstType !== 'unregistered' ? [{ id: 'gst', l: 'GST Report' }] : [])
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex gap-2 bg-white/50 p-1.5 rounded-2xl border border-gray-100 shadow-sm w-fit">
-        {[{id:'pl', l:'P&L'}, {id:'bs', l:'Balance Sheet'}, {id:'gst', l:'GST Report'}].map(s => (
+        {SUB_TABS.map(s => (
           <button key={s.id} onClick={() => setSub(s.id as any)} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sub === s.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-gray-400 hover:text-indigo-600 hover:bg-white'}`}>
             {s.l}
           </button>
@@ -3949,7 +3956,7 @@ function ReportsTab() {
       <div className="animate-in fade-in zoom-in-95 duration-300">
         {sub === 'pl' && <PLTab />}
         {sub === 'bs' && <BalanceSheetTab />}
-        {sub === 'gst' && <GSTTab />}
+        {sub === 'gst' && shopGstType !== 'unregistered' && <GSTTab />}
       </div>
     </div>
   );
@@ -5796,7 +5803,7 @@ export default function AccountingPage() {
 
         {/* Tab content */}
         <div className="mt-8">
-          {activeTab === 'Reports' && <ReportsTab />}
+          {activeTab === 'Reports' && <ReportsTab shopGstType={shop?.gst_type} />}
           {activeTab === 'Vouchers' && <VouchersTab />}
           {activeTab === 'Purchases' && <PurchasesGroupTab shopGstType={shop?.gst_type} />}
           {activeTab === 'Returns' && (
