@@ -33,6 +33,13 @@ export default function LandingPage() {
 
   const locate = useCallback((): Promise<{ lat: number; lng: number }> => {
     return new Promise((resolve, reject) => {
+      // Check if served over HTTPS - Geolocation requires secure context
+      if (typeof window !== 'undefined' && window.location.protocol === 'http:' && window.location.hostname !== 'localhost') {
+        setLocStatus('denied');
+        reject(new Error('Geolocation requires HTTPS (Secure Connection)'));
+        return;
+      }
+
       if (!navigator.geolocation) {
         setLocStatus('denied');
         reject(new Error('Geolocation not supported'));
@@ -50,7 +57,8 @@ export default function LandingPage() {
           setLocStatus('denied');
           reject(err);
         },
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        // Increased timeout to 15s for desktop stability
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
       );
     });
   }, []);
@@ -77,25 +85,35 @@ export default function LandingPage() {
   const runShopSearch = async () => {
     setSearching(true); setSearchErr(''); setHasSearched(false); setHasSearchedShops(true);
     try {
-      const params: Record<string, string | number> = { radius: 10 };
       let currentCoords = coords;
 
+      // Geolocation Attempt
       if (!currentCoords) {
         try {
           currentCoords = await locate();
         } catch (err) {
-          setSearchErr('Please allow location access to find nearby pharmacies.');
+          // 💡 FALLBACK: If GPS fails on desktop, try area search by text query (e.g. "Pandua")
+          if (query.trim()) {
+            const res = await axios.get(`${API_URL}/shops/search`, { params: { q: query.trim() } });
+            setShops(res.data.data ?? []);
+            setSearching(false);
+            return;
+          }
+          
+          setSearchErr('Location blocked. Please allow location access or type your City/Area in the search bar.');
           setSearching(false);
           return;
         }
       }
 
-      params.lat = currentCoords.lat;
-      params.lng = currentCoords.lng;
+      const params: Record<string, string | number> = { 
+        lat: currentCoords.lat, 
+        lng: currentCoords.lng,
+        radius: 10 
+      };
 
       const res = await axios.get(`${API_URL}/shops/nearby`, { params });
-      let data = res.data.data ?? [];
-      setShops(data);
+      setShops(res.data.data ?? []);
     } catch {
       setSearchErr('Unable to fetch pharmacies. Please try again.'); setShops([]);
     } finally { setSearching(false); }
