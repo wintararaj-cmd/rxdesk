@@ -4096,3 +4096,118 @@ export async function deleteJournalEntry(userId: string, entryId: string) {
   if (!entry) throw new AppError(404, 'NOT_FOUND', 'Journal entry not found');
   return prisma.journalEntry.delete({ where: { id: entryId } });
 }
+
+/**
+ * GSTR-4 Annual Report (Composite Scheme)
+ */
+export async function getAnnualGstr4Report(userId: string, startYear: number) {
+  const shop = await getShopOrThrow(userId);
+  
+  // GSTR-4 is Annual (Apr to Mar)
+  const start = new Date(startYear, 3, 1); // Apr 1st
+  const end = new Date(startYear + 1, 2, 31, 23, 59, 59); // Mar 31st
+
+  const [bills, purchases] = await Promise.all([
+    prisma.bill.findMany({
+      where: { 
+        shop_id: shop.id, 
+        payment_status: 'paid',
+        created_at: { gte: start, lte: end }
+      },
+      select: { total_amount: true, subtotal: true, cgst: true, sgst: true, igst: true, created_at: true }
+    }),
+    prisma.purchaseEntry.findMany({
+      where: {
+        shop_id: shop.id,
+        received_date: { gte: start, lte: end }
+      },
+      include: { supplier: true }
+    })
+  ]);
+
+  const totalTurnover = bills.reduce((sum, b) => sum + Number(b.total_amount), 0);
+  const taxPayable = totalTurnover * 0.01;
+
+  // Categorize purchases for Table 4A/4C
+  const table4A = purchases.filter(p => !!p.supplier?.gst_number);
+  const table4C = purchases.filter(p => !p.supplier?.gst_number);
+
+  return {
+    shop_name: shop.shop_name,
+    gstin: shop.gst_number,
+    fy: `${startYear}-${(startYear + 1).toString().slice(-2)}`,
+    turnover: {
+      total: Math.round(totalTurnover * 100) / 100,
+      tax_rate: 1,
+      tax_payable: Math.round(taxPayable * 100) / 100
+    },
+    inward_registered: table4A.map(p => ({
+      gstin: p.supplier.gst_number,
+      name: p.supplier.name,
+      invoice_no: p.invoice_number,
+      date: p.invoice_date.toISOString().split('T')[0],
+      value: Number(p.total_amount),
+      taxable: Number(p.subtotal),
+      igst: 0, 
+      cgst: Number(p.gst_amount) / 2,
+      sgst: Number(p.gst_amount) / 2
+    })),
+    inward_unregistered: table4C.map(p => ({
+      name: p.supplier.name,
+      invoice_no: p.invoice_number,
+      date: p.invoice_date.toISOString().split('T')[0],
+      value: Number(p.total_amount)
+    }))
+  };
+}
+
+export async function generateGstr4Excel(userId: string, startYear: number) {
+  const data = await getAnnualGstr4Report(userId, startYear);
+  const workbook = new ExcelJS.Workbook();
+  
+  // Sheet 1: Summary
+  const summary = workbook.addWorksheet('Summary');
+  summary.columns = [
+    { header: 'Financial Year', key: 'fy', width: 20 },
+    { header: 'GSTIN', key: 'gstin', width: 20 },
+    { header: 'Legal Name', key: 'name', width: 30 },
+    { header: 'Annual Turnover', key: 'turnover', width: 20 },
+    { header: 'Tax Payable (1%)', key: 'tax', width: 20 },
+  ];
+  summary.addRow({
+    fy: data.fy,
+    gstin: data.gstin || 'N/A',
+    name: data.shop_name,
+    turnover: data.turnover.total,
+    tax: data.turnover.tax_payable
+  });
+  summary.getRow(1).font = { bold: true };
+
+  // Sheet 2: Table 4A (B2B Inward)
+  const b2b = workbook.addWorksheet('Table 4A - B2B Inward');
+  b2b.columns = [
+    { header: 'GSTIN of Supplier', key: 'gstin', width: 20 },
+    { header: 'Supplier Name', key: 'name', width: 25 },
+    { header: 'Invoice No', key: 'invoice_no', width: 15 },
+    { header: 'Invoice Date', key: 'date', width: 15 },
+    { header: 'Total Invoice Value', key: 'value', width: 20 },
+    { header: 'Taxable Value', key: 'taxable', width: 20 },
+    { header: 'Central Tax (CGST)', key: 'cgst', width: 15 },
+    { header: 'State Tax (SGST)', key: 'sgst', width: 15 },
+  ];
+  data.inward_registered.forEach(row => b2b.addRow(row));
+  b2b.getRow(1).font = { bold: true };
+
+  // Sheet 3: Table 4C (Inward Unregistered)
+  const urd = workbook.addWorksheet('Table 4C - URD Inward');
+  urd.columns = [
+    { header: 'Supplier Name', key: 'name', width: 25 },
+    { header: 'Invoice No', key: 'invoice_no', width: 15 },
+    { header: 'Invoice Date', key: 'date', width: 15 },
+    { header: 'Total Value', key: 'value', width: 20 },
+  ];
+  data.inward_unregistered.forEach(row => urd.addRow(row));
+  urd.getRow(1).font = { bold: true };
+
+  return workbook.xlsx.writeBuffer();
+}

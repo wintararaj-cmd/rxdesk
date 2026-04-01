@@ -330,6 +330,16 @@ router.get('/reports/gstr3b-excel', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/reports/gstr4-excel', shopAuth, async (req, res, next) => {
+  try {
+    const year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
+    const buffer = await service.generateGstr4Excel(req.user!.id, year);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=GSTR4_${year}.xlsx`);
+    res.send(buffer);
+  } catch (err) { next(err); }
+});
+
 // GET /accounting/reports/payment-split?from=YYYY-MM-DD&to=YYYY-MM-DD
 router.get('/reports/payment-split', shopAuth, async (req, res, next) => {
   try {

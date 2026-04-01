@@ -221,6 +221,8 @@ export const accountingApi = {
     apiClient.get('/accounting/reports/gstr2-excel', { params: { month, year }, responseType: 'blob' }),
   getGstr3bExcel: (month: number, year: number) =>
     apiClient.get('/accounting/reports/gstr3b-excel', { params: { month, year }, responseType: 'blob' }),
+  getGstr4Excel: (year: number) =>
+    apiClient.get('/accounting/reports/gstr4-excel', { params: { year }, responseType: 'blob' }),
   getStockValuation: () => apiClient.get('/accounting/reports/stock-valuation'),
   getPaymentSplit: (from: string, to: string) =>
     apiClient.get('/accounting/reports/payment-split', { params: { from, to } }),

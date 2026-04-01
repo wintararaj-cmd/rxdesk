@@ -306,6 +306,21 @@ function PLTab() {
     }
   };
 
+  const [gstr4Year, setGstr4Year] = useState(new Date().getFullYear());
+  const downloadGstr4Excel = async () => {
+    try {
+      const buf = await accountingApi.getGstr4Excel(gstr4Year);
+      const url = window.URL.createObjectURL(new Blob([buf.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `GSTR4_${gstr4Year}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+    } catch (e) {
+      alert('Failed to generate annual report');
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Date Range & Controls */}
@@ -462,18 +477,40 @@ function PLTab() {
                <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/5 rounded-full -ml-32 -mb-32 pointer-events-none" />
                
                <div className="flex justify-between items-start mb-8 relative z-10">
-                 <h3 className="text-white text-lg font-black uppercase tracking-widest flex items-center gap-3">
-                    <div className="w-2 h-6 bg-indigo-400 rounded-full" />
+                  <h3 className="text-white text-lg font-black uppercase tracking-widest flex items-center gap-3 text-wrap">
+                    <div className="hidden sm:block w-2 h-6 bg-indigo-400 rounded-full" />
                     {isComposite ? 'Composition GST Analysis' : 'Taxation Snapshot'} — {isComposite ? `Q${quarter} ${year}` : new Date(TODAY.getFullYear(), month-1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' })}
-                 </h3>
-                 {isComposite && (
-                    <button 
-                      onClick={downloadCompositionExcel}
-                      className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-white/10 shadow-lg"
-                    >
-                       Download CMP-08
-                    </button>
-                 )}
+                  </h3>
+                  {isComposite && (
+                    <div className="flex flex-wrap gap-3">
+                      {/* GSTR-4 Annual */}
+                      <div className="flex items-center gap-2 bg-white/5 rounded-2xl px-3 py-1.5 border border-white/10">
+                        <select 
+                          value={gstr4Year}
+                          onChange={(e) => setGstr4Year(Number(e.target.value))}
+                          className="bg-transparent text-white text-[10px] font-bold border-0 focus:ring-0 p-0"
+                        >
+                          {[2023, 2024, 2025, 2026].map(y => (
+                            <option key={y} value={y} className="text-gray-900">FY {y}-{ (y+1).toString().slice(-2) }</option>
+                          ))}
+                        </select>
+                        <button 
+                          onClick={downloadGstr4Excel}
+                          className="text-indigo-300 hover:text-white text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                          Download GSTR-4
+                        </button>
+                      </div>
+
+                      {/* CMP-08 Quarterly */}
+                      <button 
+                        onClick={downloadCompositionExcel}
+                        className="bg-indigo-500 hover:bg-indigo-400 text-white px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-950/20"
+                      >
+                        Download CMP-08
+                      </button>
+                    </div>
+                  )}
                </div>
 
                {isComposite ? (
