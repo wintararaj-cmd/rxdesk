@@ -149,9 +149,12 @@ export default function LandingPage() {
             ))}
           </div>
 
-          <div className="hidden md:flex items-center gap-2">
-            <button onClick={() => setShowModal(true)} className="px-4 py-2 text-sm text-gray-300 hover:text-white transition-colors rounded-xl">Login</button>
-            <button onClick={() => setShowModal(true)} className="px-4 py-2 text-sm bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 rounded-xl font-semibold transition-all shadow shadow-violet-500/20">Get Started Free</button>
+          <div className="hidden md:flex items-center gap-3">
+            <button onClick={() => setShowModal(true)} className="px-4 py-2 text-sm text-gray-300 hover:text-white transition-colors font-medium">Login</button>
+            <Link href="/login?register=1" className="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2">
+              <Store className="w-4 h-4" /> Register Shop
+            </Link>
+            <button onClick={() => setShowModal(true)} className="px-4 py-2 text-sm bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-violet-500/20">Get Started Free</button>
           </div>
 
           <button className="md:hidden p-2 text-gray-400 hover:text-white" onClick={() => setMobileOpen(!mobileOpen)}>
@@ -497,19 +500,26 @@ export default function LandingPage() {
               </div>
               <button onClick={() => setShowModal(false)}><X className="w-5 h-5 text-gray-500" /></button>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-4">
                {[
-                 { label: 'Patient', href: '/patient/login', icon: Users, color: 'text-blue-400' },
-                 { label: 'Doctor', href: '/doctor/login', icon: Stethoscope, color: 'text-violet-400' },
-                 { label: 'Shop / Clinic', href: '/login', icon: Store, color: 'text-emerald-400' },
+                 { label: 'Patient', login: '/patient/login', register: '/patient/login?register=1', icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+                 { label: 'Doctor', login: '/doctor/login', register: '/doctor/login?register=1', icon: Stethoscope, color: 'text-violet-400', bg: 'bg-violet-500/10' },
+                 { label: 'Medical Shop', login: '/login', register: '/login?register=1', icon: Store, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
                ].map((role) => (
-                 <Link key={role.label} href={role.href} className="flex items-center justify-between p-4 bg-white/[0.03] border border-white/[0.06] rounded-2xl hover:bg-white/[0.06] transition-all">
-                   <div className="flex items-center gap-4">
-                     <role.icon className={`w-5 h-5 ${role.color}`} />
-                     <span className="font-semibold">{role.label}</span>
+                 <div key={role.label} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 transition-all">
+                   <div className="flex items-center gap-4 mb-4">
+                     <div className={`w-10 h-10 ${role.bg} rounded-xl flex items-center justify-center`}><role.icon className={`w-5 h-5 ${role.color}`} /></div>
+                     <span className="font-bold text-gray-200">{role.label}</span>
                    </div>
-                   <ChevronRight className="w-4 h-4 text-gray-600" />
-                 </Link>
+                   <div className="grid grid-cols-2 gap-3 text-xs font-bold text-center">
+                     <Link href={role.login} onClick={() => setShowModal(false)} className="py-2.5 bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.1] rounded-xl transition-all">
+                       Login
+                     </Link>
+                     <Link href={role.register} onClick={() => setShowModal(false)} className={`py-2.5 ${role.bg} ${role.color} border border-transparent rounded-xl transition-all hover:brightness-125`}>
+                       Register
+                     </Link>
+                   </div>
+                 </div>
                ))}
             </div>
           </div>
