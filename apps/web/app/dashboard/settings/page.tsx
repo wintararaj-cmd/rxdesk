@@ -516,20 +516,64 @@ export default function SettingsPage() {
               <Field label="Opening Bank Balance" field="opening_bank_balance" type="number" placeholder="0" form={activeForm} onChange={handleChange} />
             </div>
 
-            {/* Shop Coordinates (Set via Mobile) */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Latitude (Set via Mobile)</label>
-                <div className="px-3 py-2 border border-gray-100 rounded-lg text-sm bg-gray-50 text-gray-500 font-mono">
-                  {activeForm.latitude ?? 'Not Set'}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Longitude (Set via Mobile)</label>
-                <div className="px-3 py-2 border border-gray-100 rounded-lg text-sm bg-gray-50 text-gray-500 font-mono">
-                  {activeForm.longitude ?? 'Not Set'}
-                </div>
-              </div>
+            {/* Shop Coordinates */}
+            <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/30">
+               <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                       <MapPin className="w-4 h-4 text-violet-500" /> Google Maps Location
+                    </p>
+                    <p className="text-[10px] text-gray-400 mt-0.5 uppercase font-bold tracking-widest">Visibility & Nearby Search</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!navigator.geolocation) {
+                        alert('Geolocation not supported by this browser.');
+                        return;
+                      }
+                      navigator.geolocation.getCurrentPosition(
+                        (p) => {
+                          handleChange('latitude', p.coords.latitude.toString());
+                          handleChange('longitude', p.coords.longitude.toString());
+                        },
+                        (err) => alert('Unable to fetch location: ' + err.message),
+                        { enableHighAccuracy: true, timeout: 10000 }
+                      );
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-100 rounded-lg text-xs font-bold transition-all"
+                  >
+                    <Navigation className="w-3.5 h-3.5" /> Sync My Location
+                  </button>
+               </div>
+
+               <div className="grid grid-cols-2 gap-4">
+                 <div>
+                   <label className="block text-xs font-medium text-gray-500 mb-1">Latitude</label>
+                   <input
+                     type="number"
+                     step="any"
+                     value={activeForm.latitude ?? ''}
+                     onChange={(e) => handleChange('latitude', e.target.value)}
+                     placeholder="e.g. 23.12345"
+                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-violet-400 bg-white"
+                   />
+                 </div>
+                 <div>
+                   <label className="block text-xs font-medium text-gray-500 mb-1">Longitude</label>
+                   <input
+                     type="number"
+                     step="any"
+                     value={activeForm.longitude ?? ''}
+                     onChange={(e) => handleChange('longitude', e.target.value)}
+                     placeholder="e.g. 88.12345"
+                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-violet-400 bg-white"
+                   />
+                 </div>
+               </div>
+               <p className="text-[10px] text-gray-400 mt-3 italic">
+                 💡 You can find these by right-clicking any point on Google Maps.
+               </p>
             </div>
 
             {/* GST Settings */}
