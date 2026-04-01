@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { searchRateLimiter } from '../../middleware/rateLimit';
 import prisma from '../../config/database';
+import redis, { RedisKeys } from '../../config/redis';
 
 const router = Router();
 
@@ -11,6 +12,11 @@ router.get('/', async (req, res, next) => {
     const PAGE_SIZE = req.query.pageSize ? Math.min(100, Math.max(1, Number(req.query.pageSize))) : 50;
     const page = Math.max(1, req.query.page ? Number(req.query.page) : 1);
     const skip = (page - 1) * PAGE_SIZE;
+
+    // ── Redis Cache Check ───────────────────────────────────────────────────
+    const cacheKey = RedisKeys.medicineSearch(`cat:${q}:${page}:${PAGE_SIZE}`);
+    const cached = await redis.get(cacheKey);
+    if (cached) return res.json(JSON.parse(cached));
 
     const where = {
       is_active: true,
@@ -34,11 +40,16 @@ router.get('/', async (req, res, next) => {
       prisma.medicine.count({ where }),
     ]);
 
-    res.json({
+    const result = {
       success: true,
       data: medicines,
       pagination: { page, pageSize: PAGE_SIZE, total, totalPages: Math.ceil(total / PAGE_SIZE) },
-    });
+    };
+
+    // Store in Redis (1 hour)
+    await redis.setex(cacheKey, 3600, JSON.stringify(result));
+    
+    res.json(result);
   } catch (err) { next(err); }
 });
 
@@ -126,6 +137,12 @@ router.get('/composition-search', searchRateLimiter, async (req, res, next) => {
 router.get('/search', searchRateLimiter, async (req, res, next) => {
   try {
     const q = (req.query.q as string) || '';
+
+    // ── Redis Cache Check ───────────────────────────────────────────────────
+    const cacheKey = RedisKeys.medicineSearch(`quick:${q}`);
+    const cached = await redis.get(cacheKey);
+    if (cached) return res.json(JSON.parse(cached));
+
     const medicines = await prisma.medicine.findMany({
       where: {
         is_active: true,
@@ -138,7 +155,11 @@ router.get('/search', searchRateLimiter, async (req, res, next) => {
       take: 30,
       select: { id: true, name: true, generic_name: true, brand_name: true, form: true, strength: true, is_schedule_h: true },
     });
-    res.json({ success: true, data: medicines });
+
+    const result = { success: true, data: medicines };
+    await redis.setex(cacheKey, 3600, JSON.stringify(result));
+    
+    res.json(result);
   } catch (err) { next(err); }
 });
 

@@ -3,6 +3,7 @@ import prisma from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import path from 'path';
 import logger from '../../utils/logger';
+import { clearInventorySearchCache } from '../../config/redis';
 
 const STATE_MAP: Record<string, string> = {
   'wb': 'west bengal',
@@ -213,6 +214,9 @@ export async function generateBillFromPrescription(
     return created;
   });
 
+  // Invalidate search cache
+  clearInventorySearchCache(shop.id);
+
   return bill;
 }
 
@@ -392,6 +396,9 @@ export async function createManualBill(
         data: { total_outstanding: { increment: Number(totalAmount.toFixed(2)) } }
       });
     }
+
+    // Invalidate search cache
+    clearInventorySearchCache(shop.id);
 
     return created;
   }, {
@@ -721,6 +728,10 @@ export async function voidBill(billId: string, userId: string) {
     }
     await tx.creditTransaction.deleteMany({ where: { bill_id: billId } });
     await tx.bill.delete({ where: { id: billId } });
+    
+    // Invalidate search cache
+    clearInventorySearchCache(shop.id);
+
     return { success: true };
   });
 }

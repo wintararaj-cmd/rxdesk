@@ -7,6 +7,7 @@ import prisma from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import logger from '../../utils/logger';
 import insightsRoutes from './insights.routes';
+import redis, { RedisKeys, clearInventorySearchCache } from '../../config/redis';
 
 const router = Router();
 
@@ -148,6 +149,13 @@ router.get('/', requireRole('shop_owner'), async (req, res, next) => {
     const page = Math.max(1, req.query.page ? Number(req.query.page) : 1);
     const skip = (page - 1) * PAGE_SIZE;
 
+    // ── Redis Cache Check ───────────────────────────────────────────────────
+    const cacheKey = RedisKeys.inventorySearch(shop.id, `${q}:${page}:${lowStock}`);
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      return res.json(JSON.parse(cached));
+    }
+
     const where = {
       shop_id: shop.id,
       ...(q ? { medicine_name: { contains: q, mode: 'insensitive' as const } } : {}),
@@ -167,11 +175,16 @@ router.get('/', requireRole('shop_owner'), async (req, res, next) => {
       prisma.shopInventory.count({ where }),
     ]);
 
-    res.json({
+    const result = {
       success: true,
       data: inventory,
       pagination: { page, pageSize: PAGE_SIZE, total, totalPages: Math.ceil(total / PAGE_SIZE) },
-    });
+    };
+
+    // Store in Redis (5 minutes)
+    await redis.setex(cacheKey, 5 * 60, JSON.stringify(result));
+    
+    res.json(result);
   } catch (err) { next(err); }
 });
 
@@ -190,6 +203,9 @@ router.patch('/master/:id', requireRole('shop_owner'), async (req, res, next) =>
         ...(reorder_level !== undefined ? { reorder_level: Number(reorder_level) } : {}),
       }
     });
+
+    // Invalidate search cache
+    clearInventorySearchCache(shop.id);
 
     res.json({ success: true, data: updated });
   } catch (err) { next(err); }
@@ -558,6 +574,9 @@ router.post('/', requireRole('shop_owner'), async (req, res, next) => {
         medicine_id: medicine_id || undefined,
       },
     });
+    // Invalidate search cache
+    clearInventorySearchCache(shop.id);
+
     res.status(201).json({ success: true, data: item, message: 'Medicine added to inventory' });
   } catch (err) { next(err); }
 });
@@ -648,6 +667,9 @@ async function handleInventoryUpdate(req: any, res: any, next: any) {
         }).catch((e: Error) => logger.warn(`Stock alert notification failed: ${e?.message}`));
       }
     }
+
+    // Invalidate search cache
+    clearInventorySearchCache(shop.id);
 
     res.json({ success: true, data: item });
   } catch (err) { next(err); }
@@ -841,6 +863,9 @@ router.delete('/:id', requireRole('shop_owner'), async (req, res, next) => {
     const existing = await prisma.shopInventory.findFirst({ where: { id: req.params.id, shop_id: shop.id } });
     if (!existing) throw new AppError(404, 'NOT_FOUND', 'Inventory item not found');
     await prisma.shopInventory.delete({ where: { id: req.params.id } });
+    // Invalidate search cache
+    clearInventorySearchCache(shop.id);
+
     res.json({ success: true, data: null, message: 'Item removed' });
   } catch (err) { next(err); }
 });

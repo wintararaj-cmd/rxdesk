@@ -37,4 +37,31 @@ export const RedisKeys = {
   refreshToken: (userId: string, tokenId: string) => `refresh:${userId}:${tokenId}`,
   rateLimitOtp: (phone: string) => `rl:otp:${phone}`,
   shopQueue: (shopId: string) => `queue:shop:${shopId}`,
+  inventorySearch: (shopId: string, q: string) => `inventory:search:${shopId}:${q}`,
+  medicineSearch: (q: string) => `medicine:search:${q}`,
+  medicineCompSearch: (q: string) => `medicine:comp:${q}`,
 } as const;
+
+/**
+ * Deletes all keys matching a pattern using SCAN stream for safety on large datasets.
+ */
+export async function clearCacheByPattern(pattern: string): Promise<number> {
+  const stream = redis.scanStream({
+    match: pattern,
+  });
+
+  let deletedCount = 0;
+  for await (const keys of stream) {
+    if (keys.length > 0) {
+      const pipeline = redis.pipeline();
+      keys.forEach((key: string) => pipeline.del(key));
+      await pipeline.exec();
+      deletedCount += keys.length;
+    }
+  }
+
+  return deletedCount;
+}
+
+export const clearInventorySearchCache = (shopId: string) => 
+  clearCacheByPattern(`inventory:search:${shopId}:*`);
