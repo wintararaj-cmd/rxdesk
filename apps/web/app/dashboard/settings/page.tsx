@@ -185,24 +185,23 @@ export default function SettingsPage() {
     }
   }, [shop]);
 
-  const activeForm: Partial<ShopProfile> = Object.keys(form).length
-    ? form
-    : {
-      shop_name: shop?.shop_name ?? '',
-      drug_license_no: shop?.drug_license_no ?? '',
-      address_line: shop?.address_line ?? '',
-      city: shop?.city ?? '',
-      state: shop?.state ?? '',
-      pin_code: shop?.pin_code ?? '',
-      contact_phone: shop?.contact_phone ?? user?.phone ?? '',
-      contact_email: shop?.contact_email ?? '',
-      gst_type: shop?.gst_type ?? 'unregistered',
-      gst_number: shop?.gst_number ?? '',
-      opening_cash_balance: shop?.opening_cash_balance ?? 0,
-      opening_bank_balance: shop?.opening_bank_balance ?? 0,
-      latitude: shop?.latitude ?? null,
-      longitude: shop?.longitude ?? null,
-    };
+  const activeForm: Partial<ShopProfile> = {
+    shop_name: shop?.shop_name ?? '',
+    drug_license_no: shop?.drug_license_no ?? '',
+    address_line: shop?.address_line ?? '',
+    city: shop?.city ?? '',
+    state: shop?.state ?? '',
+    pin_code: shop?.pin_code ?? '',
+    contact_phone: shop?.contact_phone ?? user?.phone ?? '',
+    contact_email: shop?.contact_email ?? '',
+    gst_type: shop?.gst_type ?? 'unregistered',
+    gst_number: shop?.gst_number ?? '',
+    opening_cash_balance: shop?.opening_cash_balance ?? 0,
+    opening_bank_balance: shop?.opening_bank_balance ?? 0,
+    latitude: shop?.latitude ?? null,
+    longitude: shop?.longitude ?? null,
+    ...form
+  };
 
   const updateMutation = useMutation({
     mutationFn: (data: Partial<ShopProfile>) => shopApi.updateProfile(data),
