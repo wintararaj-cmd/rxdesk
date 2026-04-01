@@ -4114,7 +4114,7 @@ export async function getAnnualGstr4Report(userId: string, startYear: number) {
         payment_status: 'paid',
         created_at: { gte: start, lte: end }
       },
-      select: { total_amount: true, subtotal: true, cgst: true, sgst: true, igst: true, created_at: true }
+      select: { total_amount: true, subtotal: true, gst_amount: true, created_at: true }
     }),
     prisma.purchaseEntry.findMany({
       where: {
@@ -4142,8 +4142,8 @@ export async function getAnnualGstr4Report(userId: string, startYear: number) {
       tax_payable: Math.round(taxPayable * 100) / 100
     },
     inward_registered: table4A.map(p => ({
-      gstin: p.supplier.gst_number,
-      name: p.supplier.name,
+      gstin: p.supplier!.gst_number,
+      name: p.supplier!.name,
       invoice_no: p.invoice_number,
       date: p.invoice_date.toISOString().split('T')[0],
       value: Number(p.total_amount),
@@ -4153,7 +4153,7 @@ export async function getAnnualGstr4Report(userId: string, startYear: number) {
       sgst: Number(p.gst_amount) / 2
     })),
     inward_unregistered: table4C.map(p => ({
-      name: p.supplier.name,
+      name: p.supplier?.name || 'Unregistered Supplier',
       invoice_no: p.invoice_number,
       date: p.invoice_date.toISOString().split('T')[0],
       value: Number(p.total_amount)
