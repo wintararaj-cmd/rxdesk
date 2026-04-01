@@ -26,8 +26,16 @@ export async function registerShop(
     opening_bank_balance?: number;
   }
 ) {
-  const existing = await prisma.medicalShop.findFirst({ where: { owner_user_id: userId } });
-  if (existing) throw new AppError(409, 'DUPLICATE_BOOKING', 'You already have a registered shop');
+  const existingByOwner = await prisma.medicalShop.findFirst({ where: { owner_user_id: userId } });
+  if (existingByOwner) throw new AppError(409, 'DUPLICATE_SHOP', 'You already have a registered shop');
+
+  // Check unique phone number
+  const existingByPhone = await prisma.medicalShop.findFirst({ where: { contact_phone: data.contact_phone } });
+  if (existingByPhone) throw new AppError(409, 'DUPLICATE_PHONE', 'A shop with this mobile number already exists');
+
+  // Check unique drug license
+  const existingByLicense = await prisma.medicalShop.findFirst({ where: { drug_license_no: data.drug_license_no } });
+  if (existingByLicense) throw new AppError(409, 'DUPLICATE_LICENSE', 'A shop with this Drug License Number is already registered');
 
   const shop = await prisma.medicalShop.create({
     data: { 
