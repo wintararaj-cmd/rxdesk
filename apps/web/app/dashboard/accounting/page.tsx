@@ -269,12 +269,42 @@ function PLTab() {
     queryFn: () => accountingApi.getPL(from, to).then((r) => r.data.data),
   });
 
+  const { data: myShop } = useQuery({
+    queryKey: ['my-shop'],
+    queryFn: () => shopApi.getMyShop().then(r => r.data.data),
+  });
+
   const month = TODAY.getMonth() + 1;
   const year = TODAY.getFullYear();
+  const quarter = Math.floor((month - 1) / 3) + 1;
+
   const { data: gst } = useQuery<GstSummary>({
     queryKey: ['web-gst', month, year],
     queryFn: () => accountingApi.getGstSummary(month, year).then((r) => r.data.data),
+    enabled: !!myShop && myShop.gst_type !== 'composite'
   });
+
+  const { data: compositionGst } = useQuery({
+    queryKey: ['web-gst-composition', quarter, year],
+    queryFn: () => accountingApi.getCompositionGstReport(quarter, year).then((r) => r.data.data),
+    enabled: !!myShop && myShop.gst_type === 'composite'
+  });
+
+  const isComposite = myShop?.gst_type === 'composite';
+
+  const downloadCompositionExcel = async () => {
+    try {
+      const buf = await accountingApi.getCompositionGstExcel(quarter, year);
+      const url = window.URL.createObjectURL(new Blob([buf.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `CMP08_Q${quarter}_${year}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+    } catch (e) {
+      alert('Failed to generate report');
+    }
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -426,33 +456,58 @@ function PLTab() {
           </div>
 
           {/* GST Insights */}
-          {gst && (
+          {(isComposite ? compositionGst : gst) && (
             <div className="bg-indigo-900 rounded-[40px] p-8 shadow-2xl relative overflow-hidden">
                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32 pointer-events-none" />
                <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/5 rounded-full -ml-32 -mb-32 pointer-events-none" />
                
-               <h3 className="text-white text-lg font-black uppercase tracking-widest mb-8 flex items-center gap-3">
-                  <div className="w-2 h-6 bg-indigo-400 rounded-full" />
-                  Taxation Snapshot — {new Date(TODAY.getFullYear(), month-1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' })}
-               </h3>
-
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
-                 <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/10">
-                   <p className="text-white/50 text-[10px] font-black uppercase tracking-widest mb-2">Outward Taxable</p>
-                   <p className="text-2xl font-black text-white tracking-tighter">{fmt(gst.outward_supplies.taxable_value)}</p>
-                   <div className="w-12 h-1 bg-white/20 mt-4 rounded-full" />
-                 </div>
-                 <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/10">
-                   <p className="text-white/50 text-[10px] font-black uppercase tracking-widest mb-2">GST Collected</p>
-                   <p className="text-2xl font-black text-emerald-400 tracking-tighter">{fmt(gst.outward_supplies.total_gst_collected)}</p>
-                   <div className="w-12 h-1 bg-emerald-400/20 mt-4 rounded-full" />
-                 </div>
-                 <div className="bg-indigo-500 rounded-3xl p-6 shadow-2xl shadow-indigo-950/50">
-                   <p className="text-white/70 text-[10px] font-black uppercase tracking-widest mb-2">Net Tax Payable</p>
-                   <p className="text-3xl font-black text-white tracking-tighter">{fmt(gst.net_tax_payable)}</p>
-                   <p className="text-[10px] text-white/50 font-bold mt-2 uppercase tracking-tight">After ITC Adjustment</p>
-                 </div>
+               <div className="flex justify-between items-start mb-8 relative z-10">
+                 <h3 className="text-white text-lg font-black uppercase tracking-widest flex items-center gap-3">
+                    <div className="w-2 h-6 bg-indigo-400 rounded-full" />
+                    {isComposite ? 'Composition GST Analysis' : 'Taxation Snapshot'} — {isComposite ? `Q${quarter} ${year}` : new Date(TODAY.getFullYear(), month-1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' })}
+                 </h3>
+                 {isComposite && (
+                    <button 
+                      onClick={downloadCompositionExcel}
+                      className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-white/10 shadow-lg"
+                    >
+                       Download CMP-08
+                    </button>
+                 )}
                </div>
+
+               {isComposite ? (
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
+                    <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/10">
+                      <p className="text-white/50 text-[10px] font-black uppercase tracking-widest mb-2">Quarterly Turnover</p>
+                      <p className="text-3xl font-black text-white tracking-tighter">{fmt(compositionGst.total_sales)}</p>
+                      <p className="text-[10px] text-white/30 font-bold mt-2 uppercase tracking-tight">Outward supplies including exempt</p>
+                    </div>
+                    <div className="bg-indigo-500 rounded-3xl p-6 shadow-2xl shadow-indigo-950/50">
+                      <p className="text-white/70 text-[10px] font-black uppercase tracking-widest mb-2">Self-Assessed Tax (@1%)</p>
+                      <p className="text-3xl font-black text-white tracking-tighter">{fmt(compositionGst.tax_payable)}</p>
+                      <p className="text-[10px] text-white/50 font-bold mt-2 uppercase tracking-tight">Quarterly liability for payment</p>
+                    </div>
+                 </div>
+               ) : (
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
+                   <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/10">
+                     <p className="text-white/50 text-[10px] font-black uppercase tracking-widest mb-2">Outward Taxable</p>
+                     <p className="text-2xl font-black text-white tracking-tighter">{fmt(gst!.outward_supplies.taxable_value)}</p>
+                     <div className="w-12 h-1 bg-white/20 mt-4 rounded-full" />
+                   </div>
+                   <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/10">
+                     <p className="text-white/50 text-[10px] font-black uppercase tracking-widest mb-2">GST Collected</p>
+                     <p className="text-2xl font-black text-emerald-400 tracking-tighter">{fmt(gst!.outward_supplies.total_gst_collected)}</p>
+                     <div className="w-12 h-1 bg-emerald-400/20 mt-4 rounded-full" />
+                   </div>
+                   <div className="bg-indigo-500 rounded-3xl p-6 shadow-2xl shadow-indigo-950/50">
+                     <p className="text-white/70 text-[10px] font-black uppercase tracking-widest mb-2">Net Tax Payable</p>
+                     <p className="text-3xl font-black text-white tracking-tighter">{fmt(gst!.net_tax_payable)}</p>
+                     <p className="text-[10px] text-white/50 font-bold mt-2 uppercase tracking-tight">After ITC Adjustment</p>
+                   </div>
+                 </div>
+               )}
             </div>
           )}
         </>

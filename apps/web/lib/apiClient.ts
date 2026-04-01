@@ -211,6 +211,10 @@ export const accountingApi = {
     apiClient.get('/accounting/reports/sales-detailed', { params: { from, to } }),
   getGstSummary: (month: number, year: number) =>
     apiClient.get('/accounting/reports/gst-summary', { params: { month, year } }),
+  getCompositionGstReport: (quarter: number, year: number) =>
+    apiClient.get('/accounting/reports/gst-composition', { params: { quarter, year } }),
+  getCompositionGstExcel: (quarter: number, year: number) =>
+    apiClient.get('/accounting/reports/gst-composition-excel', { params: { quarter, year }, responseType: 'blob' }),
   getGstr1Excel: (month: number, year: number) =>
     apiClient.get('/accounting/reports/gstr1-excel', { params: { month, year }, responseType: 'blob' }),
   getGstr2Excel: (month: number, year: number) =>

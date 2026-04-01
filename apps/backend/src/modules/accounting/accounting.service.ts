@@ -4003,6 +4003,91 @@ export async function getBalanceSheet(userId: string, date: string) {
 /**
  * Journal entries delete
  */
+export async function getCompositionGstReport(userId: string, quarter: number, year: number) {
+  const shop = await getShopOrThrow(userId);
+  
+  // Define quarter date ranges (Indian Financial Year: Q1: Apr-Jun, Q2: Jul-Sep, Q3: Oct-Dec, Q4: Jan-Mar)
+  // Actually common GST quarters are:
+  // Q1: Jan-Mar, Q2: Apr-Jun, Q3: Jul-Sep, Q4: Oct-Dec
+  // Let's use the calendar year quarters as they are more common in generic reporting.
+  
+  let start: Date, end: Date;
+  switch (Number(quarter)) {
+    case 1: start = new Date(year, 0, 1); end = new Date(year, 2, 31, 23, 59, 59); break;
+    case 2: start = new Date(year, 3, 1); end = new Date(year, 5, 30, 23, 59, 59); break;
+    case 3: start = new Date(year, 6, 1); end = new Date(year, 8, 30, 23, 59, 59); break;
+    case 4: start = new Date(year, 9, 1); end = new Date(year, 11, 31, 23, 59, 59); break;
+    default: throw new AppError(400, 'VALIDATION_ERROR', 'Invalid quarter (use 1-4)');
+  }
+
+  // Fetch all paid bills in the quarter
+  const bills = await prisma.bill.findMany({
+    where: { 
+      shop_id: shop.id, 
+      payment_status: 'paid',
+      created_at: { gte: start, lte: end }
+    },
+    select: { total_amount: true, created_at: true }
+  });
+
+  const totalSales = bills.reduce((sum, b) => sum + Number(b.total_amount), 0);
+  const taxPayable = totalSales * 0.01; // 1% of total turnover
+
+  return {
+    shop_id: shop.id,
+    shop_name: shop.shop_name,
+    period: `Q${quarter} ${year}`,
+    date_range: { start, end },
+    total_sales: totalSales,
+    tax_rate: 1,
+    tax_payable: Math.round(taxPayable * 100) / 100,
+    bill_count: bills.length,
+  };
+}
+
+export async function generateCompositionGstExcel(userId: string, quarter: number, year: number) {
+  const summary = await getCompositionGstReport(userId, quarter, year);
+
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet(`CMP-08_Q${quarter}_${year}`);
+
+  sheet.columns = [
+    { header: 'Particulars', key: 'particulars', width: 45 },
+    { header: 'Total Value (Turnover)', key: 'turnover', width: 25 },
+    { header: 'Tax Rate (%)', key: 'rate', width: 15 },
+    { header: 'Tax Payable', key: 'payable', width: 20 },
+  ];
+
+  sheet.addRow({
+    particulars: '1. Outward supplies (including exempt supplies)',
+    turnover: summary.total_sales,
+    rate: '1%',
+    payable: summary.tax_payable,
+  });
+
+  sheet.addRow({
+    particulars: '2. Inward supplies attracting reverse charge',
+    turnover: 0,
+    rate: '-',
+    payable: 0,
+  });
+
+  sheet.addRow({});
+
+  sheet.addRow({
+    particulars: 'Total Tax Payable (CMP-08 Summary)',
+    turnover: summary.total_sales,
+    rate: '',
+    payable: summary.tax_payable,
+  }).font = { bold: true };
+
+  // Styling
+  sheet.getRow(1).font = { bold: true };
+  sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+
+  return workbook.xlsx.writeBuffer();
+}
+
 export async function deleteJournalEntry(userId: string, entryId: string) {
   const shop = await getShopOrThrow(userId);
   const entry = await prisma.journalEntry.findFirst({

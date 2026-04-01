@@ -277,6 +277,26 @@ router.get('/reports/gst-summary', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/reports/gst-composition', shopAuth, async (req, res, next) => {
+  try {
+    const quarter = req.query.quarter ? Number(req.query.quarter) : Math.floor(new Date().getMonth() / 3) + 1;
+    const year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
+    const data = await service.getCompositionGstReport(req.user!.id, quarter, year);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/reports/gst-composition-excel', shopAuth, async (req, res, next) => {
+  try {
+    const quarter = req.query.quarter ? Number(req.query.quarter) : Math.floor(new Date().getMonth() / 3) + 1;
+    const year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
+    const buffer = await service.generateCompositionGstExcel(req.user!.id, quarter, year);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=CMP08_Q${quarter}_${year}.xlsx`);
+    res.send(buffer);
+  } catch (err) { next(err); }
+});
+
 router.get('/reports/gstr1-excel', shopAuth, async (req, res, next) => {
   try {
     const month = req.query.month ? Number(req.query.month) : new Date().getMonth() + 1;
