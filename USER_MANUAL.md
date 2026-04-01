@@ -92,3 +92,47 @@ If you encounter any issues or need custom feature requests:
 *   **Email**: support@rxdesk.in
 *   **Phone**: +91-XXXXXXXXXX
 *   **Admin Panel**: Use the Help Desk icon in your top navigation bar.
+
+---
+
+## 7. Pharmacy Digital Profile & SEO ✨
+RxDesk automatically creates a professional, SEO-optimized public profile for your pharmacy to help customers find you on Google and Bing.
+
+### 7.1 Managing Your Public Profile
+*   **Automatic Setup**: As soon as your shop is verified, it becomes visible at `rxdesk.in/pharmacy/[your-id]`.
+*   **Linking Doctors**: Any doctor you add to your chambers (see Section 8) will automatically appear on your public profile with their consultation timings.
+*   **Google Search Visibility**: We include "Pharmacy Schema" in your profile, which helps your shop appear with your address, phone number, and timings in local search results.
+
+### 7.2 Home Delivery & Contact
+*   Customers can click the **Call Pharmacy** button directly from their mobile browser to reach you.
+*   The **Directions** button opens Google Maps to guide customers directly to your shop front.
+
+---
+
+## 8. Doctor Chamber Management
+If your pharmacy hosts doctors, you can manage their schedules and appointments directly within RxDesk.
+
+### 8.1 Adding a Doctor
+1.  Navigate to the **Chambers** or **Doctors** tab in your dashboard.
+2.  Click **Add New Doctor**.
+3.  Enter their Full Name, Specialization (e.g., ENT, Cardiologist), and Qualifications (MBBS, etc.).
+4.  **Set Consultation Fees**: This will be displayed on your public profile for transparency.
+
+### 8.2 Setting Timings (Schedules)
+*   For each doctor, you can define their weekly "Consultation Hours."
+*   Example: *Monday & Thursday, 10:00 AM - 01:00 PM*.
+*   These timings are instantly synced to your public pharmacy page so patients know when to visit.
+
+---
+
+## 9. Search & Discovery (Find Pharmacy/Doctor)
+The RxDesk landing page (`rxdesk.in`) serves as a discovery hub for patients.
+
+### 9.1 Near Pharmacy Search
+*   **Mobile Users**: Uses one-tap GPS to find the closest pharmacies within a 10km radius.
+*   **Desktop Users**: If location permissions are blocked, patients can type their **City or Area** (e.g., *"Pandua"*) into the search bar and click **Near Pharmacy** to find local results.
+
+### 9.2 Finding Doctors
+*   Patients can search by **Doctor Name**, **Specialization**, or **Symptom**.
+*   The results show the distance to each doctor and the specific pharmacy where they are currently sitting.
+*   Clicking **View Profile & Timings** gives the patient a full breakdown of the doctor's weekly schedule.
