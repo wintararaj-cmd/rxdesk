@@ -289,17 +289,26 @@ export async function createManualBill(
         customer_gstin: data.customer_gstin,
         billing_address: data.billing_address,
         billing_state: data.billing_state,
-        subtotal: subtotal,
-        discount_amount: totalDiscount,
-        gst_amount: gstAmount,
-        total_amount: totalAmount,
+        subtotal: subtotal.toFixed(2),
+        discount_amount: totalDiscount.toFixed(2),
+        gst_amount: gstAmount.toFixed(2),
+        total_amount: totalAmount.toFixed(2),
         payment_status: paymentStatus as any,
         payment_method: isPaid ? (paymentMethod as any) : 'cash',
         staff_id: userId,
         items: {
           create: billItems.map(bi => ({
-            ...bi,
-            line_total: Number(bi.line_total)
+            inventory_id: bi.inventory_id || null,
+            medicine_name: bi.medicine_name,
+            hsn_code: bi.hsn_code || null,
+            batch_number: bi.batch_number || null,
+            expiry_date: bi.expiry_date || null,
+            mrp: Number(bi.mrp).toFixed(2),
+            quantity: Math.floor(bi.quantity),
+            discount_type: bi.discount_type || 'percentage',
+            discount_value: Number(bi.discount_value).toFixed(2),
+            gst_rate: Number(bi.gst_rate).toFixed(2),
+            line_total: Number(bi.line_total).toFixed(2)
           }))
         },
       },
