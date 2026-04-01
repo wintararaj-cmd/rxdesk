@@ -411,67 +411,108 @@ export default function LandingPage() {
         </section>
       )}
 
-      {/* PHARMACY BILLING SHOWCASE */}
-      <section id="pharmacy-billing" className="py-24 px-4 border-t border-emerald-900/40 bg-gradient-to-b from-emerald-950/25 via-[#09090f] to-[#09090f]">
+      {/* ECOSYSTEM BENTO GRID */}
+      <section id="features" className="py-24 px-4 bg-gradient-to-b from-[#09090f] via-[#0b0b14] to-[#09090f]">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-14">
-            <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-3 py-1 text-xs text-emerald-400 mb-4 font-medium">
-              <Receipt className="w-3 h-3" /> Pharmacy Billing Software
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-bold mb-3">
-              Complete <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">Pharmacy Billing</span> Software
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-5xl font-bold mb-4 tracking-tight">
+              One ecosystem. <span className="bg-gradient-to-r from-emerald-400 via-violet-400 to-blue-400 bg-clip-text text-transparent">Complete control.</span>
             </h2>
-            <p className="text-gray-500 max-w-xl mx-auto text-sm sm:text-base">
-              From medicine sales to GST returns â€” every billing operation your pharmacy needs, fast and accurate.
+            <p className="text-gray-500 max-w-2xl mx-auto text-base">
+              Connecting rural healthcare with urban technology. A seamless bridge between patients, chambers, and pharmacies.
             </p>
           </div>
 
-          <div className="grid lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 rounded-2xl p-7 hover:border-emerald-400/50 transition-all shadow-lg shadow-emerald-900/20">
-              <div className="w-12 h-12 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center mb-5">
-                <Receipt className="w-6 h-6 text-emerald-400" />
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+            
+            {/* LARGE BENTO: PHARMACY BILLING */}
+            <div className="md:col-span-4 bg-[#11111d]/60 border border-white/[0.08] rounded-[2.5rem] p-8 hover:border-emerald-500/30 transition-all group overflow-hidden relative shadow-2xl">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 blur-[80px] rounded-full group-hover:bg-emerald-500/10 transition-colors" />
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center">
+                    <Receipt className="w-6 h-6 text-emerald-400" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-white">Smart Pharmacy Billing</h3>
+                </div>
+                <p className="text-gray-400 text-sm max-w-md mb-8 leading-relaxed">
+                  The fastest GST billing engine in India. Scan medicines, manage HSN codes, and generate professional tax invoices in under 10 seconds.
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="bg-white/[0.03] border border-white/[0.05] p-4 rounded-2xl">
+                      <div className="text-emerald-400 font-bold text-lg mb-1">99%</div>
+                      <div className="text-gray-500 text-[10px] uppercase font-black">GST Accuracy</div>
+                   </div>
+                   <div className="bg-white/[0.03] border border-white/[0.05] p-4 rounded-2xl">
+                      <div className="text-violet-400 font-bold text-lg mb-1">Live</div>
+                      <div className="text-gray-500 text-[10px] uppercase font-black">Inventory Sync</div>
+                   </div>
+                </div>
               </div>
-              <h3 className="text-xl font-bold mb-2">GST-Compliant Invoice Generation</h3>
-              <p className="text-gray-500 text-sm mb-6 leading-relaxed">
-                Generate GSTIN-compliant tax invoices for medicine sales with automatic HSN code mapping, CGST/SGST/IGST calculation, and print-ready PDF format.
-              </p>
-              <ul className="grid sm:grid-cols-2 gap-2.5">
-                {[
-                  'Auto HSN code mapping',
-                  'CGST / SGST / IGST split',
-                  'GSTIN on every invoice',
-                  'Batch & expiry tracking',
-                  'Discount & MRP controls',
-                  'PDF invoice download',
-                ].map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-sm text-gray-400">
-                    <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> {f}
-                  </li>
-                ))}
-              </ul>
             </div>
 
-            <div className="bg-gradient-to-br from-violet-500/10 to-indigo-500/10 border border-violet-500/30 rounded-2xl p-7 hover:border-violet-400/50 transition-all shadow-lg shadow-violet-900/20">
-              <div className="w-12 h-12 bg-violet-500/10 border border-violet-500/20 rounded-xl flex items-center justify-center mb-5">
-                <Package className="w-6 h-6 text-violet-400" />
-              </div>
-              <h3 className="text-lg font-bold mb-2">Live Inventory Management</h3>
-              <p className="text-gray-500 text-sm mb-4 leading-relaxed">
-                Real-time stock levels with low-stock alerts. Track batch numbers, expiry dates, and rack locations automatically.
-              </p>
-              <ul className="space-y-2.5">
-                {[
-                  'Low-stock & expiry alerts',
-                  'Batch number management',
-                  'Auto stock deduction on sale',
-                  'Multi-rack locations',
-                ].map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-sm text-gray-500">
-                    <CheckCircle className="w-3.5 h-3.5 text-violet-400 shrink-0" /> {f}
-                  </li>
-                ))}
-              </ul>
+            {/* SMALL BENTO: PATIENT SEARCH */}
+            <div className="md:col-span-2 bg-[#11111d]/60 border border-white/[0.08] rounded-[2.5rem] p-8 hover:border-blue-500/30 transition-all group relative overflow-hidden shadow-2xl">
+               <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 blur-[70px] rounded-full" />
+               <div className="w-10 h-10 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center mb-6">
+                 <MapPin className="w-5 h-5 text-blue-400" />
+               </div>
+               <h3 className="text-xl font-bold text-white mb-3">Discovery</h3>
+               <p className="text-gray-500 text-xs leading-relaxed mb-6">
+                 Patients can find your shop and your associated doctors from anywhere in India.
+               </p>
+               <div className="flex flex-col gap-2">
+                  <div className="h-1 bg-blue-500/20 rounded-full overflow-hidden">
+                     <div className="w-[85%] h-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                  </div>
+                  <div className="text-[10px] text-gray-600 font-bold">LOCAL SEO OPTIMIZED</div>
+               </div>
             </div>
+
+            {/* MEDIUM BENTO: DOCTOR DASHBOARD */}
+            <div className="md:col-span-3 bg-[#11111d]/60 border border-white/[0.08] rounded-[2.5rem] p-8 hover:border-violet-500/30 transition-all group relative overflow-hidden shadow-2xl">
+               <div className="absolute top-0 left-0 w-48 h-48 bg-violet-500/5 blur-[70px] rounded-full" />
+               <div className="flex items-center gap-4 mb-6">
+                  <div className="w-12 h-12 bg-violet-500/10 border border-violet-500/20 rounded-2xl flex items-center justify-center">
+                    <Calendar className="w-6 h-6 text-violet-400" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white">Cloud Appointments</h3>
+               </div>
+               <p className="text-gray-400 text-sm leading-relaxed mb-6">
+                 Manage multiple chambers, live queues, and patient history from a single mobile-friendly dashboard.
+               </p>
+               <div className="bg-violet-500/5 border border-violet-500/10 p-3 rounded-xl flex items-center gap-3">
+                  <CheckCircle className="w-4 h-4 text-violet-400" />
+                  <span className="text-xs text-gray-400">Digital Prescription Support</span>
+               </div>
+            </div>
+
+            {/* MEDIUM BENTO: REPORTS & GST */}
+            <div className="md:col-span-3 bg-[#11111d]/60 border border-white/[0.08] rounded-[2.5rem] p-8 hover:border-amber-500/30 transition-all group relative overflow-hidden shadow-2xl border-b-2 border-b-amber-500/10">
+               <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/5 blur-[70px] rounded-full" />
+               <div className="flex items-center gap-4 mb-6">
+                  <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-center">
+                    <BarChart3 className="w-6 h-6 text-amber-400" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white">GST & Accounting</h3>
+               </div>
+               <p className="text-gray-400 text-sm leading-relaxed mb-6">
+                 Automatic GSTR reports (GSTR-1, 3B) and full shop accounting. No manual calculator needed.
+               </p>
+               <div className="flex gap-1.5 items-center">
+                  {[1,2,3,4,5].map(i => <div key={i} className="h-8 flex-1 bg-white/[0.02] border border-white/[0.05] rounded-md relative flex items-end"><div className="w-full bg-amber-500/20" style={{height: `${i*15}%`}} /></div>)}
+               </div>
+            </div>
+
+          </div>
+
+          <div className="mt-16 text-center">
+            <Link href="/login?register=1" className="inline-flex items-center gap-3 px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-sm font-bold transition-all group">
+               <span>Ready to digitize your pharmacy?</span>
+               <span className="text-emerald-400 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                 Get Started Now <ArrowRight className="w-4 h-4" />
+               </span>
+            </Link>
           </div>
         </div>
       </section>
