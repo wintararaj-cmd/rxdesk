@@ -83,15 +83,39 @@ export async function getShopByOwnerId(userId: string) {
   return shop;
 }
 
-export async function searchShops(q?: string, city?: string, pinCode?: string) {
+export async function searchShops(q?: string, cityArg?: string, pinCode?: string) {
+  let processedQ = q || '';
+  // Strip common filler phrases that users might type
+  processedQ = processedQ.replace(/pharmacy near me/gi, 'pharmacy');
+  processedQ = processedQ.replace(/near me/gi, '');
+  processedQ = processedQ.replace(/pharmacy in/gi, 'pharmacy');
+  
+  const searchTerms = processedQ.trim().split(/\s+/).filter(word => word.length > 1);
+
+  const where: any = { is_active: true };
+
+  if (searchTerms.length > 0) {
+    // Match shops that contain ALL meaningful terms in name, city, address, or district
+    where.AND = searchTerms.map(term => ({
+      OR: [
+        { shop_name: { contains: term, mode: 'insensitive' } },
+        { city: { contains: term, mode: 'insensitive' } },
+        { address_line: { contains: term, mode: 'insensitive' } },
+        { district: { contains: term, mode: 'insensitive' } },
+      ]
+    }));
+  }
+
+  if (cityArg) {
+    where.city = { contains: cityArg, mode: 'insensitive' };
+  }
+  if (pinCode) {
+    where.pin_code = pinCode;
+  }
+
   return prisma.medicalShop.findMany({
-    where: {
-      is_active: true,
-      ...(q ? { shop_name: { contains: q, mode: 'insensitive' } } : {}),
-      ...(city ? { city: { contains: city, mode: 'insensitive' } } : {}),
-      ...(pinCode ? { pin_code: pinCode } : {}),
-    },
-    select: { id: true, shop_name: true, address_line: true, city: true, pin_code: true, contact_phone: true },
+    where,
+    select: { id: true, shop_name: true, address_line: true, city: true, pin_code: true, contact_phone: true, latitude: true, longitude: true },
     take: 20,
     orderBy: { shop_name: 'asc' },
   });

@@ -95,8 +95,8 @@ router.get('/nearby', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /shops/search?q=&city=&pin_code=  (authenticated — used by doctors to find shops to link)
-router.get('/search', authenticate, async (req, res, next) => {
+// GET /shops/search?q=&city=&pin_code=  (public)
+router.get('/search', async (req, res, next) => {
   try {
     const { q, city, pin_code } = req.query as Record<string, string>;
     const shops = await service.searchShops(q, city, pin_code);
