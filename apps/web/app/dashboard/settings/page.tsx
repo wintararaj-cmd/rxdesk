@@ -485,7 +485,19 @@ export default function SettingsPage() {
 
         {/* Profile form */}
         <div className="bg-white rounded-2xl border border-gray-200 p-5">
-          <h2 className="text-base font-semibold text-gray-800 mb-5">{isNewShop ? 'Create Shop Profile' : 'Shop Profile'}</h2>
+           <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-semibold text-gray-800">{isNewShop ? 'Create Shop Profile' : 'Shop Profile'}</h2>
+              {!isNewShop && shop?.id && (
+                <a 
+                  href={`/pharmacy/${shop.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100 rounded-lg text-xs font-bold transition-all"
+                >
+                  <Search className="w-3.5 h-3.5" /> View Public Profile
+                </a>
+              )}
+           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <Field label="Shop Name *" field="shop_name" placeholder="Enter shop name" form={activeForm} onChange={handleChange} />
             <Field label="Drug License No *" field="drug_license_no" placeholder="e.g. MH-MUM-123456" form={activeForm} onChange={handleChange} />
