@@ -715,4 +715,12 @@ router.get('/reports/balance-sheet', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/reports/trial-balance', shopAuth, async (req, res, next) => {
+  try {
+    const { date } = req.query as { date: string };
+    const data = await service.getTrialBalance(req.user!.id, date || new Date().toISOString().split('T')[0]);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 export default router;

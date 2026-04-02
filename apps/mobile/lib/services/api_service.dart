@@ -52,7 +52,7 @@ class ApiService {
   static Future<Map<String, dynamic>> _request(
     String method,
     String path, {
-    Map<String, dynamic>? body,
+    dynamic body,
     Map<String, String>? query,
     bool auth = true,
   }) async {

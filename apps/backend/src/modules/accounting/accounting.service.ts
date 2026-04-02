@@ -3887,6 +3887,127 @@ export async function listJournalEntries(userId: string, from?: string, to?: str
 }
 
 /**
+ * Financial Reports: Trial Balance
+ */
+export async function getTrialBalance(userId: string, date: string) {
+  const shop = await getShopOrThrow(userId);
+  const asOfDate = new Date(date);
+  asOfDate.setHours(23, 59, 59, 999);
+
+  // Fetch ALL account groups
+  const groups = await prisma.accountGroup.findMany({
+    where: {
+      OR: [{ shop_id: shop.id }, { shop_id: null }],
+    },
+    include: {
+      accounts: {
+        where: { shop_id: shop.id },
+      }
+    }
+  });
+
+  const report = await Promise.all(groups.map(async (group) => {
+    const accountsWithBalance = await Promise.all(group.accounts.map(async (acc) => {
+      // 1. Journal impacts
+      const jvDebits = await prisma.journalItem.aggregate({
+        where: { account_id: acc.id, type: 'debit', journal: { entry_date: { lte: asOfDate } } },
+        _sum: { amount: true }
+      });
+      const jvCredits = await prisma.journalItem.aggregate({
+        where: { account_id: acc.id, type: 'credit', journal: { entry_date: { lte: asOfDate } } },
+        _sum: { amount: true }
+      });
+
+      let debits = Number(jvDebits._sum.amount || 0);
+      let credits = Number(jvCredits._sum.amount || 0);
+      
+      // 2. Integration with Phase 1 entries
+      if (acc.name === 'Cash in Hand') {
+        const inc = await prisma.incomeEntry.aggregate({ where: { shop_id: shop.id, payment_method: 'cash', entry_date: { lte: asOfDate } }, _sum: { amount: true } });
+        const exp = await prisma.expenseEntry.aggregate({ where: { shop_id: shop.id, payment_method: 'cash', entry_date: { lte: asOfDate }, linked_purchase_id: null }, _sum: { amount: true } });
+        const sup = await prisma.supplierPayment.aggregate({ where: { shop_id: shop.id, payment_method: 'cash', payment_date: { lte: asOfDate } }, _sum: { amount: true } });
+        const sret = await prisma.saleReturn.aggregate({ where: { shop_id: shop.id, refund_method: 'cash', return_date: { lte: asOfDate } }, _sum: { total_amount: true } });
+        const contras = await prisma.contraEntry.findMany({ where: { shop_id: shop.id, entry_date: { lte: asOfDate }, OR: [{ from_account: 'cash' }, { to_account: 'cash' }] } });
+        
+        debits += Number(inc._sum.amount || 0);
+        credits += Number(exp._sum.amount || 0) + Number(sup._sum.amount || 0) + Number(sret._sum.total_amount || 0);
+        for (const c of contras) {
+          if (c.from_account === 'cash') credits += Number(c.amount);
+          if (c.to_account === 'cash') debits += Number(c.amount);
+        }
+        debits += Number(acc.opening_balance || 0);
+      } else if (acc.name === 'Bank Account') {
+        const methods = ['upi', 'neft', 'cheque', 'card', 'bank_transfer'];
+        const inc = await prisma.incomeEntry.aggregate({ where: { shop_id: shop.id, payment_method: { in: methods as any }, entry_date: { lte: asOfDate } }, _sum: { amount: true } });
+        const exp = await prisma.expenseEntry.aggregate({ where: { shop_id: shop.id, payment_method: { in: methods as any }, entry_date: { lte: asOfDate }, linked_purchase_id: null }, _sum: { amount: true } });
+        const sup = await prisma.supplierPayment.aggregate({ where: { shop_id: shop.id, payment_method: { in: methods as any }, payment_date: { lte: asOfDate } }, _sum: { amount: true } });
+        const sret = await prisma.saleReturn.aggregate({ where: { shop_id: shop.id, refund_method: { in: methods as any }, return_date: { lte: asOfDate } }, _sum: { total_amount: true } });
+        const contras = await prisma.contraEntry.findMany({ where: { shop_id: shop.id, entry_date: { lte: asOfDate }, OR: [{ from_account: { in: methods as any } }, { to_account: { in: methods as any } }] } });
+
+        debits += Number(inc._sum.amount || 0);
+        credits += Number(exp._sum.amount || 0) + Number(sup._sum.amount || 0) + Number(sret._sum.total_amount || 0);
+        for (const c of contras) {
+          if (methods.includes(c.from_account)) credits += Number(c.amount);
+          if (methods.includes(c.to_account)) debits += Number(c.amount);
+        }
+        debits += Number(acc.opening_balance || 0);
+      } else if (acc.name === 'Sales Account') {
+        const saleSum = await prisma.bill.aggregate({
+          where: { shop_id: shop.id, created_at: { lte: asOfDate }, payment_status: 'paid' },
+          _sum: { total_amount: true }
+        });
+        credits += Number(saleSum._sum.total_amount || 0);
+        credits += Number(acc.opening_balance || 0);
+      } else if (acc.name === 'Purchase Account') {
+        const purSum = await prisma.purchaseEntry.aggregate({
+          where: { shop_id: shop.id, received_date: { lte: asOfDate } },
+          _sum: { total_amount: true }
+        });
+        debits += Number(purSum._sum.total_amount || 0);
+        debits += Number(acc.opening_balance || 0);
+      } else {
+        const exp = await prisma.expenseEntry.aggregate({
+          where: { account_id: acc.id, entry_date: { lte: asOfDate } },
+          _sum: { amount: true }
+        });
+        debits += Number(exp._sum.amount || 0);
+        debits += Number(acc.opening_balance || 0);
+      }
+
+      // Final Balance for Trial Balance
+      let finalDebit = 0;
+      let finalCredit = 0;
+      const net = debits - credits;
+      if (net > 0) finalDebit = net;
+      else finalCredit = Math.abs(net);
+
+      return {
+        id: acc.id,
+        name: acc.name,
+        group_name: group.name,
+        debit: finalDebit,
+        credit: finalCredit
+      };
+    }));
+
+    return {
+      group_name: group.name,
+      accounts: accountsWithBalance.filter(a => a.debit !== 0 || a.credit !== 0)
+    };
+  }));
+
+  const flatList = report.flatMap(g => g.accounts);
+  const totalDebit = flatList.reduce((s, a) => s + a.debit, 0);
+  const totalCredit = flatList.reduce((s, a) => s + a.credit, 0);
+
+  return {
+    as_of: asOfDate,
+    accounts: flatList,
+    totals: { debit: totalDebit, credit: totalCredit }
+  };
+}
+
+/**
  * Financial Reports: Balance Sheet
  */
 export async function getBalanceSheet(userId: string, date: string) {

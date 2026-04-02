@@ -92,6 +92,7 @@ export default function ReportsPage() {
     { href: '/dashboard/reports/sales', label: 'Sales Report', icon: '💰', desc: 'Detailed sales analysis' },
     { href: '/dashboard/reports/purchase', label: 'Purchase Report', icon: '🛒', desc: 'Stock inward & supplier analysis' },
     { href: '/dashboard/reports/gst', label: 'GST Report', icon: '📋', desc: 'GST summary & tax filing' },
+    { href: '/dashboard/reports/trial-balance', label: 'Trial Balance', icon: '⚖️', desc: 'Full ledger balances' },
   ];
 
   const { data: analytics, isLoading, isError } = useQuery<Analytics>({
