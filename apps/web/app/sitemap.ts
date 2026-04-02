@@ -90,11 +90,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.85,
   }));
 
+  const specializationRoutes = seoData.specializations.map((spec: string) => ({
+    url: `${baseUrl}/doctor/specialization/${encodeURIComponent(spec.toLowerCase())}`,
+    lastModified: new Date(),
+    changeFrequency: 'daily' as const,
+    priority: 0.8,
+  }));
+
   return [
     ...staticRoutes, 
     ...shopRoutes, 
     ...doctorRoutes,
     ...shopCityRoutes,
-    ...doctorCityRoutes
+    ...doctorCityRoutes,
+    ...specializationRoutes
   ];
 }
