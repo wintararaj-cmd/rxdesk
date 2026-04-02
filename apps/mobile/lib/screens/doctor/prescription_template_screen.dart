@@ -45,7 +45,7 @@ class _PrescriptionTemplateScreenState extends State<PrescriptionTemplateScreen>
         foregroundColor: const Color(0xFF0F172A),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.fuchsia),
+            icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.pinkAccent),
             onPressed: () {
               // TODO: Navigate to Create Template Screen
             },
@@ -72,7 +72,7 @@ class _PrescriptionTemplateScreenState extends State<PrescriptionTemplateScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.auto_awesome_rounded, size: 80, color: Colors.fuchsia.withOpacity(0.2)),
+          Icon(Icons.auto_awesome_rounded, size: 80, color: Colors.pinkAccent.withOpacity(0.2)),
           const SizedBox(height: 24),
           const Text(
             'No Bundles Yet',
@@ -90,7 +90,7 @@ class _PrescriptionTemplateScreenState extends State<PrescriptionTemplateScreen>
             icon: const Icon(Icons.add),
             label: const Text('Create First Bundle'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.fuchsia,
+              backgroundColor: Colors.pinkAccent,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -129,10 +129,10 @@ class _PrescriptionTemplateScreenState extends State<PrescriptionTemplateScreen>
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: Colors.fuchsia.withOpacity(0.1),
+            color: Colors.pinkAccent.withOpacity(0.1),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: const Icon(Icons.medication_rounded, color: Colors.fuchsia, size: 24),
+          child: const Icon(Icons.medication_rounded, color: Colors.pinkAccent, size: 24),
         ),
         children: [
           Padding(
@@ -192,7 +192,7 @@ class _PrescriptionTemplateScreenState extends State<PrescriptionTemplateScreen>
       padding: const EdgeInsets.only(bottom: 8.0),
       child: Row(
         children: [
-          const Icon(Icons.circle, size: 6, color: Colors.fuchsia),
+          const Icon(Icons.circle, size: 6, color: Colors.pinkAccent),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

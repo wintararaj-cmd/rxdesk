@@ -92,8 +92,8 @@ class _ProfileShareScreenState extends State<ProfileShareScreen> {
                     ),
                     const SizedBox(height: 48),
                     const Text(
-                      'Direct Profile Link:',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey, uppercase: true),
+                      'DIRECT PROFILE LINK:',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
                     ),
                     const SizedBox(height: 8),
                     Container(

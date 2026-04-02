@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireRole, authenticate } from '../../middleware/auth';
 import { createDoctorSchema } from '@rxdesk/shared';
 import * as service from './doctor.service';
+import * as templateService from '../prescriptions/template.service';
 import { buildPaginatedResponse } from '../../utils/pagination';
 import { searchRateLimiter } from '../../middleware/rateLimit';
 
@@ -58,7 +59,7 @@ router.get('/me/earnings', requireRole('doctor'), async (req, res, next) => {
 // GET /doctors/me/templates
 router.get('/me/templates', requireRole('doctor'), async (req, res, next) => {
   try {
-    const templates = await service.getDoctorTemplates(req.user!.id);
+    const templates = await templateService.getTemplates(req.user!.id);
     res.json({ success: true, data: templates });
   } catch (err) { next(err); }
 });
@@ -66,7 +67,7 @@ router.get('/me/templates', requireRole('doctor'), async (req, res, next) => {
 // POST /doctors/me/templates
 router.post('/me/templates', requireRole('doctor'), async (req, res, next) => {
   try {
-    const template = await service.createDoctorTemplate(req.user!.id, req.body);
+    const template = await templateService.createTemplate(req.user!.id, req.body);
     res.status(201).json({ success: true, data: template });
   } catch (err) { next(err); }
 });
@@ -74,7 +75,7 @@ router.post('/me/templates', requireRole('doctor'), async (req, res, next) => {
 // DELETE /doctors/me/templates/:id
 router.delete('/me/templates/:id', requireRole('doctor'), async (req, res, next) => {
   try {
-    await service.deleteDoctorTemplate(req.user!.id, req.params.id);
+    await templateService.deleteTemplate(req.params.id, req.user!.id);
     res.json({ success: true, message: 'Template deleted' });
   } catch (err) { next(err); }
 });

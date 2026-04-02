@@ -149,7 +149,7 @@ class _EarningsAnalysisScreenState extends State<EarningsAnalysisScreen> {
                   if (index < 0 || index >= breakdown.length) return const Text('');
                   final dateStr = breakdown[index]['date'] as String;
                   return Padding(
-                    padding: const EdgeInsets.top(8.0),
+                    padding: const EdgeInsets.all(8.0),
                     child: Text(
                       dateStr.substring(8), // Just the day
                       style: TextStyle(color: Colors.grey[400], fontSize: 10, fontWeight: FontWeight.bold),

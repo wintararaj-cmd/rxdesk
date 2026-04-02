@@ -211,7 +211,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> with Sing
                       _buildToolCard('Prescribe', Icons.edit_note_rounded, Colors.teal, () {
                         Navigator.push(context, MaterialPageRoute(builder: (_) => DoctorPrescribeScreen()));
                       }),
-                      _buildToolCard('Templates', Icons.auto_awesome_rounded, Colors.fuchsia, () {
+                      _buildToolCard('Templates', Icons.auto_awesome_rounded, Colors.pinkAccent, () {
                         Navigator.push(context, MaterialPageRoute(builder: (_) => const PrescriptionTemplateScreen()));
                       }),
                       _buildToolCard('Analytics', Icons.bar_chart_rounded, Colors.indigo, () {
@@ -369,7 +369,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> with Sing
   }) {
     Color statusColor;
     if (status == 'Completed') {
-      statusColor = Colors.emerald;
+      statusColor = Colors.teal;
     } else if (status == 'In Progress') {
       statusColor = Colors.orange;
     } else {

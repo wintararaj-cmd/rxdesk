@@ -225,7 +225,7 @@ export async function getDoctorEarnings(userId: string) {
   ]);
 
   // Daily breakdown for charts (last 7 days)
-  const last7Days = [];
+  const last7Days: Date[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
