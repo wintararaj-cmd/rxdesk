@@ -649,6 +649,104 @@ function BalanceSheetTab() {
   );
 }
 
+function TrialBalanceTab() {
+  const [date, setDate] = useState(TODAY_STR);
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['trial-balance', date],
+    queryFn: () => accountingApi.getTrialBalance(date).then(r => r.data.data)
+  });
+
+  const groupedAccounts = data?.accounts.reduce((acc: any, curr: any) => {
+    if (!acc[curr.group_name]) acc[curr.group_name] = [];
+    acc[curr.group_name].push(curr);
+    return acc;
+  }, {} as Record<string, any[]>) || {};
+
+  const isBalanced = data ? Math.abs(data.totals.debit - data.totals.credit) < 0.1 : true;
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="bg-white rounded-[40px] p-8 md:p-10 border border-gray-100 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-violet-50/30 rounded-full blur-3xl -mr-32 -mt-32" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+          <div>
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight uppercase">Trial Balance</h2>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Summary of all ledger balances as on {date}</p>
+          </div>
+          <div className="flex items-center gap-4 bg-gray-50 p-2 rounded-2xl border border-gray-200/50">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-3 font-mono">As of</span>
+            <input 
+              type="date" 
+              value={date} 
+              onChange={e => setDate(e.target.value)}
+              className="bg-white px-4 py-2 rounded-xl text-xs font-black text-gray-900 border-none shadow-sm focus:ring-2 focus:ring-indigo-500" 
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden min-h-[400px]">
+        {isLoading ? (
+          <div className="py-20 text-center animate-pulse text-xs font-black text-gray-300 uppercase tracking-widest">Compiling Trial Balance...</div>
+        ) : isError ? (
+          <div className="py-20 text-center text-rose-500 font-black uppercase text-xs">Failed to load report data</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50/50">
+                <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
+                  <th className="text-left px-8 py-5">Account Particulars</th>
+                  <th className="text-right px-8 py-5 w-40">Debit</th>
+                  <th className="text-right px-8 py-5 w-40">Credit</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {Object.entries(groupedAccounts).map(([group, accounts]: [any, any]) => (
+                  <Fragment key={group}>
+                    <tr className="bg-indigo-50/10">
+                      <td colSpan={3} className="px-8 py-2.5 text-[9px] font-black text-indigo-500 uppercase tracking-widest">
+                        {group}
+                      </td>
+                    </tr>
+                    {accounts.map((acc: any) => (
+                      <tr key={acc.id} className="hover:bg-gray-50/50 transition-all group">
+                        <td className="px-8 py-4 text-xs font-bold text-gray-700">{acc.name}</td>
+                        <td className="px-8 py-4 text-right font-black text-gray-900 font-mono text-xs">{acc.debit > 0 ? fmt(acc.debit) : '—'}</td>
+                        <td className="px-8 py-4 text-right font-black text-gray-900 font-mono text-xs">{acc.credit > 0 ? fmt(acc.credit) : '—'}</td>
+                      </tr>
+                    ))}
+                  </Fragment>
+                ))}
+              </tbody>
+              <tfoot className="bg-gray-900 text-white border-t border-gray-800">
+                <tr className="font-black">
+                  <td className="px-8 py-5 text-xs text-right uppercase tracking-widest opacity-60">Grand Total</td>
+                  <td className="px-8 py-5 text-right font-mono text-sm">{fmt(data?.totals.debit || 0)}</td>
+                  <td className="px-8 py-5 text-right font-mono text-sm">{fmt(data?.totals.credit || 0)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+        
+        {!isLoading && !isBalanced && (
+          <div className="p-4 bg-rose-50 border-t border-rose-100 text-center animate-pulse">
+            <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Warning: Trial Balance is not balanced. Difference: {fmt(Math.abs((data?.totals.debit || 0) - (data?.totals.credit || 0)))}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-end pt-4">
+        <button onClick={() => window.print()} className="flex items-center gap-2 bg-white px-6 py-3 rounded-2xl border border-gray-200 text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.89l-4.72-4.72m0 0l4.72-4.72M2 9.17h18a2 2 0 012 2v10.95" /></svg>
+          Print/Share Report
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function JournalTab() {
   const qc = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
@@ -4006,19 +4104,20 @@ function ReturnsTab({ setSelectedSaleReturnId, setSelectedPurchaseReturnId }: { 
 }
 
 function ReportsTab({ shopGstType }: { shopGstType?: string }) {
-  const [sub, setSub] = useState<'pl' | 'bs' | 'gst'>('pl');
+  const [sub, setSub] = useState<'pl' | 'bs' | 'tb' | 'gst'>('pl');
   
   const SUB_TABS = [
     { id: 'pl', l: 'P&L' },
     { id: 'bs', l: 'Balance Sheet' },
+    { id: 'tb', l: 'Trial Balance' },
     ...(shopGstType !== 'unregistered' ? [{ id: 'gst', l: 'GST Report' }] : [])
   ];
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-2 bg-white/50 p-1.5 rounded-2xl border border-gray-100 shadow-sm w-fit">
+      <div className="flex gap-2 bg-white/50 p-1.5 rounded-2xl border border-gray-100 shadow-sm w-fit overflow-x-auto no-scrollbar">
         {SUB_TABS.map(s => (
-          <button key={s.id} onClick={() => setSub(s.id as any)} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sub === s.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-gray-400 hover:text-indigo-600 hover:bg-white'}`}>
+          <button key={s.id} onClick={() => setSub(s.id as any)} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${sub === s.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-gray-400 hover:text-indigo-600 hover:bg-white'}`}>
             {s.l}
           </button>
         ))}
@@ -4026,6 +4125,7 @@ function ReportsTab({ shopGstType }: { shopGstType?: string }) {
       <div className="animate-in fade-in zoom-in-95 duration-300">
         {sub === 'pl' && <PLTab />}
         {sub === 'bs' && <BalanceSheetTab />}
+        {sub === 'tb' && <TrialBalanceTab />}
         {sub === 'gst' && shopGstType !== 'unregistered' && <GSTTab />}
       </div>
     </div>
