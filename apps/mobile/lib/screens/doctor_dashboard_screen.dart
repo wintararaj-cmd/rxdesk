@@ -4,6 +4,7 @@ import 'doctor/earnings_analysis_screen.dart';
 import 'doctor/prescription_template_screen.dart';
 import 'doctor/profile_share_screen.dart';
 import 'doctor/doctor_prescribe_screen.dart';
+import 'doctor/chamber_list_screen.dart';
 
 class DoctorDashboardScreen extends StatefulWidget {
   const DoctorDashboardScreen({Key? key}) : super(key: key);
@@ -219,6 +220,9 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> with Sing
                       }),
                       _buildToolCard('Share Profile', Icons.qr_code_2_rounded, Colors.orange, () {
                         Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileShareScreen()));
+                      }),
+                      _buildToolCard('My Clinics', Icons.business_rounded, Colors.blue, () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ChamberListScreen()));
                       }),
                     ],
                   ),

@@ -307,6 +307,20 @@ class ApiService {
     final res = await _request('GET', '/shops/nearby', query: query, auth: false);
     return (res['data'] as List?) ?? [];
   }
+
+  // ── CHAMBERS & SCHEDULE ──────────────────────────────────────────────────
+  static Future<List<dynamic>> getDoctorChambers() async {
+    final res = await _request('GET', '/chambers/mine');
+    return (res['data'] as List?) ?? [];
+  }
+
+  static Future<Map<String, dynamic>> updateChamberSchedule(String chamberId, List<dynamic> schedules) async {
+    return _request('PUT', '/chambers/$chamberId/schedule', body: schedules);
+  }
+
+  static Future<Map<String, dynamic>> markChamberLeave(String chamberId, String date, String reason) async {
+    return _request('POST', '/chambers/$chamberId/leave', body: {'leave_date': date, 'reason': reason});
+  }
 }
 
 class ApiException implements Exception {
