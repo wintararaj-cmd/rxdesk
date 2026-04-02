@@ -1,72 +1,144 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
+import 'doctor/earnings_analysis_screen.dart';
+import 'doctor/prescription_template_screen.dart';
+import 'doctor/profile_share_screen.dart';
+import 'doctor/doctor_prescribe_screen.dart';
 
-class DoctorDashboardScreen extends StatelessWidget {
+class DoctorDashboardScreen extends StatefulWidget {
   const DoctorDashboardScreen({Key? key}) : super(key: key);
+
+  @override
+  State<DoctorDashboardScreen> createState() => _DoctorDashboardScreenState();
+}
+
+class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  }
+
+  IconData _getGreetingIcon() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return Icons.wb_sunny_rounded;
+    if (hour < 18) return Icons.wb_cloudy_rounded;
+    return Icons.nightlight_round;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text('Doctor Dashboard', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.account_circle_outlined),
-            onPressed: () {},
-          )
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Welcome Section
-            Container(
-              padding: const EdgeInsets.all(24),
-              color: Colors.white,
-              child: Row(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 140.0,
+            floating: false,
+            pinned: true,
+            backgroundColor: Colors.teal[700],
+            elevation: 0,
+            flexibleSpace: FlexibleSpaceBar(
+              titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
+              title: Text(
+                _getGreeting(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 18,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              background: Stack(
                 children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundColor: Colors.teal.withOpacity(0.1),
-                    child: const Icon(Icons.medical_services, size: 30, color: Colors.teal),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Colors.teal[800]!, Colors.teal[600]!],
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: 16),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Welcome Back,',
-                        style: TextStyle(fontSize: 14, color: Colors.grey),
-                      ),
-                      Text(
-                        'Dr. Williams',
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                      ),
-                    ],
+                  Positioned(
+                    right: -20,
+                    top: -20,
+                    child: Icon(
+                      _getGreetingIcon(),
+                      size: 150,
+                      color: Colors.white.withOpacity(0.1),
+                    ),
                   ),
                 ],
               ),
             ),
-            
-            Padding(
-              padding: const EdgeInsets.all(20.0),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.notifications_none_rounded, color: Colors.white),
+                onPressed: () {},
+              ),
+              const Padding(
+                padding: EdgeInsets.only(right: 16.0),
+                child: CircleAvatar(
+                  radius: 16,
+                  backgroundColor: Colors.white24,
+                  child: Icon(Icons.person, size: 20, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Stat Cards
+                  // Glassmorphic Stats Section
                   Row(
                     children: [
-                      Expanded(child: _buildStatCard('Today\'s Appointments', '8', Icons.people_outline, Colors.teal)),
+                      Expanded(
+                        child: _buildGlassCard(
+                          title: "Appointments",
+                          value: "12",
+                          icon: Icons.calendar_today_rounded,
+                          color: Colors.teal,
+                          isLive: true,
+                        ),
+                      ),
                       const SizedBox(width: 16),
-                      Expanded(child: _buildStatCard('Pending Reviews', '3', Icons.pending_actions, Colors.orange)),
+                      Expanded(
+                        child: _buildGlassCard(
+                          title: "Total Revenue",
+                          value: "₹4,500",
+                          icon: Icons.account_balance_wallet_rounded,
+                          color: Colors.indigo,
+                          onTap: () {
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const EarningsAnalysisScreen()));
+                          },
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 32),
@@ -76,18 +148,23 @@ class DoctorDashboardScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        "Today's Schedule",
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        "Queue Timeline",
+                        style: TextStyle(
+                          fontSize: 20, 
+                          fontWeight: FontWeight.w900, 
+                          color: Color(0xFF1E293B),
+                          letterSpacing: -0.5,
+                        ),
                       ),
                       TextButton(
                         onPressed: () {},
-                        child: const Text('View All'),
+                        style: TextButton.styleFrom(foregroundColor: Colors.teal),
+                        child: const Text('View All', style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   
-                  // Timeline items
                   _buildAppointmentTimelineItem(
                     time: '09:00 AM',
                     name: 'Michael Brown',
@@ -112,64 +189,173 @@ class DoctorDashboardScreen extends StatelessWidget {
                   
                   const SizedBox(height: 32),
                   
-                  // Quick Tools
+                  // Premium Tools Grid
                   const Text(
-                    'Quick Tools',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    'Practice Tools',
+                    style: TextStyle(
+                      fontSize: 20, 
+                      fontWeight: FontWeight.w900, 
+                      color: Color(0xFF1E293B),
+                      letterSpacing: -0.5,
+                    ),
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 16,
+                    childAspectRatio: 1.5,
                     children: [
-                      _buildToolIcon('Prescribe', Icons.edit_document, Colors.indigo),
-                      _buildToolIcon('Patients', Icons.group, Colors.blue),
-                      _buildToolIcon('Earnings', Icons.account_balance_wallet, Colors.green),
-                      _buildToolIcon('Settings', Icons.settings, Colors.grey),
+                      _buildToolCard('Prescribe', Icons.edit_note_rounded, Colors.teal, () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => DoctorPrescribeScreen()));
+                      }),
+                      _buildToolCard('Templates', Icons.auto_awesome_rounded, Colors.fuchsia, () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const PrescriptionTemplateScreen()));
+                      }),
+                      _buildToolCard('Analytics', Icons.bar_chart_rounded, Colors.indigo, () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const EarningsAnalysisScreen()));
+                      }),
+                      _buildToolCard('Share Profile', Icons.qr_code_2_rounded, Colors.orange, () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileShareScreen()));
+                      }),
                     ],
                   ),
+                  const SizedBox(height: 80), // Footer spacer
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-         backgroundColor: Colors.teal,
-         onPressed: () {},
-         child: const Icon(Icons.add_task),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: Colors.teal[800],
+        onPressed: () {},
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text('Quick Prescription', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 2,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+  Widget _buildGlassCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+    bool isLive = false,
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.8),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.white.withOpacity(0.5)),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                )
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(icon, color: color, size: 20),
+                    ),
+                    if (isLive)
+                      ScaleTransition(
+                        scale: _pulseAnimation,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 24, 
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 12, 
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 28),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+    );
+  }
+
+  Widget _buildToolCard(String title, IconData icon, Color color, VoidCallback onTap) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.grey[200]!),
           ),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14, 
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF334155),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -183,7 +369,7 @@ class DoctorDashboardScreen extends StatelessWidget {
   }) {
     Color statusColor;
     if (status == 'Completed') {
-      statusColor = Colors.green;
+      statusColor = Colors.emerald;
     } else if (status == 'In Progress') {
       statusColor = Colors.orange;
     } else {
@@ -192,96 +378,70 @@ class DoctorDashboardScreen extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border(left: BorderSide(color: statusColor, width: 4)),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.08),
-            spreadRadius: 1,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            color: Colors.grey.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 70,
-            child: Text(
-              time,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-            ),
+          Column(
+            children: [
+              Text(
+                time.split(' ')[0],
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+              ),
+              Text(
+                time.split(' ')[1],
+                style: TextStyle(color: Colors.grey[400], fontSize: 10, fontWeight: FontWeight.bold),
+              ),
+            ],
           ),
-          Container(
-            width: 1,
-            height: 50,
-            color: Colors.grey.shade300,
-            margin: const EdgeInsets.symmetric(horizontal: 12),
-          ),
+          const SizedBox(width: 20),
+          Container(width: 1, height: 40, color: Colors.grey[100]),
+          const SizedBox(width: 20),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                    Icon(
-                      isOnline ? Icons.videocam : Icons.location_on, 
-                      size: 16, 
-                      color: Colors.grey,
-                    ),
-                  ],
+                Text(
+                  name,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B)),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  type,
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    status,
-                    style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.bold),
-                  ),
+                Row(
+                  children: [
+                    Icon(isOnline ? Icons.videocam_rounded : Icons.person_pin_circle_rounded, size: 12, color: Colors.grey),
+                    const SizedBox(width: 4),
+                    Text(
+                      type,
+                      style: TextStyle(color: Colors.grey[500], fontSize: 12, fontWeight: FontWeight.w500),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              status.toUpperCase(),
+              style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.w900),
+            ),
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildToolIcon(String title, IconData icon, Color color) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: color, size: 24),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          title,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-        ),
-      ],
     );
   }
 }

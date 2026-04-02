@@ -294,6 +294,10 @@ export const doctorApi = {
   getTodayAppointments: (chamberId?: string) =>
     apiClient.get('/appointments/today', { params: chamberId ? { chamber_id: chamberId } : undefined }),
   getMyPrescriptions: (params?: object) => apiClient.get('/prescriptions/my-issued', { params }),
+  getEarnings: () => apiClient.get('/doctors/me/earnings'),
+  getTemplates: () => apiClient.get('/prescriptions/templates'),
+  createTemplate: (data: object) => apiClient.post('/prescriptions/templates', data),
+  deleteTemplate: (id: string) => apiClient.delete(`/prescriptions/templates/${id}`),
 };
 
 export const adminApi = {

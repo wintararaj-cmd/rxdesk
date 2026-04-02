@@ -47,6 +47,38 @@ router.get('/dashboard/stats', requireRole('doctor'), async (req, res, next) => 
   } catch (err) { next(err); }
 });
 
+// GET /doctors/me/earnings
+router.get('/me/earnings', requireRole('doctor'), async (req, res, next) => {
+  try {
+    const earnings = await service.getDoctorEarnings(req.user!.id);
+    res.json({ success: true, data: earnings });
+  } catch (err) { next(err); }
+});
+
+// GET /doctors/me/templates
+router.get('/me/templates', requireRole('doctor'), async (req, res, next) => {
+  try {
+    const templates = await service.getDoctorTemplates(req.user!.id);
+    res.json({ success: true, data: templates });
+  } catch (err) { next(err); }
+});
+
+// POST /doctors/me/templates
+router.post('/me/templates', requireRole('doctor'), async (req, res, next) => {
+  try {
+    const template = await service.createDoctorTemplate(req.user!.id, req.body);
+    res.status(201).json({ success: true, data: template });
+  } catch (err) { next(err); }
+});
+
+// DELETE /doctors/me/templates/:id
+router.delete('/me/templates/:id', requireRole('doctor'), async (req, res, next) => {
+  try {
+    await service.deleteDoctorTemplate(req.user!.id, req.params.id);
+    res.json({ success: true, message: 'Template deleted' });
+  } catch (err) { next(err); }
+});
+
 // POST /doctors  (mobile setup-profile uses this)
 router.post('/', authenticate, async (req, res, next) => {
   try {

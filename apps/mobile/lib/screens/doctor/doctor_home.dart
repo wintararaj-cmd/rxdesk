@@ -7,6 +7,7 @@ import '../login_screen.dart';
 import 'doctor_prescribe_screen.dart';
 import 'doctor_profile_details.dart';
 import 'doctor_prescription_detail.dart';
+import '../doctor_dashboard_screen.dart';
 
 class DoctorHome extends StatefulWidget {
   const DoctorHome({super.key});
@@ -37,7 +38,7 @@ class _DoctorHomeState extends State<DoctorHome> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = [
-      const DoctorAppointmentsTab(),
+      const DoctorDashboardScreen(),
       const DoctorHistoryTab(),
       DoctorPrescribeScreen(),
       const DoctorProfileTab(),

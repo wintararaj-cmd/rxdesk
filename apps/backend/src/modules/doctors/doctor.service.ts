@@ -193,6 +193,73 @@ export async function getDoctorStats(userId: string) {
   return { today: todayCount, this_week: weekCount, this_month: monthCount, total: totalCount };
 }
 
+export async function getDoctorEarnings(userId: string) {
+  const doctor = await prisma.doctor.findUnique({ where: { user_id: userId } });
+  if (!doctor) throw new AppError(404, 'NOT_FOUND', 'Doctor profile not found');
+
+  const now = new Date();
+  const startOfDay = new Date(now);
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const [dailyEarnings, monthlyEarnings] = await Promise.all([
+    prisma.appointment.aggregate({
+      where: {
+        chamber: { doctor_id: doctor.id },
+        appointment_date: { gte: startOfDay },
+        status: 'completed',
+        payment_status: 'paid',
+      },
+      _sum: { payment_amount: true },
+    }),
+    prisma.appointment.aggregate({
+      where: {
+        chamber: { doctor_id: doctor.id },
+        appointment_date: { gte: startOfMonth },
+        status: 'completed',
+        payment_status: 'paid',
+      },
+      _sum: { payment_amount: true },
+    }),
+  ]);
+
+  // Daily breakdown for charts (last 7 days)
+  const last7Days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    d.setHours(0, 0, 0, 0);
+    last7Days.push(d);
+  }
+
+  const dailyBreakdown = await Promise.all(
+    last7Days.map(async (date) => {
+      const nextDay = new Date(date);
+      nextDay.setDate(nextDay.getDate() + 1);
+      const sum = await prisma.appointment.aggregate({
+        where: {
+          chamber: { doctor_id: doctor.id },
+          appointment_date: { gte: date, lt: nextDay },
+          status: 'completed',
+          payment_status: 'paid',
+        },
+        _sum: { payment_amount: true },
+      });
+      return {
+        date: date.toISOString().split('T')[0],
+        amount: Number(sum._sum.payment_amount || 0),
+      };
+    })
+  );
+
+  return {
+    daily_total: Number(dailyEarnings._sum.payment_amount || 0),
+    monthly_total: Number(monthlyEarnings._sum.payment_amount || 0),
+    daily_breakdown: dailyBreakdown,
+  };
+}
+
 export async function updateDoctor(
   userId: string,
   data: {

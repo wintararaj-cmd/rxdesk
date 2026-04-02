@@ -257,6 +257,14 @@ class ApiService {
   }
 
   // ── TEMPLATES ────────────────────────────────────────────────────────────
+  static Future<Map<String, dynamic>> getDoctorStats() async {
+    return _request('GET', '/doctors/me/stats');
+  }
+
+  static Future<Map<String, dynamic>> getDoctorEarnings() async {
+    return _request('GET', '/doctors/me/earnings');
+  }
+
   static Future<List<dynamic>> getDoctorTemplates() async {
     final res = await _request('GET', '/prescriptions/templates');
     return (res['data'] as List?) ?? [];
