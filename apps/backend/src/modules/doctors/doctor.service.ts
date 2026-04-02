@@ -71,6 +71,7 @@ export async function searchDoctors(req: Request) {
   const availableToday = req.query.available_today === 'true';
   const userLat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
   const userLng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
+  const city = req.query.city as string | undefined;
 
   const today = new Date().getDay(); // 0=Sun, 6=Sat
 
@@ -84,6 +85,11 @@ export async function searchDoctors(req: Request) {
         ],
       }),
       ...(specialization && { specialization: { contains: specialization, mode: 'insensitive' } }),
+      ...(city && {
+        chambers: {
+          some: { shop: { city: { contains: city, mode: 'insensitive' } }, status: 'active' },
+        },
+      }),
       ...(pincode && {
         chambers: {
           some: { shop: { pin_code: pincode }, status: 'active' },

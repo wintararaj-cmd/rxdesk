@@ -24,6 +24,7 @@ import subscriptionRoutes from './modules/subscriptions/subscription.routes';
 import adminRoutes from './modules/admin/admin.routes';
 import bannerRoutes from './modules/banners/banners.routes';
 import accountingRoutes from './modules/accounting/accounting.routes';
+import publicRoutes from './modules/public/public.routes';
 import path from 'path';
 
 
@@ -99,6 +100,7 @@ app.use(`${API}/subscriptions`, subscriptionRoutes);
 app.use(`${API}/admin`, adminRoutes);
 app.use(`${API}/banners`, bannerRoutes);
 app.use(`${API}/accounting`, accountingRoutes);
+app.use(`${API}/public`, publicRoutes);
 
 
 // ─── Error Handling ──────────────────────────

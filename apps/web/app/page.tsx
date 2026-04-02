@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Search, MapPin, Navigation, Activity, Stethoscope, Store, Users,
@@ -63,6 +63,20 @@ export default function LandingPage() {
     });
   }, []);
 
+  const [seoCities, setSeoCities] = useState<{ shop_cities: string[]; doctor_cities: string[] }>({
+    shop_cities: ['Mumbai', 'Delhi', 'Bangalore', 'Kolkata', 'Chennai', 'Hyderabad'],
+    doctor_cities: ['Mumbai', 'Delhi', 'Bangalore', 'Pune', 'Lucknow', 'Patna']
+  });
+
+  const loadSeoMeta = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_URL}/public/seo-metadata`);
+      if (res.data.success) setSeoCities(res.data.data);
+    } catch (err) { console.error('Meta load failed', err); }
+  }, []);
+
+  useEffect(() => { loadSeoMeta(); }, [loadSeoMeta]);
+
   const runSearch = async (overrideQuery?: string) => {
     const q = overrideQuery ?? query;
     setSearching(true); setSearchErr(''); setHasSearched(true); setHasSearchedShops(false);
@@ -124,6 +138,32 @@ export default function LandingPage() {
     runSearch(s);
     document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  // Add city discovery to footer
+  const cityLinks = (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-left mb-16 pt-16 border-t border-white/[0.04]">
+      <div>
+        <h4 className="text-sm font-bold text-gray-300 uppercase tracking-widest mb-6">Local Pharmacy in Cities</h4>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-4">
+           {seoCities.shop_cities.slice(0, 12).map(c => (
+             <Link key={c} href={`/pharmacy/city/${c.toLowerCase()}`} className="text-xs text-gray-500 hover:text-emerald-400 transition-colors">
+               Pharmacy in {c}
+             </Link>
+           ))}
+        </div>
+      </div>
+      <div>
+        <h4 className="text-sm font-bold text-gray-300 uppercase tracking-widest mb-6">Popular Doctors in Cities</h4>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-4">
+           {seoCities.doctor_cities.slice(0, 12).map(c => (
+             <Link key={c} href={`/doctor/city/${c.toLowerCase()}`} className="text-xs text-gray-500 hover:text-violet-400 transition-colors">
+               Doctors in {c}
+             </Link>
+           ))}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-[#09090f] text-white font-sans">
@@ -685,6 +725,7 @@ export default function LandingPage() {
              <span className="font-bold text-lg">RxDesk</span>
           </Link>
           <p className="text-sm text-gray-600 mb-8 max-w-sm mx-auto leading-relaxed">India&apos;s integrated pharmacy billing and doctor appointment platform. Built for Indian healthcare.</p>
+          {cityLinks}
           <p className="text-xs text-gray-700">Â© 2026 RxDesk India. All rights reserved.</p>
         </div>
       </footer>
