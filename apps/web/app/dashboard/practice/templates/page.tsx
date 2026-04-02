@@ -12,7 +12,8 @@ import {
   ChevronDown, 
   ChevronUp,
   Activity,
-  Check
+  Check,
+  Clock
 } from 'lucide-react';
 
 export default function TemplatesPage() {
