@@ -32,6 +32,8 @@ const ACTION_STYLES: Record<string, { bg: string; text: string; dot: string }> =
   'prescription':  { bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-500' },
   'auth':          { bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500' },
   'purchase':      { bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500' },
+  'supplier_payment': { bg: 'bg-rose-50',  text: 'text-rose-700',    dot: 'bg-rose-500' },
+  'customer_credit':  { bg: 'bg-cyan-50',  text: 'text-cyan-700',    dot: 'bg-cyan-500' },
   'default':       { bg: 'bg-gray-50',    text: 'text-gray-600',    dot: 'bg-gray-400' },
 };
 
@@ -47,6 +49,11 @@ const ACTION_OPTIONS = [
   { value: 'prescription.created',   label: 'Prescription Created' },
   { value: 'prescription.viewed',    label: 'Prescription Viewed' },
   { value: 'prescription.deleted',   label: 'Prescription Deleted' },
+  { value: 'purchase.created',       label: 'Purchase Created' },
+  { value: 'purchase.updated',       label: 'Purchase Updated' },
+  { value: 'purchase.voided',        label: 'Purchase Voided' },
+  { value: 'supplier_payment.recorded', label: 'Supplier Payment' },
+  { value: 'customer_credit.payment',   label: 'Credit Payment' },
   { value: 'auth.login',             label: 'Login' },
 ];
 
