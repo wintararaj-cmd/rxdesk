@@ -118,6 +118,11 @@ class ApiService {
     await AuthService.clearSession();
   }
 
+  static Future<void> deactivateAccount() async {
+    await _request('DELETE', '/auth/account');
+    await AuthService.clearSession();
+  }
+
   // ── SHOP ─────────────────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> getMyShop() async {
     return _request('GET', '/shops/me');

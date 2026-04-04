@@ -99,6 +99,8 @@ export default function SettingsPage() {
   const [subError, setSubError] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState<string>('6');
   const [showContactModal, setShowContactModal] = useState(false);
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [deactivateLoading, setDeactivateLoading] = useState(false);
 
   const { user } = useAuthStore();
   const { data: shopRes, isLoading, isError: shopNotFound } = useQuery({
@@ -306,6 +308,21 @@ export default function SettingsPage() {
   const expiryDate = sub?.current_period_end ?? sub?.trial_ends_at;
 
 
+
+  const handleDeactivate = async () => {
+    if (!confirm('Are you absolutely sure? This will deactivate your account and log you out of all devices.')) return;
+    try {
+      setDeactivateLoading(true);
+      await authApi.deactivateAccount();
+      useAuthStore.getState().clearAuth();
+      window.location.href = '/login';
+    } catch (err: any) {
+      alert(err?.response?.data?.error?.message ?? 'Failed to deactivate account');
+    } finally {
+      setDeactivateLoading(false);
+      setShowDeactivateModal(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -819,6 +836,24 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+
+        {/* Danger Zone */}
+        <div className="bg-white rounded-2xl border border-red-100 p-5">
+           <div className="flex items-center gap-2 mb-4">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+              <h2 className="text-base font-semibold text-red-800">Danger Zone</h2>
+           </div>
+           <p className="text-gray-500 text-sm mb-6">
+              Deactivating your account will immediately stop your access to the platform and sign you out from all devices. 
+              Your data will be preserved but you will not be able to log in.
+           </p>
+           <button
+              onClick={() => setShowDeactivateModal(true)}
+              className="px-6 py-2.5 bg-red-50 text-red-600 border border-red-100 text-sm font-semibold rounded-xl hover:bg-red-100 transition-colors"
+           >
+              Deactivate Account
+           </button>
+        </div>
         {/* Quick Explore Guide */}
         <div className="bg-gradient-to-br from-violet-50 to-indigo-50 rounded-3xl border border-violet-100 p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
@@ -977,6 +1012,41 @@ export default function SettingsPage() {
               >
                 Dismiss
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deactivate Confirmation Modal */}
+      {showDeactivateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-8 text-center">
+              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <AlertCircle className="w-8 h-8 text-red-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Deactivate Account?</h3>
+              <p className="text-gray-500 text-sm mb-8 leading-relaxed">
+                This action will immediately disable your access to RxDesk and clear all active sessions. 
+                You will need to contact support if you wish to reactivate your account in the future.
+              </p>
+              
+              <div className="space-y-3">
+                <button
+                  disabled={deactivateLoading}
+                  onClick={handleDeactivate}
+                  className="w-full py-3.5 bg-red-600 text-white text-sm font-bold rounded-2xl hover:bg-red-700 transition-all shadow-lg shadow-red-100 disabled:opacity-50"
+                >
+                  {deactivateLoading ? 'Deactivating...' : 'Yes, Deactivate My Account'}
+                </button>
+                <button
+                  disabled={deactivateLoading}
+                  onClick={() => setShowDeactivateModal(false)}
+                  className="w-full py-3.5 bg-gray-100 text-gray-700 text-sm font-bold rounded-2xl hover:bg-gray-200 transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>

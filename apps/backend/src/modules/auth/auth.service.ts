@@ -368,3 +368,15 @@ export async function getUserById(userId: string) {
 export async function savePushToken(userId: string, pushToken: string): Promise<void> {
   await prisma.user.update({ where: { id: userId }, data: { fcm_token: pushToken } });
 }
+export async function deactivateUserAccount(userId: string): Promise<void> {
+  // 1. Mark user as inactive in DB
+  await prisma.user.update({
+    where: { id: userId },
+    data: { is_active: false },
+  });
+
+  // 2. Clear all sessions from Redis
+  await logout(userId);
+
+  logger.info(`User ${userId} deactivated their account`);
+}

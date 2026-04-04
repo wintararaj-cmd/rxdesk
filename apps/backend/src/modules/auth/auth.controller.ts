@@ -127,3 +127,21 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
     next(err);
   }
 }
+
+export async function deactivateAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = req.user!.id;
+    await authService.deactivateUserAccount(userId);
+    audit({
+      action: 'auth.account_deactivation',
+      userId: userId,
+      actorRole: req.user!.role,
+      resource: 'auth',
+      ipAddress: req.ip,
+      metadata: { method: 'user_initiated' },
+    });
+    res.json({ success: true, data: null, message: 'Account deactivated successfully' });
+  } catch (err) {
+    next(err);
+  }
+}

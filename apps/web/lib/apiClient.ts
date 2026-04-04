@@ -77,6 +77,7 @@ export const authApi = {
   refreshToken: (refreshToken: string) =>
     axios.post(`${BASE_URL}/auth/token/refresh`, { refresh_token: refreshToken }),
   logout: () => apiClient.post('/auth/logout'),
+  deactivateAccount: () => apiClient.delete('/auth/account'),
 };
 
 export const shopApi = {

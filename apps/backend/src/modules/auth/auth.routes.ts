@@ -75,4 +75,11 @@ router.get('/me', authenticate, controller.getMe);
  */
 router.patch('/push-token', authenticate, controller.registerPushToken);
 
+/**
+ * @route  DELETE /api/v1/auth/account
+ * @desc   Deactivate / delete current user account
+ * @access Private
+ */
+router.delete('/account', authenticate, controller.deactivateAccount);
+
 export default router;
