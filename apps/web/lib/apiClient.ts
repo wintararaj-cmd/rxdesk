@@ -338,6 +338,14 @@ export const adminApi = {
   // Broadcast
   broadcast: (data: { title: string; body: string; target_role?: string }) =>
     apiClient.post('/admin/broadcast', data),
+  // Audit Logs
+  getAuditLogs: (params: Record<string, string | number | undefined>) => 
+    apiClient.get('/admin/audit-logs', { params }),
+  getAuditLogsExportUrl: (params: Record<string, string | undefined>) => {
+    const q = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v) q.set(k, v); });
+    return `${apiClient.defaults.baseURL}/admin/audit-logs/export-csv?${q}`;
+  },
   // Sessions
   flushSessions: () => apiClient.post('/admin/sessions/flush'),
   // Recharges

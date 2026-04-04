@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { Shield, Download, Search, RefreshCw, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { adminApi } from '@/lib/apiClient';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -62,16 +63,8 @@ const ROLE_OPTIONS = [
 async function fetchLogs(params: {
   action?: string; actor_role?: string; from?: string; to?: string; page: number;
 }): Promise<{ logs: AuditEntry[]; pagination: Pagination }> {
-  const q = new URLSearchParams({ page: String(params.page) });
-  if (params.action)     q.set('action', params.action);
-  if (params.actor_role) q.set('actor_role', params.actor_role);
-  if (params.from)       q.set('from', params.from);
-  if (params.to)         q.set('to', params.to);
-
-  const res = await fetch(`/api/v1/admin/audit-logs?${q}`, { credentials: 'include' });
-  if (!res.ok) throw new Error('Failed to fetch audit logs');
-  const json = await res.json();
-  return { logs: json.data, pagination: json.pagination };
+  const { data } = await adminApi.getAuditLogs(params);
+  return { logs: data.data, pagination: data.pagination };
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -112,12 +105,7 @@ export default function AuditLogsPage() {
   }
 
   function buildExportUrl() {
-    const q = new URLSearchParams();
-    if (action)     q.set('action', action);
-    if (actorRole)  q.set('actor_role', actorRole);
-    if (from)       q.set('from', from);
-    if (to)         q.set('to', to);
-    return `/api/v1/admin/audit-logs/export-csv?${q}`;
+    return adminApi.getAuditLogsExportUrl({ action, actor_role: actorRole, from, to });
   }
 
   return (
