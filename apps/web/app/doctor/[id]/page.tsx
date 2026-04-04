@@ -49,18 +49,24 @@ export default async function DoctorProfilePage({ params }: Props) {
   const doctor = await getDoctor(params.id);
   if (!doctor) notFound();
 
+  const primaryChamber = doctor.chambers && doctor.chambers.length > 0 ? doctor.chambers[0] : null;
+
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Physician',
     'name': `Dr. ${doctor.full_name}`,
+    'url': `https://rxdesk.in/doctor/${doctor.id}`,
+    'image': doctor.profile_photo || 'https://rxdesk.in/icon.svg',
     'medicalSpecialty': doctor.specialization,
+    'priceRange': primaryChamber ? `₹${primaryChamber.consultation_fee || 499}` : '₹₹',
+    'telephone': primaryChamber ? primaryChamber.shop.contact_phone : undefined,
     'description': doctor.about || `Consult with Dr. ${doctor.full_name}, a specialized ${doctor.specialization}.`,
-    'address': doctor.chambers && doctor.chambers.length > 0 ? {
+    'address': primaryChamber ? {
       '@type': 'PostalAddress',
-      'streetAddress': doctor.chambers[0].shop.address_line,
-      'addressLocality': doctor.chambers[0].shop.city,
-      'addressRegion': doctor.chambers[0].shop.state,
-      'postalCode': doctor.chambers[0].shop.pin_code,
+      'streetAddress': primaryChamber.shop.address_line,
+      'addressLocality': primaryChamber.shop.city,
+      'addressRegion': primaryChamber.shop.state,
+      'postalCode': primaryChamber.shop.pin_code,
       'addressCountry': 'IN',
     } : undefined,
   };

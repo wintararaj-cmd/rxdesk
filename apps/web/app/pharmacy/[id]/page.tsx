@@ -50,10 +50,15 @@ export default async function ShopProfilePage({ params }: Props) {
   const shop = await getShop(params.id);
   if (!shop) notFound();
 
+  const openingTime = shop.opening_time || '09:00';
+  const closingTime = shop.closing_time || '22:00';
+
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Pharmacy',
     'name': shop.shop_name,
+    'url': `https://rxdesk.in/pharmacy/${shop.id}`,
+    'image': 'https://rxdesk.in/icon.svg',
     'address': {
       '@type': 'PostalAddress',
       'streetAddress': shop.address_line,
@@ -63,7 +68,15 @@ export default async function ShopProfilePage({ params }: Props) {
       'addressCountry': 'IN',
     },
     'telephone': shop.contact_phone,
-    'openingHours': shop.opening_time && shop.closing_time ? `${shop.opening_time}-${shop.closing_time}` : undefined,
+    'priceRange': '₹₹',
+    'openingHoursSpecification': {
+      '@type': 'OpeningHoursSpecification',
+      'dayOfWeek': [
+        'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+      ],
+      'opens': openingTime,
+      'closes': closingTime
+    },
     'geo': shop.latitude && shop.longitude ? {
       '@type': 'GeoCoordinates',
       'latitude': shop.latitude,

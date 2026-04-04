@@ -5,7 +5,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/admin/', '/dashboard/', '/doctor/', '/patient/'], // Prevent indexing of private portals
+      disallow: ['/admin/', '/dashboard/', '/doctor/dashboard/', '/doctor/login/', '/patient/dashboard/', '/patient/login/', '/pharmacy/dashboard/', '/pharmacy/login/'], // Prevent indexing of private portals
     },
     sitemap: 'https://rxdesk.in/sitemap.xml',
   };
