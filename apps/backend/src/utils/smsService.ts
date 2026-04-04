@@ -102,3 +102,50 @@ export async function sendReminderSms(
     return { success: false, error: message };
   }
 }
+
+/**
+ * Send subscription expiration/recharge reminder SMS
+ */
+export async function sendSubscriptionReminderSms(
+  phone: string,
+  shopName: string,
+  type: 'trial' | 'active',
+  daysLeft: number
+): Promise<SmsResult> {
+  const action = type === 'trial' ? 'recharge your account' : 'renew your subscription';
+  const timeText = daysLeft === 0 ? 'today' : `in ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}`;
+  
+  if (isDev) {
+    logger.info(`[DEV] Subscription Reminder SMS to ${phone}: ${shopName}, ${type} expires ${timeText}.`);
+    return { success: true, messageId: 'dev-mock' };
+  }
+
+  if (!env.FAST2SMS_API_KEY) {
+    return { success: false, error: 'SMS not configured' };
+  }
+
+  const mobile = phone.replace(/^\+91/, '').replace(/^\+/, '');
+  const message = `Dear ${shopName}, your ${type === 'trial' ? 'trial' : 'premium'} plan on RxDesk expires ${timeText}. Please ${action} to avoid service interruption.`;
+
+  try {
+    const response = await axios.post(
+      'https://www.fast2sms.com/dev/bulkV2',
+      {
+        route: 'q',
+        message,
+        numbers: mobile,
+      },
+      {
+        headers: {
+          authorization: env.FAST2SMS_API_KEY,
+        },
+        timeout: 10_000,
+      }
+    );
+    return { success: true, messageId: response.data?.request_id };
+  } catch (err: unknown) {
+    const errMessage = err instanceof Error ? err.message : String(err);
+    logger.error(`Subscription Reminder SMS failed for ${phone}: ${errMessage}`);
+    return { success: false, error: errMessage };
+  }
+}

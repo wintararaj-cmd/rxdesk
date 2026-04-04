@@ -11,6 +11,7 @@ import { Shortcut, useKeyboardShortcuts } from '../../hooks/useShortcuts';
 import { ShortcutsHelp, ShortcutItem } from '../../components/dashboard/ShortcutsHelp';
 import { Keyboard, Menu, X as XIcon } from 'lucide-react';
 import { NotificationBell } from '../../components/dashboard/NotificationBell';
+import { SubscriptionAlert } from '../../components/dashboard/SubscriptionAlert';
 
 const SHOP_NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg> },
@@ -260,6 +261,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       />
 
       {/* Main content */}
+      <SubscriptionAlert />
       <main className="flex-1 overflow-auto flex flex-col min-w-0">
         <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-gray-200/50 px-4 sm:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
