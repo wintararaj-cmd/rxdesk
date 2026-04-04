@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   Search, MapPin, Navigation, Activity, Stethoscope, Store, Users,
@@ -18,9 +18,87 @@ interface DoctorChamber { id: string; distance_km?: number; shop: DoctorShop; }
 interface Doctor { id: string; full_name: string; specialization?: string; qualifications: string[]; experience_years?: number; consultation_fee?: number; chambers: DoctorChamber[]; }
 interface Shop { id: string; shop_name: string; address_line: string; city: string; pin_code: string; contact_phone: string; latitude: number; longitude: number; distance_km?: number; }
 
+
+/* ─────────────────────────────────────────────
+   Animated Stats Counter Component
+───────────────────────────────────────────── */
+const STATS = [
+  { label: 'Verified Pharmacies', end: 500, suffix: '+', prefix: '', accent: 'from-emerald-400 to-teal-400', glow: 'rgba(52,211,153,0.3)' },
+  { label: 'Appointments Managed', end: 10000, suffix: '+', prefix: '', accent: 'from-violet-400 to-indigo-400', glow: 'rgba(139,92,246,0.3)' },
+  { label: 'Billed This Year', end: 5, suffix: 'Cr+', prefix: '₹', accent: 'from-amber-400 to-orange-400', glow: 'rgba(251,191,36,0.3)' },
+  { label: 'Doctors on Platform', end: 200, suffix: '+', prefix: '', accent: 'from-blue-400 to-cyan-400', glow: 'rgba(96,165,250,0.3)' },
+];
+
+function useCountUp(end: number, duration = 1800, started: boolean) {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (!started) return;
+    let startTime: number | null = null;
+    const ease = (t: number) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    const step = (ts: number) => {
+      if (!startTime) startTime = ts;
+      const progress = Math.min((ts - startTime) / duration, 1);
+      setCount(Math.floor(ease(progress) * end));
+      if (progress < 1) requestAnimationFrame(step);
+      else setCount(end);
+    };
+    requestAnimationFrame(step);
+  }, [started, end, duration]);
+  return count;
+}
+
+function StatCounter({ label, end, suffix, prefix, accent, glow, started }: typeof STATS[0] & { started: boolean }) {
+  const count = useCountUp(end, 1800, started);
+  return (
+    <div className="flex flex-col items-center gap-2 px-6 py-2">
+      <div
+        className={`text-4xl sm:text-5xl font-black bg-gradient-to-r ${accent} bg-clip-text text-transparent`}
+        style={{ filter: `drop-shadow(0 0 16px ${glow})` }}
+      >
+        {prefix}{count.toLocaleString('en-IN')}{suffix}
+      </div>
+      <div className="text-xs text-gray-500 font-semibold uppercase tracking-widest text-center">{label}</div>
+    </div>
+  );
+}
+
+function StatsSection() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [started, setStarted] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setStarted(true); obs.disconnect(); } },
+      { threshold: 0.3 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return (
+    <section ref={ref} className="py-20 px-4 bg-gradient-to-b from-[#09090f] to-[#0b0b14] relative overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_50%,rgba(139,92,246,0.07),transparent_70%)] pointer-events-none" />
+      <div className="max-w-5xl mx-auto">
+        <p className="text-center text-[11px] font-bold text-gray-600 uppercase tracking-[0.2em] mb-10">Trusted Across India</p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-violet-500/5 to-transparent rounded-3xl" />
+          {STATS.map((s) => (
+            <div key={s.label} className="relative bg-white/[0.02] border border-white/[0.05] rounded-3xl p-6 hover:border-white/[0.1] transition-all hover:-translate-y-1 shadow-xl">
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+              <StatCounter {...s} started={started} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
 export default function LandingPage() {
   const [query, setQuery] = useState('');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+
   const [locStatus, setLocStatus] = useState<'idle' | 'loading' | 'ok' | 'denied'>('idle');
   const [searching, setSearching] = useState(false);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -324,6 +402,32 @@ export default function LandingPage() {
                 </button>
               );
             })}
+          </div>
+
+          {/* City Quick-Search Pills */}
+          <div className="mt-6 pt-5 border-t border-white/[0.04]">
+            <p className="text-[11px] text-gray-600 font-semibold uppercase tracking-widest mb-3 flex items-center justify-center gap-2">
+              <Store className="w-3 h-3" /> Find Pharmacies by City
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {['Mumbai', 'Delhi', 'Kolkata', 'Bangalore', 'Hyderabad', 'Pune', 'Chennai', 'Lucknow', 'Patna', 'Jaipur'].map((city) => (
+                <button
+                  key={city}
+                  onClick={() => {
+                    setQuery(city);
+                    setSearching(true); setSearchErr(''); setHasSearched(false); setHasSearchedShops(true);
+                    axios.get(`${API_URL}/shops/search`, { params: { q: city } })
+                      .then(res => setShops(res.data.data ?? []))
+                      .catch(() => setSearchErr('Unable to fetch pharmacies. Please try again.'))
+                      .finally(() => setSearching(false));
+                    document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="px-3 py-1.5 text-xs text-gray-400 bg-emerald-500/5 border border-emerald-500/15 rounded-full hover:bg-emerald-500/15 hover:text-emerald-300 hover:border-emerald-500/35 transition-all"
+                >
+                  📍 {city}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -648,6 +752,9 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* ANIMATED STATS STRIP */}
+      <StatsSection />
 
       {/* HOW IT WORKS */}
       <section id="how-it-works" className="py-24 px-4 bg-[#09090f]">

@@ -9,7 +9,7 @@ import { useConfigStore } from '../../store/configStore';
 import { authApi, shopApi } from '../../lib/apiClient';
 import { Shortcut, useKeyboardShortcuts } from '../../hooks/useShortcuts';
 import { ShortcutsHelp, ShortcutItem } from '../../components/dashboard/ShortcutsHelp';
-import { Keyboard } from 'lucide-react';
+import { Keyboard, Menu, X as XIcon } from 'lucide-react';
 import { NotificationBell } from '../../components/dashboard/NotificationBell';
 
 const SHOP_NAV = [
@@ -43,6 +43,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const qc = useQueryClient();
   const [hovered, setHovered] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const shortcuts: Shortcut[] = [
     { key: 'd', altKey: true, label: 'Dashboard', category: 'Navigation', action: () => router.push('/dashboard') },
@@ -106,9 +107,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const currentNav = user?.role === 'doctor' ? [...DOCTOR_NAV, ...COMMON_NAV] : [...SHOP_NAV, ...COMMON_NAV];
 
   return (
-    <div className="flex h-screen bg-[#f8f9fb]">
+    <div className="flex h-screen bg-[#f8f9fb] overflow-hidden">
+      {/* Mobile Backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-[260px] bg-[#0f0f1a] flex flex-col relative overflow-hidden shrink-0 print:hidden">
+      <aside className={`
+        fixed lg:static inset-y-0 left-0 z-50
+        w-[260px] bg-[#0f0f1a] flex flex-col relative overflow-hidden shrink-0 print:hidden
+        transform transition-transform duration-300 ease-in-out
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
         {/* Decorative gradient blob */}
         <div className="absolute -top-20 -left-20 w-60 h-60 bg-violet-600/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
@@ -151,7 +165,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         {/* Nav */}
-        <nav className="relative z-10 flex-1 px-3 space-y-0.5">
+        <nav className="relative z-10 flex-1 min-h-0 overflow-y-auto px-3 space-y-0.5 pb-2">
           <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest px-3 mb-2">Menu</p>
           {currentNav.map(({ href, label, icon }) => {
             const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
@@ -246,11 +260,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       />
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto flex flex-col">
-        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-gray-200/50 px-8 py-4 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-gray-800">
-            {currentNav.find(n => pathname === n.href || (n.href !== '/dashboard' && pathname.startsWith(n.href)))?.label ?? 'Dashboard'}
-          </h2>
+      <main className="flex-1 overflow-auto flex flex-col min-w-0">
+        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-gray-200/50 px-4 sm:px-8 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {/* Mobile hamburger */}
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="lg:hidden p-2 -ml-1 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Toggle sidebar"
+            >
+              {sidebarOpen ? <XIcon className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+            <h2 className="text-sm font-bold text-gray-800">
+              {currentNav.find(n => pathname === n.href || (n.href !== '/dashboard' && pathname.startsWith(n.href)))?.label ?? 'Dashboard'}
+            </h2>
+          </div>
           <div className="flex items-center gap-4">
             <NotificationBell />
             <div className="w-px h-4 bg-gray-200" />

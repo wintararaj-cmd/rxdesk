@@ -8,7 +8,7 @@ import {
   AreaChart, Area, XAxis, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import {
-  TrendingUp, CalendarDays, Receipt, AlertTriangle,
+  TrendingUp, TrendingDown, CalendarDays, Receipt, AlertTriangle,
   Plus, UserPlus, Package, Users,
 } from 'lucide-react';
 import { shopApi, appointmentApi, reportsApi } from '../../lib/apiClient';
@@ -58,6 +58,14 @@ function fmtRevenue(n: number) {
   if (n >= 100_000) return `₹${(n / 100_000).toFixed(1)}L`;
   if (n >= 1_000) return `₹${(n / 1_000).toFixed(1)}K`;
   return `₹${n}`;
+}
+
+function computeTrend(revenue: DailyRevenue[]): number | null {
+  if (revenue.length < 2) return null;
+  const today = revenue[revenue.length - 1]?.amount ?? 0;
+  const yesterday = revenue[revenue.length - 2]?.amount ?? 0;
+  if (yesterday === 0) return null;
+  return Math.round(((today - yesterday) / yesterday) * 100);
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -126,6 +134,8 @@ export default function DashboardPage() {
     amt: d.amount,
   }));
 
+  const revTrend = computeTrend(analytics?.revenue ?? []);
+
   const stats = [
     {
       label: "Today's Revenue",
@@ -136,6 +146,7 @@ export default function DashboardPage() {
       bg: 'bg-emerald-50',
       border: 'border-emerald-100',
       bar: 'bg-emerald-500',
+      trend: revTrend,
     },
     {
       label: "Today's Appointments",
@@ -246,7 +257,8 @@ export default function DashboardPage() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 mb-7">
-        {stats.map(({ label, value, Icon, accent, bg, border, bar, href, note }) => {
+        {stats.map(({ label, value, Icon, accent, bg, border, bar, href, note, trend }) => {
+          const TrendIcon = trend !== null && trend !== undefined ? (trend >= 0 ? TrendingUp : TrendingDown) : null;
           const CardContent = (
             <div className={`h-full rounded-2xl border ${border} ${bg} p-5 relative overflow-hidden transition-sm hover:shadow-md cursor-default data-active:border-violet-300 ${href ? 'cursor-pointer group/card' : ''}`}>
               <div className={`absolute top-0 left-0 w-1 h-full ${bar} rounded-l-2xl`} />
@@ -254,7 +266,19 @@ export default function DashboardPage() {
                 <div className={`w-9 h-9 rounded-xl ${bg} border ${border} flex items-center justify-center mb-3 ml-1`}>
                   <Icon className={`w-5 h-5 ${accent}`} />
                 </div>
-                {note && <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight bg-white/50 px-2 py-1 rounded-lg border border-gray-100">{note}</span>}
+                <div className="flex items-center gap-1.5">
+                  {note && <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight bg-white/50 px-2 py-1 rounded-lg border border-gray-100">{note}</span>}
+                  {trend !== null && trend !== undefined && TrendIcon && (
+                    <span className={`inline-flex items-center gap-0.5 text-[10px] font-black px-1.5 py-0.5 rounded-lg border ${
+                      trend >= 0
+                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                        : 'bg-rose-50 text-rose-600 border-rose-100'
+                    }`}>
+                      <TrendIcon className="w-2.5 h-2.5" />
+                      {Math.abs(trend)}%
+                    </span>
+                  )}
+                </div>
               </div>
               <div className={`text-2xl font-bold ml-1 ${accent}`}>{String(value)}</div>
               <div className="text-xs text-gray-500 font-medium ml-1 mt-1 group-hover/card:text-violet-600 transition-colors">{label}</div>
