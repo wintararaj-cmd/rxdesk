@@ -627,6 +627,10 @@ class MedicineSearchField extends StatefulWidget {
 
 class _MedicineSearchFieldState extends State<MedicineSearchField> {
   String? _lastSelectedName;
+  // Capture the FocusNode from fieldViewBuilder so we can unfocus it from
+  // the correct context when an option is selected (the optionsViewBuilder
+  // runs inside an overlay with a different BuildContext).
+  FocusNode? _fieldFocusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -645,14 +649,22 @@ class _MedicineSearchFieldState extends State<MedicineSearchField> {
       },
       displayStringForOption: (option) => (option['medicine_name'] ?? '').toString(),
       onSelected: (option) {
-        FocusScope.of(context).unfocus();
+        // Unfocus the captured field node — this is the correct focus node
+        // for the text field. Using FocusScope.of(context) here would reference
+        // the Overlay's context (wrong scope) and the dropdown would not close.
+        _fieldFocusNode?.unfocus();
         setState(() {
           _lastSelectedName = option['medicine_name']?.toString();
         });
         widget.onSelected(option);
       },
       fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-        if (controller.text != widget.initialValue && widget.initialValue.isNotEmpty && controller.text.isEmpty) {
+        // Capture the focus node so onSelected can unfocus it correctly.
+        _fieldFocusNode = focusNode;
+
+        if (controller.text != widget.initialValue &&
+            widget.initialValue.isNotEmpty &&
+            controller.text.isEmpty) {
           controller.text = widget.initialValue;
         }
         return TextField(
@@ -685,10 +697,22 @@ class _MedicineSearchFieldState extends State<MedicineSearchField> {
                 itemCount: options.length,
                 itemBuilder: (BuildContext context, int index) {
                   final option = options.elementAt(index);
+                  final totalStock = option['total_stock'] ?? 0;
+                  final batches = option['batch_count'] ?? option['batches']?.length ?? '';
+                  final soonestExp = option['soonest_expiry']?.toString().split('T')[0] ?? '';
                   return ListTile(
-                    title: Text(option['medicine_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text("Stock: ${option['total_stock'] ?? 0}"),
-                    trailing: Text("₹${option['min_mrp'] ?? '0'}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                    title: Text(
+                      option['medicine_name'] ?? '',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    subtitle: Text(
+                      [
+                        'Total Stock: $totalStock',
+                        if (batches != '') 'Batches: $batches',
+                        if (soonestExp.isNotEmpty) 'Soonest Exp: $soonestExp',
+                      ].join(' | '),
+                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                    ),
                     onTap: () => onSelected(option),
                   );
                 },
@@ -700,3 +724,4 @@ class _MedicineSearchFieldState extends State<MedicineSearchField> {
     );
   }
 }
+
