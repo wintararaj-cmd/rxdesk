@@ -182,6 +182,7 @@ export async function verifyOtpAndLogin(
 
   logger.info(`User ${user.id} logged in via OTP (new: ${isNewUser})`);
 
+  // Return userId so the route handler can emit an audit event with the request IP
   return {
     access_token: accessToken,
     refresh_token: `${tokenId}:${refreshToken}`,

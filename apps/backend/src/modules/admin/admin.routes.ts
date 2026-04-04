@@ -424,6 +424,72 @@ router.get('/recharges/report', requireRole('admin'), async (_req, res, next) =>
   } catch (err) { next(err); }
 });
 
+// ─── Audit Logs ───────────────────────────────────────────────────────────────
+
+// GET /admin/audit-logs?action=&shop_id=&actor_role=&from=&to=&page=
+// Must be before /audit-logs/export-csv to prevent param capture issues
+router.get('/audit-logs/export-csv', requireRole('admin'), async (req, res, next) => {
+  try {
+    const { action, shop_id, actor_role, from, to } = req.query as Record<string, string | undefined>;
+    const where: any = {
+      ...(action && { action: { contains: action, mode: 'insensitive' } }),
+      ...(shop_id && { shop_id }),
+      ...(actor_role && { actor_role }),
+      ...((from || to) && { created_at: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } }),
+    };
+    const logs = await prisma.auditLog.findMany({
+      where,
+      orderBy: { created_at: 'desc' },
+      take: 10000,
+      include: { user: { select: { phone: true } }, shop: { select: { shop_name: true } } },
+    });
+    const header = 'timestamp,action,actor_phone,actor_role,shop,resource,resource_id,ip,metadata';
+    const rows = logs.map(l =>
+      [
+        l.created_at.toISOString(),
+        l.action,
+        l.user?.phone ?? '',
+        l.actor_role ?? '',
+        l.shop?.shop_name ?? '',
+        l.resource ?? '',
+        l.resource_id ?? '',
+        l.ip_address ?? '',
+        JSON.stringify(l.metadata ?? {}),
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
+    );
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=audit_logs_${new Date().toISOString().slice(0, 10)}.csv`);
+    res.send([header, ...rows].join('\n'));
+  } catch (err) { next(err); }
+});
+
+router.get('/audit-logs', requireRole('admin'), async (req, res, next) => {
+  try {
+    const { action, shop_id, actor_role, from, to, page = '1' } = req.query as Record<string, string | undefined>;
+    const PAGE_SIZE = 50;
+    const skip = (Number(page) - 1) * PAGE_SIZE;
+    const where: any = {
+      ...(action && { action: { contains: action, mode: 'insensitive' } }),
+      ...(shop_id && { shop_id }),
+      ...(actor_role && { actor_role }),
+      ...((from || to) && { created_at: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to) }) } }),
+    };
+    const [logs, total] = await Promise.all([
+      prisma.auditLog.findMany({
+        where, skip, take: PAGE_SIZE,
+        orderBy: { created_at: 'desc' },
+        include: {
+          user: { select: { phone: true, role: true } },
+          shop: { select: { shop_name: true, city: true } },
+        },
+      }),
+      prisma.auditLog.count({ where }),
+    ]);
+    res.json({ success: true, data: logs, pagination: { total, page: Number(page), totalPages: Math.ceil(total / PAGE_SIZE) } });
+  } catch (err) { next(err); }
+});
+
 export default router;
+
 
 

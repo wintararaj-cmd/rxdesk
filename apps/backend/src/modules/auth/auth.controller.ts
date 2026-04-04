@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { sendOtpSchema, verifyOtpSchema, loginSchema, setPasswordSchema, resetPasswordSchema } from '@rxdesk/shared';
 import * as authService from './auth.service';
+import { audit } from '../../utils/audit';
 
 export async function sendOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -16,6 +17,7 @@ export async function verifyOtp(req: Request, res: Response, next: NextFunction)
   try {
     const body = verifyOtpSchema.parse(req.body);
     const result = await authService.verifyOtpAndLogin(body.phone, body.otp, body.otp_ref);
+    audit({ action: 'auth.login', userId: result.user.id, actorRole: result.user.role, resource: 'auth', ipAddress: req.ip, metadata: { method: 'otp', phone: body.phone } });
     res.json({ success: true, data: result, message: 'Login successful' });
   } catch (err) {
     next(err);
@@ -96,6 +98,7 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
   try {
     const { phone, password } = loginSchema.parse(req.body);
     const result = await authService.loginWithPassword(phone, password);
+    audit({ action: 'auth.login', userId: result.user.id, actorRole: result.user.role, resource: 'auth', ipAddress: req.ip, metadata: { method: 'password', phone } });
     res.json({ success: true, data: result, message: 'Login successful' });
   } catch (err) {
     next(err);

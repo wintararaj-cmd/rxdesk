@@ -348,6 +348,7 @@ model MedicalShop {
   account_groups      AccountGroup[]
   chart_of_accounts   ChartOfAccount[]
   journal_entries     JournalEntry[]
+  audit_logs          AuditLog[]
 
   @@map("medical_shops")
 }
@@ -681,20 +682,27 @@ model Notification {
 model AuditLog {
   id          String   @id @default(uuid())
   user_id     String?
-  action      String
-  resource    String?
-  resource_id String?
+  action      String                        // e.g. "bill.created", "prescription.viewed", "auth.login"
+  actor_role  String?                       // "shop_owner" | "doctor" | "patient" | "admin"
+  shop_id     String?                       // null for non-shop events
+  resource    String?                       // "bill" | "prescription" | "patient" etc.
+  resource_id String?                       // the record's ID
   ip_address  String?
   user_agent  String?
   old_data    Json?
   new_data    Json?
+  metadata    Json?                         // extra context (amount, qty, etc.)
   created_at  DateTime @default(now())
 
   // Relations
-  user User? @relation(fields: [user_id], references: [id])
+  user User?        @relation(fields: [user_id], references: [id])
+  shop MedicalShop? @relation(fields: [shop_id], references: [id], onDelete: SetNull)
 
   @@index([user_id])
+  @@index([shop_id])
+  @@index([action])
   @@index([resource, resource_id])
+  @@index([created_at])
   @@map("audit_logs")
 }
 

@@ -5,6 +5,7 @@ import * as service from './prescription.service';
 import { pdfRateLimiter } from '../../middleware/rateLimit';
 import { randomUUID } from 'crypto';
 import { env } from '../../config/env';
+import { audit } from '../../utils/audit';
 
 // ── Dev-mode in-memory PDF token cache (bypasses S3 when credentials are dummy) ──
 const devPdfCache = new Map<string, { buffer: Buffer; expiresAt: number }>();
@@ -30,6 +31,16 @@ router.post('/', requireRole('doctor'), async (req, res, next) => {
     const io = req.app.get('io');
     if (io) io.to(`shop:${prescription.shop_id}`).emit('prescription.issued', { prescription });
 
+    audit({
+      action: 'prescription.created',
+      userId: req.user!.id,
+      actorRole: req.user!.role,
+      shopId: prescription.shop_id,
+      resource: 'prescription',
+      resourceId: prescription.id,
+      ipAddress: req.ip,
+      metadata: { patient_id: prescription.patient_id, diagnosis: prescription.diagnosis },
+    });
     res.status(201).json({ success: true, data: prescription, message: 'Prescription issued' });
   } catch (err) { next(err); }
 });
@@ -101,6 +112,15 @@ router.get('/my-issued', requireRole('doctor'), async (req, res, next) => {
 router.get('/:id', requireRole('patient', 'doctor', 'shop_owner', 'admin'), async (req, res, next) => {
   try {
     const prescription = await service.getPrescriptionById(req.params.id, req.user!.id, req.user!.role);
+    audit({
+      action: 'prescription.viewed',
+      userId: req.user!.id,
+      actorRole: req.user!.role,
+      shopId: (prescription as any).shop_id ?? undefined,
+      resource: 'prescription',
+      resourceId: req.params.id,
+      ipAddress: req.ip,
+    });
     res.json({ success: true, data: prescription });
   } catch (err) { next(err); }
 });
@@ -134,6 +154,14 @@ router.get('/:id/pdf', pdfRateLimiter, requireRole('patient', 'doctor', 'shop_ow
 router.delete('/:id', requireRole('doctor'), async (req, res, next) => {
   try {
     await service.deletePrescription(req.params.id, req.user!.id);
+    audit({
+      action: 'prescription.deleted',
+      userId: req.user!.id,
+      actorRole: req.user!.role,
+      resource: 'prescription',
+      resourceId: req.params.id,
+      ipAddress: req.ip,
+    });
     res.json({ success: true, message: 'Prescription deleted' });
   } catch (err) { next(err); }
 });

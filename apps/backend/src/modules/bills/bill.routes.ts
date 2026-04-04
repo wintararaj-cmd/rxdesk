@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireRole } from '../../middleware/auth';
 import * as service from './bill.service';
+import { audit } from '../../utils/audit';
 
 const router = Router();
 
@@ -38,6 +39,16 @@ router.get('/stats', requireRole('shop_owner'), async (req, res, next) => {
 router.post('/manual', requireRole('shop_owner'), async (req, res, next) => {
   try {
     const bill = await service.createManualBill(req.user!.id, req.body);
+    audit({
+      action: 'bill.created',
+      userId: req.user!.id,
+      actorRole: req.user!.role,
+      shopId: bill.shop_id,
+      resource: 'bill',
+      resourceId: bill.id,
+      ipAddress: req.ip,
+      metadata: { bill_number: bill.bill_number, total_amount: Number(bill.total_amount), payment_method: bill.payment_method },
+    });
     res.status(201).json({ success: true, data: bill, message: 'Bill created' });
   } catch (err) { next(err); }
 });
@@ -48,6 +59,16 @@ router.post('/from-prescription/:prescriptionId', requireRole('shop_owner'), asy
     const bill = await service.generateBillFromPrescription(
       req.params.prescriptionId, req.user!.id, req.body
     );
+    audit({
+      action: 'bill.created',
+      userId: req.user!.id,
+      actorRole: req.user!.role,
+      shopId: bill.shop_id,
+      resource: 'bill',
+      resourceId: bill.id,
+      ipAddress: req.ip,
+      metadata: { bill_number: bill.bill_number, total_amount: Number(bill.total_amount), source: 'prescription', prescription_id: req.params.prescriptionId },
+    });
     res.status(201).json({ success: true, data: bill, message: 'Bill generated' });
   } catch (err) { next(err); }
 });
@@ -100,6 +121,14 @@ router.patch('/:id', requireRole('shop_owner'), async (req, res, next) => {
 router.delete('/:id', requireRole('shop_owner'), async (req, res, next) => {
   try {
     const data = await service.voidBill(req.params.id, req.user!.id);
+    audit({
+      action: 'bill.voided',
+      userId: req.user!.id,
+      actorRole: req.user!.role,
+      resource: 'bill',
+      resourceId: req.params.id,
+      ipAddress: req.ip,
+    });
     res.json({ success: true, data, message: 'Bill voided successfully' });
   } catch (err) { next(err); }
 });
