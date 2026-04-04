@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireRole } from '../../middleware/auth';
 import * as service from './accounting.service';
+import { audit } from '../../utils/audit';
 
 const router = Router();
 
@@ -73,6 +74,16 @@ router.get('/purchases', shopAuth, async (req, res, next) => {
 router.post('/purchases', shopAuth, async (req, res, next) => {
   try {
     const data = await service.createPurchaseEntry(req.user!.id, req.body);
+    audit({
+      action: 'purchase.created',
+      userId: req.user!.id,
+      actorRole: req.user!.role,
+      shopId: data.shop_id,
+      resource: 'purchase',
+      resourceId: data.id,
+      ipAddress: req.ip,
+      metadata: { invoice_number: data.invoice_number, total_amount: Number(data.total_amount), supplier_id: data.supplier_id },
+    });
     res.status(201).json({ success: true, data, message: 'Purchase entry created and inventory updated' });
   } catch (err) { next(err); }
 });
@@ -87,6 +98,16 @@ router.get('/purchases/:id', shopAuth, async (req, res, next) => {
 router.put('/purchases/:id', shopAuth, async (req, res, next) => {
   try {
     const data = await service.updatePurchaseEntry(req.user!.id, req.params.id, req.body);
+    audit({
+      action: 'purchase.updated',
+      userId: req.user!.id,
+      actorRole: req.user!.role,
+      shopId: data.shop_id,
+      resource: 'purchase',
+      resourceId: data.id,
+      ipAddress: req.ip,
+      metadata: { invoice_number: data.invoice_number, total_amount: Number(data.total_amount) },
+    });
     res.json({ success: true, data, message: 'Purchase updated' });
   } catch (err) { next(err); }
 });
@@ -107,6 +128,16 @@ router.get('/supplier-payments', shopAuth, async (req, res, next) => {
 router.post('/supplier-payments', shopAuth, async (req, res, next) => {
   try {
     const data = await service.recordSupplierPayment(req.user!.id, req.body);
+    audit({
+      action: 'supplier_payment.recorded',
+      userId: req.user!.id,
+      actorRole: req.user!.role,
+      shopId: data.shop_id,
+      resource: 'supplier_payment',
+      resourceId: data.id,
+      ipAddress: req.ip,
+      metadata: { amount: Number(data.amount), method: data.payment_method, supplier_id: data.supplier_id },
+    });
     res.status(201).json({ success: true, data, message: 'Payment recorded' });
   } catch (err) { next(err); }
 });
@@ -205,6 +236,16 @@ router.get('/credit-customers/:id/ledger', shopAuth, async (req, res, next) => {
 router.post('/credit-customers/:id/payment', shopAuth, async (req, res, next) => {
   try {
     const data = await service.recordCreditPayment(req.user!.id, req.params.id, req.body);
+    audit({
+      action: 'customer_credit.payment',
+      userId: req.user!.id,
+      actorRole: req.user!.role,
+      shopId: data.shop_id,
+      resource: 'credit_transaction',
+      resourceId: data.id,
+      ipAddress: req.ip,
+      metadata: { amount: Number(data.amount), customer_id: data.customer_id, method: data.payment_method },
+    });
     res.status(201).json({ success: true, data, message: 'Payment received and outstanding updated' });
   } catch (err) { next(err); }
 });
@@ -566,6 +607,15 @@ router.get('/reports/gstr3b-excel', shopAuth, async (req, res, next) => {
 router.delete('/purchases/:id', shopAuth, async (req, res, next) => {
   try {
     const data = await service.voidPurchase(req.user!.id, req.params.id);
+    audit({
+      action: 'purchase.voided',
+      userId: req.user!.id,
+      actorRole: req.user!.role,
+      shopId: data.shop_id,
+      resource: 'purchase',
+      resourceId: req.params.id,
+      ipAddress: req.ip,
+    });
     res.json({ success: true, data, message: 'Purchase voided and items reversed' });
   } catch (err) { next(err); }
 });
