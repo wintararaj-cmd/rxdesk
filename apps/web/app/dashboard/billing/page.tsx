@@ -36,6 +36,9 @@ interface BillData {
   customer_gstin?: string | null;
   billing_address?: string | null;
   billing_state?: string | null;
+  ewb_status?: 'generated' | 'pending' | 'not_required';
+  ewb_number?: string | null;
+  ewb_valid_till?: string | null;
 }
 
 interface BillStats {
@@ -1249,7 +1252,7 @@ function BillHistoryTab() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50/80 border-b border-gray-100">
-              {['Bill No.', 'Patient', 'Date', 'Items', 'Amount', 'Status', 'Method', 'Actions'].map(h => (
+              {['Bill No.', 'Patient', 'Date', 'Items', 'Amount', 'Status', 'EWB Status', 'Method', 'Actions'].map(h => (
                 <th key={h} className="px-5 py-3.5 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
               ))}
             </tr>
@@ -1296,6 +1299,15 @@ function BillHistoryTab() {
                 <td className="px-5 py-4 font-bold text-gray-900">{fmtCurrency(Math.round(bill.total_amount))}</td>
                 <td className="px-5 py-4">
                   <StatusBadge status={bill.payment_status} />
+                </td>
+                <td className="px-5 py-4 whitespace-nowrap">
+                  {bill.ewb_status === 'generated' ? (
+                    <span className="bg-green-100 text-green-700 font-bold px-2 py-1 rounded text-[10px] uppercase flex items-center justify-center w-fit gap-1 shadow-[0_2px_4px_rgba(0,0,0,0.02)] border border-green-200/50"><span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>Generated</span>
+                  ) : bill.ewb_status === 'pending' ? (
+                    <span className="bg-yellow-100 text-yellow-700 font-bold px-2 py-1 rounded text-[10px] uppercase flex items-center justify-center w-fit gap-1 shadow-[0_2px_4px_rgba(0,0,0,0.02)] border border-yellow-200/50"><span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>Pending</span>
+                  ) : (
+                    <span className="bg-gray-100 text-gray-500 font-bold px-2 py-1 rounded text-[10px] uppercase flex items-center justify-center w-fit gap-1 shadow-[0_2px_4px_rgba(0,0,0,0.02)] border border-gray-200/50"><span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Not Req.</span>
+                  )}
                 </td>
                 <td className="px-5 py-4">
                   <span className={`text-xs font-medium ${METHOD_LABEL[bill.payment_method]?.color ?? 'text-gray-500'}`}>
@@ -1411,6 +1423,8 @@ function WalkInSaleTab() {
   const [globalDiscount, setGlobalDiscount] = useState('');
   const [items, setItems] = useState<WalkInItem[]>([{ ...EMPTY_ITEM }]);
   const [createdBill, setCreatedBill] = useState<BillData | null>(null);
+  const [ewbData, setEwbData] = useState({ transport_mode: '', vehicle_number: '', transporter_name: '' });
+  const [showEwbModal, setShowEwbModal] = useState(false);
   const [suggestions, setSuggestions] = useState<Record<number, any[]>>({});
   const searchTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
   const [customerSearchResults, setCustomerSearchResults] = useState<{ customer_name: string | null; customer_phone: string; customer_gstin?: string; billing_address?: string; billing_state?: string }[]>([]);
@@ -1433,10 +1447,26 @@ function WalkInSaleTab() {
   const shopName = (shopData as any)?.shop_name ?? 'Medical Shop';
   const isTaxInvoice = (shopData as any)?.gst_type === 'regular';
 
+  const ewbMutation = useMutation({
+    mutationFn: (data: { id: string; payload: any }) => billApi.generateEWayBill(data.id, data.payload),
+    onSuccess: (res) => {
+      setCreatedBill(res.data.data);
+      setShowEwbModal(false);
+      qc.invalidateQueries({ queryKey: ['bill-history'] });
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.error?.message || 'Failed to generate E-Way bill');
+    }
+  });
+
   const createMutation = useMutation({
     mutationFn: (payload: object) => billApi.createManual(payload),
     onSuccess: (res) => {
-      setCreatedBill(res.data.data);
+      const newBill = res.data.data;
+      setCreatedBill(newBill);
+      if (Number(newBill.total_amount) > 50000 && !ewbMutation.isSuccess) {
+        setShowEwbModal(true);
+      }
       qc.invalidateQueries({ queryKey: ['bill-history'] });
       qc.invalidateQueries({ queryKey: ['bill-stats'] });
     },
@@ -1472,6 +1502,9 @@ function WalkInSaleTab() {
     setPaymentMethod('cash'); setGlobalDiscount(''); setItems([{ ...EMPTY_ITEM }]);
     setCustomerSearchResults([]); setShowCustomerDropdown(false); setCustomerHighlight(-1); setSuggHighlights({});
     setTriedToSubmit(false); setValidationError(null);
+    setEwbData({ transport_mode: '', vehicle_number: '', transporter_name: '' });
+    setShowEwbModal(false);
+    ewbMutation.reset();
     createMutation.reset();
   };
 
@@ -1707,6 +1740,20 @@ function WalkInSaleTab() {
             <div className="flex justify-between font-bold text-gray-900 text-xl pt-3 border-t border-gray-200"><span>Total</span><span className="text-violet-700">{fmtCurrency(Math.round(createdBill.total_amount))}</span></div>
           </div>
 
+          {/* E-Way Bill Details */}
+          {createdBill.ewb_status === 'generated' && (
+            <div className="bg-yellow-50/50 border border-yellow-200/60 rounded-xl p-4 mb-4 text-sm text-yellow-800">
+              <h4 className="font-bold flex items-center gap-1.5 mb-2">
+                <svg className="w-4 h-4 text-yellow-600" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" /></svg>
+                E-Way Bill Generated
+              </h4>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div><span className="text-yellow-600">EWB Number:</span> <br/><span className="font-semibold text-yellow-900">{createdBill.ewb_number}</span></div>
+                <div><span className="text-yellow-600">Valid Till:</span> <br/><span className="font-semibold text-yellow-900">{createdBill.ewb_valid_till ? new Date(createdBill.ewb_valid_till).toLocaleString() : 'N/A'}</span></div>
+              </div>
+            </div>
+          )}
+
           {/* Pay now if pending */}
           {createdBill.payment_status === 'pending' && (
             <div className="mb-4">
@@ -1743,6 +1790,36 @@ function WalkInSaleTab() {
             + New Walk-in Sale
           </button>
         </div>
+
+        {/* E-Way Bill Auto Modal */}
+        {showEwbModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl p-7 w-full max-w-md shadow-2xl relative animate-in zoom-in-95 duration-200">
+              <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-yellow-100 text-yellow-600 p-3.5 rounded-full border-4 border-white shadow-xl shadow-yellow-200/50">
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+              </div>
+              <div className="mt-6 text-center">
+                <h2 className="text-xl font-bold text-gray-900 mb-2">E-Way Bill Required</h2>
+                <p className="text-sm text-gray-500 mb-6 font-medium leading-relaxed">
+                  Invoice <span className="font-bold text-gray-700">{createdBill.bill_number}</span> exceeds ₹50,000.<br/>
+                  Do you want to generate an E-Way Bill now before dispatching the goods?
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <button onClick={() => setShowEwbModal(false)} className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 hover:text-gray-900 transition-colors">
+                    Later
+                  </button>
+                  <button
+                    onClick={() => ewbMutation.mutate({ id: createdBill.id, payload: ewbData })}
+                    disabled={ewbMutation.isPending}
+                    className="flex-1 py-3 rounded-xl bg-violet-600 text-white font-bold text-sm hover:bg-violet-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-violet-200 disabled:opacity-50"
+                  >
+                    {ewbMutation.isPending ? 'Generating...' : 'Generate Now'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -2211,6 +2288,53 @@ function WalkInSaleTab() {
               ))}
             </div>
           </div>
+        </div>
+
+        {/* E-Way Bill Section */}
+        <div className="bg-gray-50/50 rounded-2xl border border-gray-100 p-5">
+          <h3 className="font-semibold text-gray-800 text-sm mb-3 flex items-center gap-2">
+            <span className="w-6 h-6 bg-violet-100 text-violet-600 rounded-full flex items-center justify-center text-xs font-bold">5</span>
+            🚚 E-Way Bill Details
+          </h3>
+          {Math.round(calcTotal) <= 50000 ? (
+            <div className="bg-gray-100/80 rounded-xl p-4 text-center border border-gray-200 border-dashed">
+              <svg className="w-6 h-6 text-gray-400 mx-auto mb-1" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12A9 9 0 113 12a9 9 0 0118 0z" /></svg>
+              <p className="text-gray-500 text-sm font-medium">Not required for invoices below ₹50,000</p>
+            </div>
+          ) : (
+            <div className="bg-yellow-50/80 border border-yellow-200 rounded-xl p-4 shadow-sm relative overflow-hidden animate-in fade-in duration-300">
+               <div className="absolute top-0 left-0 w-1 h-full bg-yellow-400" />
+               <div className="flex items-start gap-3 mb-4">
+                 <div className="p-1.5 bg-yellow-100 text-yellow-600 rounded-lg shrink-0 mt-0.5">
+                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                 </div>
+                 <div>
+                   <p className="text-yellow-800 font-bold text-sm">E-Way Bill is required</p>
+                   <p className="text-yellow-700/80 text-xs">This invoice exceeds ₹50,000. It is recommended to generate an E-Way Bill before dispatch.</p>
+                 </div>
+               </div>
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                 <div>
+                   <label className="block text-[10px] font-bold text-yellow-800/60 uppercase tracking-widest mb-1">Transport Mode</label>
+                   <select value={ewbData.transport_mode} onChange={e => setEwbData({...ewbData, transport_mode: e.target.value})} className="w-full bg-white border border-yellow-200/60 rounded-lg px-2 h-9 text-xs text-gray-700 outline-none focus:border-yellow-400">
+                     <option value="">Select Mode</option>
+                     <option value="Road">Road</option>
+                     <option value="Rail">Rail</option>
+                     <option value="Air">Air</option>
+                     <option value="Ship">Ship</option>
+                   </select>
+                 </div>
+                 <div>
+                   <label className="block text-[10px] font-bold text-yellow-800/60 uppercase tracking-widest mb-1">Vehicle No.</label>
+                   <input type="text" placeholder="e.g. MH04 XY 1234" value={ewbData.vehicle_number} onChange={e => setEwbData({...ewbData, vehicle_number: e.target.value})} className="w-full bg-white border border-yellow-200/60 rounded-lg px-3 h-9 text-xs text-gray-900 outline-none focus:border-yellow-400 uppercase" />
+                 </div>
+                 <div>
+                   <label className="block text-[10px] font-bold text-yellow-800/60 uppercase tracking-widest mb-1">Transporter ID / Name</label>
+                   <input type="text" placeholder="Transporter Details" value={ewbData.transporter_name} onChange={e => setEwbData({...ewbData, transporter_name: e.target.value})} className="w-full bg-white border border-yellow-200/60 rounded-lg px-3 h-9 text-xs text-gray-900 outline-none focus:border-yellow-400" />
+                 </div>
+               </div>
+            </div>
+          )}
         </div>
 
         {/* Live summary */}

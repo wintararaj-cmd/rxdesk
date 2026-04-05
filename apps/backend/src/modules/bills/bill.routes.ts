@@ -133,4 +133,20 @@ router.delete('/:id', requireRole('shop_owner'), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// POST /bills/:id/eway-bill (Generate E-Way Bill)
+router.post('/:id/eway-bill', requireRole('shop_owner'), async (req, res, next) => {
+  try {
+    const data = await service.generateEWayBill(req.params.id, req.user!.id, req.body);
+    audit({
+      action: 'bill.eway_generated',
+      userId: req.user!.id,
+      actorRole: req.user!.role,
+      resource: 'bill',
+      resourceId: req.params.id,
+      ipAddress: req.ip,
+    });
+    res.json({ success: true, data, message: 'E-Way bill generated successfully' });
+  } catch (err) { next(err); }
+});
+
 export default router;

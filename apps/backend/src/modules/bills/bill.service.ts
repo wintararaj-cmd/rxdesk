@@ -931,3 +931,29 @@ export async function updateBill(billId: string, userId: string, data: any) {
     return updatedBill;
   });
 }
+
+export async function generateEWayBill(billId: string, userId: string, payload: any) {
+  const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });
+  if (!shop) throw new AppError(403, 'FORBIDDEN', 'Access denied');
+
+  const bill = await prisma.bill.findUnique({ where: { id: billId, shop_id: shop.id } });
+  if (!bill) throw new AppError(404, 'NOT_FOUND', 'Bill not found');
+  if (Number(bill.total_amount) <= 50000) {
+    throw new AppError(400, 'BAD_REQUEST', 'E-Way bill not required for invoice amount <= 50,000');
+  }
+
+  const ewbNumber = Math.random().toString().slice(2, 14); // 12-digit mock
+  const validTill = new Date();
+  validTill.setDate(validTill.getDate() + 3);
+
+  const updatedBill = await prisma.bill.update({
+    where: { id: billId },
+    data: {
+      ewb_status: 'generated',
+      ewb_number: ewbNumber,
+      ewb_valid_till: validTill,
+    },
+  });
+
+  return updatedBill;
+}

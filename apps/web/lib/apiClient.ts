@@ -152,6 +152,7 @@ export const billApi = {
     ),
   void: (id: string) => apiClient.delete(`/bills/${id}`),
   update: (id: string, data: object) => apiClient.patch(`/bills/${id}`, data),
+  generateEWayBill: (id: string, data: object) => apiClient.post(`/bills/${id}/eway-bill`, data),
 };
 
 export const prescriptionApi = {
