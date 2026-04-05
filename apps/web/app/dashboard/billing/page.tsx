@@ -1471,7 +1471,7 @@ function EWayBillDashboardTab() {
                   </span>
                 </td>
                 <td className="px-5 py-4">
-                   <span className="text-xs font-medium text-gray-500 truncate max-w-[120px] block" title={bill.ewb_transporter_name}>{bill.ewb_transporter_name || 'N/A'}</span>
+                   <span className="text-xs font-medium text-gray-500 truncate max-w-[120px] block" title={bill.ewb_transporter_name || ''}>{bill.ewb_transporter_name || 'N/A'}</span>
                 </td>
                 <td className="px-5 py-4 font-bold text-gray-900">{fmtCurrency(bill.total_amount)}</td>
                 <td className="px-5 py-4">
