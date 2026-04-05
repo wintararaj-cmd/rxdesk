@@ -39,6 +39,11 @@ interface BillData {
   ewb_status?: 'generated' | 'pending' | 'not_required';
   ewb_number?: string | null;
   ewb_valid_till?: string | null;
+  ewb_transport_mode?: string | null;
+  ewb_vehicle_number?: string | null;
+  ewb_transporter_name?: string | null;
+  ewb_transport_doc_no?: string | null;
+  ewb_transport_date?: string | null;
 }
 
 interface BillStats {
