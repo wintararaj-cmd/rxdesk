@@ -580,10 +580,15 @@ model Bill {
   payment_status  BillPaymentStatus @default(pending)
   staff_id        String?
   pdf_url         String?
-  ewb_status      String?           @default("not_required")
-  ewb_number      String?
-  ewb_valid_till  DateTime?
-  created_at      DateTime          @default(now())
+  ewb_status          String?           @default("not_required")
+  ewb_number          String?
+  ewb_valid_till      DateTime?
+  ewb_transport_mode  String?
+  ewb_vehicle_number  String?
+  ewb_transporter_name String?
+  ewb_transport_doc_no String?
+  ewb_transport_date  DateTime?
+  created_at          DateTime          @default(now())
   updated_at      DateTime          @updatedAt
 
   // Relations

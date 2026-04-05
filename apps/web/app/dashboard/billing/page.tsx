@@ -380,6 +380,12 @@ function sendWhatsApp(bill: BillData, shopName = 'Medical Shop', shopData?: any)
     }
   }
   msg += `💰 *Total: ${cur(Math.round(bill.total_amount))}*\n`;
+  if (bill.ewb_status === 'generated') {
+    msg += `\n🚛 *E-Way Bill Details:*\n`;
+    msg += `EWB No: ${bill.ewb_number}\n`;
+    if (bill.ewb_transport_mode) msg += `Mode: ${bill.ewb_transport_mode}\n`;
+    if (bill.ewb_vehicle_number) msg += `Vehicle: ${bill.ewb_vehicle_number}\n`;
+  }
   msg += `\nPayment: ${(bill.payment_method ?? '').toUpperCase()} | ${(bill.payment_status ?? '').toUpperCase()}\n`;
   msg += `\nThank you! 🙏`;
   const encoded = encodeURIComponent(msg);
@@ -1068,7 +1074,24 @@ function BillDetailModal({ bill, onClose, onPay }: {
                 </div>
               )}
 
-              <div className="flex gap-3 pt-2">
+                {bill.ewb_status === 'generated' && (
+                  <div className="bg-yellow-50/50 border border-yellow-200/60 rounded-2xl p-5 text-sm text-yellow-800 space-y-3 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-yellow-400" />
+                    <h4 className="font-bold flex items-center gap-2 text-yellow-900">
+                       <svg className="w-5 h-5 text-yellow-600" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" /></svg>
+                       E-Way Bill Details
+                    </h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <div><p className="text-[10px] font-bold text-yellow-600 uppercase tracking-widest">EWB Number</p><p className="font-mono font-bold text-gray-900">{bill.ewb_number}</p></div>
+                      <div><p className="text-[10px] font-bold text-yellow-600 uppercase tracking-widest">Valid Till</p><p className="font-bold text-gray-900">{bill.ewb_valid_till ? fmtDateTime(bill.ewb_valid_till) : 'N/A'}</p></div>
+                      <div><p className="text-[10px] font-bold text-yellow-600 uppercase tracking-widest">Transport Mode</p><p className="font-bold text-gray-900">{bill.ewb_transport_mode || 'Road'}</p></div>
+                      <div><p className="text-[10px] font-bold text-yellow-600 uppercase tracking-widest">Vehicle Number</p><p className="font-bold text-gray-900 uppercase">{bill.ewb_vehicle_number || 'N/A'}</p></div>
+                      <div className="col-span-2"><p className="text-[10px] font-bold text-yellow-600 uppercase tracking-widest">Transporter</p><p className="font-bold text-gray-900">{bill.ewb_transporter_name || 'Self / Local'}</p></div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => printInvoice(bill, shopData)}
                   className="flex-1 flex items-center justify-center gap-2 bg-gray-900 text-white rounded-xl py-3 text-sm font-bold hover:bg-black transition-all shadow-lg shadow-gray-200 active:scale-95"
@@ -1412,26 +1435,39 @@ function EWayBillDashboardTab() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50/80 border-b border-gray-100">
-              {['Bill No.', 'EWB Number', 'Status', 'Valid Till', 'Amount', 'Actions'].map(h => (
+              {['Bill No.', 'EWB Details', 'Transport', 'Status', 'Transporter', 'Amount', 'Actions'].map(h => (
                 <th key={h} className="px-5 py-3.5 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {isLoading ? (
-              <tr><td colSpan={6} className="text-center py-20 text-gray-400">Loading EWBs...</td></tr>
+              <tr><td colSpan={7} className="text-center py-20 text-gray-400">Loading EWBs...</td></tr>
             ) : bills.length === 0 ? (
-              <tr><td colSpan={6} className="text-center py-20 text-gray-400">No generated E-Way bills found.</td></tr>
+              <tr><td colSpan={7} className="text-center py-20 text-gray-400">No generated E-Way bills found.</td></tr>
             ) : bills.map((bill) => (
               <tr key={bill.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-5 py-4 font-bold text-violet-700">{bill.bill_number}</td>
-                <td className="px-5 py-4 font-mono text-gray-900">{bill.ewb_number}</td>
+                <td className="px-5 py-4">
+                  <div className="flex flex-col">
+                    <span className="font-mono text-gray-900 font-bold">{bill.ewb_number}</span>
+                    <span className="text-[10px] text-gray-400 uppercase tracking-tighter">Valid Till: {bill.ewb_valid_till ? fmtDateTime(bill.ewb_valid_till) : 'N/A'}</span>
+                  </div>
+                </td>
+                <td className="px-5 py-4">
+                   <div className="flex flex-col">
+                     <span className="text-xs font-bold text-gray-800 uppercase">{bill.ewb_transport_mode || 'Road'}</span>
+                     <span className="text-[10px] text-violet-600 font-medium uppercase font-mono">{bill.ewb_vehicle_number || 'N/A'}</span>
+                   </div>
+                </td>
                 <td className="px-5 py-4">
                   <span className="bg-green-100 text-green-700 font-bold px-2 py-1 rounded text-[10px] uppercase flex items-center justify-center w-fit gap-1 border border-green-200/50">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>Generated
                   </span>
                 </td>
-                <td className="px-5 py-4 text-gray-600 font-medium">{bill.ewb_valid_till ? fmtDateTime(bill.ewb_valid_till) : 'N/A'}</td>
+                <td className="px-5 py-4">
+                   <span className="text-xs font-medium text-gray-500 truncate max-w-[120px] block" title={bill.ewb_transporter_name}>{bill.ewb_transporter_name || 'N/A'}</span>
+                </td>
                 <td className="px-5 py-4 font-bold text-gray-900">{fmtCurrency(bill.total_amount)}</td>
                 <td className="px-5 py-4">
                    <button onClick={() => setSelectedBill(bill)} className="text-violet-600 hover:text-violet-800 font-bold text-xs uppercase tracking-wider">View Details</button>
@@ -1495,7 +1531,7 @@ function WalkInSaleTab() {
   const [globalDiscount, setGlobalDiscount] = useState('');
   const [items, setItems] = useState<WalkInItem[]>([{ ...EMPTY_ITEM }]);
   const [createdBill, setCreatedBill] = useState<BillData | null>(null);
-  const [ewbData, setEwbData] = useState({ transport_mode: '', vehicle_number: '', transporter_name: '' });
+  const [ewbData, setEwbData] = useState({ transport_mode: 'Road', vehicle_number: '', transporter_name: '', transport_doc_no: '', transport_date: new Date().toISOString().split('T')[0] });
   const [showEwbModal, setShowEwbModal] = useState(false);
   const [suggestions, setSuggestions] = useState<Record<number, any[]>>({});
   const searchTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
@@ -1536,7 +1572,7 @@ function WalkInSaleTab() {
     onSuccess: (res) => {
       const newBill = res.data.data;
       setCreatedBill(newBill);
-      if (Number(newBill.total_amount) > 50000 && !ewbMutation.isSuccess) {
+      if (Number(newBill.total_amount) > 50000 && !ewbMutation.isSuccess && newBill.ewb_status !== 'generated') {
         setShowEwbModal(true);
       }
       qc.invalidateQueries({ queryKey: ['bill-history'] });
@@ -2363,17 +2399,12 @@ function WalkInSaleTab() {
         </div>
 
         {/* E-Way Bill Section */}
-        <div className="bg-gray-50/50 rounded-2xl border border-gray-100 p-5">
-          <h3 className="font-semibold text-gray-800 text-sm mb-3 flex items-center gap-2">
-            <span className="w-6 h-6 bg-violet-100 text-violet-600 rounded-full flex items-center justify-center text-xs font-bold">5</span>
-            🚚 E-Way Bill Details
-          </h3>
-          {Math.round(calcTotal) <= 50000 ? (
-            <div className="bg-gray-100/80 rounded-xl p-4 text-center border border-gray-200 border-dashed">
-              <svg className="w-6 h-6 text-gray-400 mx-auto mb-1" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12A9 9 0 113 12a9 9 0 0118 0z" /></svg>
-              <p className="text-gray-500 text-sm font-medium">Not required for invoices below ₹50,000</p>
-            </div>
-          ) : (
+        {Math.round(calcTotal) > 50000 && (
+          <div className="bg-gray-50/50 rounded-2xl border border-gray-100 p-5">
+            <h3 className="font-semibold text-gray-800 text-sm mb-3 flex items-center gap-2">
+              <span className="w-6 h-6 bg-violet-100 text-violet-600 rounded-full flex items-center justify-center text-xs font-bold">5</span>
+              🚚 E-Way Bill Details
+            </h3>
             <div className="bg-yellow-50/80 border border-yellow-200 rounded-xl p-4 shadow-sm relative overflow-hidden animate-in fade-in duration-300">
                <div className="absolute top-0 left-0 w-1 h-full bg-yellow-400" />
                <div className="flex items-start gap-3 mb-4">
@@ -2386,28 +2417,35 @@ function WalkInSaleTab() {
                  </div>
                </div>
                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                 <div>
-                   <label className="block text-[10px] font-bold text-yellow-800/60 uppercase tracking-widest mb-1">Transport Mode</label>
-                   <select value={ewbData.transport_mode} onChange={e => setEwbData({...ewbData, transport_mode: e.target.value})} className="w-full bg-white border border-yellow-200/60 rounded-lg px-2 h-9 text-xs text-gray-700 outline-none focus:border-yellow-400">
-                     <option value="">Select Mode</option>
-                     <option value="Road">Road</option>
-                     <option value="Rail">Rail</option>
-                     <option value="Air">Air</option>
-                     <option value="Ship">Ship</option>
-                   </select>
-                 </div>
-                 <div>
-                   <label className="block text-[10px] font-bold text-yellow-800/60 uppercase tracking-widest mb-1">Vehicle No.</label>
-                   <input type="text" placeholder="e.g. MH04 XY 1234" value={ewbData.vehicle_number} onChange={e => setEwbData({...ewbData, vehicle_number: e.target.value})} className="w-full bg-white border border-yellow-200/60 rounded-lg px-3 h-9 text-xs text-gray-900 outline-none focus:border-yellow-400 uppercase" />
-                 </div>
-                 <div>
-                   <label className="block text-[10px] font-bold text-yellow-800/60 uppercase tracking-widest mb-1">Transporter ID / Name</label>
-                   <input type="text" placeholder="Transporter Details" value={ewbData.transporter_name} onChange={e => setEwbData({...ewbData, transporter_name: e.target.value})} className="w-full bg-white border border-yellow-200/60 rounded-lg px-3 h-9 text-xs text-gray-900 outline-none focus:border-yellow-400" />
-                 </div>
-               </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-yellow-800/60 uppercase tracking-widest mb-1">Transport Mode</label>
+                    <select value={ewbData.transport_mode} onChange={e => setEwbData({...ewbData, transport_mode: e.target.value})} className="w-full bg-white border border-yellow-200/60 rounded-lg px-2 h-9 text-xs text-gray-700 outline-none focus:border-yellow-400">
+                      <option value="Road">Road</option>
+                      <option value="Rail">Rail</option>
+                      <option value="Air">Air</option>
+                      <option value="Ship">Ship</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-yellow-800/60 uppercase tracking-widest mb-1">Vehicle No.</label>
+                    <input type="text" placeholder="e.g. MH04 XY 1234" value={ewbData.vehicle_number} onChange={e => setEwbData({...ewbData, vehicle_number: e.target.value})} className="w-full bg-white border border-yellow-200/60 rounded-lg px-3 h-9 text-xs text-gray-900 outline-none focus:border-yellow-400 uppercase" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-yellow-800/60 uppercase tracking-widest mb-1">Transporter Name</label>
+                    <input type="text" placeholder="Transporter Details" value={ewbData.transporter_name} onChange={e => setEwbData({...ewbData, transporter_name: e.target.value})} className="w-full bg-white border border-yellow-200/60 rounded-lg px-3 h-9 text-xs text-gray-900 outline-none focus:border-yellow-400" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-yellow-800/60 uppercase tracking-widest mb-1">Doc No. (LR/RR)</label>
+                    <input type="text" placeholder="Transport Doc No." value={ewbData.transport_doc_no} onChange={e => setEwbData({...ewbData, transport_doc_no: e.target.value})} className="w-full bg-white border border-yellow-200/60 rounded-lg px-3 h-9 text-xs text-gray-900 outline-none focus:border-yellow-400 uppercase" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-yellow-800/60 uppercase tracking-widest mb-1">Transport Date</label>
+                    <input type="date" value={ewbData.transport_date} onChange={e => setEwbData({...ewbData, transport_date: e.target.value})} className="w-full bg-white border border-yellow-200/60 rounded-lg px-3 h-9 text-xs text-gray-900 outline-none focus:border-yellow-400" />
+                  </div>
+                </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Live summary */}
         <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-xl shadow-gray-200/40 relative overflow-hidden group">

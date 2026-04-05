@@ -315,6 +315,7 @@ export async function createManualBill(
         total_amount: totalAmount.toFixed(2),
         payment_status: paymentStatus as any,
         payment_method: isPaid ? (paymentMethod as any) : 'cash',
+        ewb_status: totalAmount <= 50000 ? 'not_required' : 'pending',
         staff_id: userId,
         items: {
           create: billItems.map(bi => ({
@@ -952,6 +953,11 @@ export async function generateEWayBill(billId: string, userId: string, payload: 
       ewb_status: 'generated',
       ewb_number: ewbNumber,
       ewb_valid_till: validTill,
+      ewb_transport_mode: payload?.transport_mode,
+      ewb_vehicle_number: payload?.vehicle_number,
+      ewb_transporter_name: payload?.transporter_name,
+      ewb_transport_doc_no: payload?.transport_doc_no,
+      ewb_transport_date: payload?.transport_date ? new Date(payload.transport_date) : new Date(),
     },
   });
 
