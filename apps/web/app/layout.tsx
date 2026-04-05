@@ -6,6 +6,7 @@ import { Providers } from './providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://rxdesk.in'),
   title: 'RxDesk — Pharmacy Billing Software & Doctor Appointment Management India',
   description: 'RxDesk is India\'s leading pharmacy billing and doctor appointment management software. GST-compliant medicine billing, inventory management, HSN-coded invoices, and online appointment scheduling for medical shops and clinics.',
   keywords: [
@@ -25,12 +26,24 @@ export const metadata: Metadata = {
   authors: [{ name: 'RxDesk' }],
   creator: 'RxDesk',
   publisher: 'RxDesk',
-  robots: { index: true, follow: true },
-  alternates: { canonical: 'https://rxdesk.in' },
+  robots: { 
+    index: true, 
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    }
+  },
+  alternates: { 
+    canonical: '/',
+  },
   openGraph: {
     type: 'website',
     locale: 'en_IN',
-    url: 'https://rxdesk.in',
+    url: '/',
     siteName: 'RxDesk',
     title: 'RxDesk — Pharmacy Billing & Doctor Appointment Management',
     description: 'Complete pharmacy billing software with GST invoicing, medicine inventory, and integrated doctor appointment management. Trusted by 200+ clinics across India.',

@@ -41,10 +41,10 @@ export async function generateMetadata(
       type: 'website',
       title: `${shopName} - Trusted Pharmacy in ${city}`,
       description,
-      url: `https://rxdesk.in/pharmacy/${params.id}`,
+      url: `/pharmacy/${params.id}`,
     },
     alternates: {
-      canonical: `https://rxdesk.in/pharmacy/${params.id}`,
+      canonical: `/pharmacy/${params.id}`,
     },
   };
 }
