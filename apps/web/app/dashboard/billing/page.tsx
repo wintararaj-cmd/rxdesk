@@ -131,7 +131,7 @@ function printA4Invoice(bill: BillData, shopData: any) {
   const showHsn = shopData?.show_hsn_code !== false;
   const showBatch = shopData?.show_batch_no !== false;
 
-  const itemRows = bill.items.map((it, idx) =>
+  const itemRows = (bill.items || []).map((it, idx) =>
     `<tr>
       <td style="padding:8px 6px;text-align:center;">${idx + 1}</td>
       <td style="padding:8px 6px;">
@@ -318,7 +318,7 @@ ${customerGstin && bill.billing_state ? `<div><b>Place of Supply:</b> ${bill.bil
     <th style="text-align:right;width:22%">Rate</th>
     <th style="text-align:right;width:23%">Amt</th>
   </tr></thead>
-  <tbody>${itemRows}</tbody>
+  <tbody>${(bill.items || []).map(it => `<tr><td>${it.medicine_name}</td><td class="c">${it.quantity}</td><td class="r">${cur(it.mrp)}</td><td class="r">${cur(it.line_total)}</td></tr>`).join('')}</tbody>
   <tfoot>
     <tr><td colspan="3" style="padding-top:3px">Subtotal</td><td style="text-align:right;padding-top:3px">${cur(bill.subtotal)}</td></tr>
     ${bill.discount_amount > 0 ? `<tr><td colspan="3">Discount</td><td style="text-align:right">-${cur(bill.discount_amount)}</td></tr>` : ''}
@@ -358,7 +358,7 @@ function sendWhatsApp(bill: BillData, shopName = 'Medical Shop', shopData?: any)
     day: '2-digit', month: 'short', year: 'numeric',
   });
   const cur = (v: number | string) => `Rs.${Number(v).toFixed(2)}`;
-  const itemLines = bill.items
+  const itemLines = (bill.items || [])
     .map(it => `  • ${it.medicine_name} x${it.quantity} = ${cur(it.line_total)}`)
     .join('\n');
   let msg = `🧾 *${shopName}*\n`;
@@ -557,7 +557,7 @@ function NewBillTab() {
           </div>
 
           <div className="bg-gray-50/80 rounded-xl p-4 mb-5">
-            {bill.items.map((item, i) => (
+            {(bill?.items || []).map((item, i) => (
               <div key={item.id} className={`flex items-center justify-between py-2.5 text-sm ${i > 0 ? 'border-t border-gray-100' : ''}`}>
                 <div>
                   <span className="text-gray-900 font-medium">{item.medicine_name}</span>
@@ -652,7 +652,7 @@ function BillDetailModal({ bill, onClose, onPay }: {
     payment_method: bill.payment_method,
     payment_status: bill.payment_status,
     discount_amount: String(bill.discount_amount || 0),
-    items: bill.items.map(it => ({
+    items: (bill.items || []).map(it => ({
       ...it,
       inventory_id: (it as any).inventory_id || '',
       mrp: String(it.mrp),
@@ -1012,7 +1012,7 @@ function BillDetailModal({ bill, onClose, onPay }: {
                   <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Items ({bill.items.length})</p>
                 </div>
                 <div className="bg-gray-50/80 rounded-2xl p-4 border border-gray-100">
-                  {bill.items.map((item, i) => (
+                  {(bill.items || []).map((item, i) => (
                     <div key={item.id} className={`flex items-start justify-between py-3 ${i > 0 ? 'border-t border-gray-200/50' : ''}`}>
                       <div className="flex flex-col gap-0.5">
                         <span className="text-gray-900 font-bold text-sm tracking-tight">{item.medicine_name}</span>
@@ -1703,16 +1703,16 @@ function WalkInSaleTab() {
 
           {/* Items */}
           <div className="bg-gray-50 rounded-xl p-4 mb-4 space-y-0">
-            {createdBill.items.map((item, i) => (
-              <div key={item.id} className={`flex justify-between py-2 text-sm ${i > 0 ? 'border-t border-gray-100' : ''}`}>
+            {(createdBill?.items || []).map((item, i) => (
+              <div key={item?.id || i} className={`flex justify-between py-2 text-sm ${i > 0 ? 'border-t border-gray-100' : ''}`}>
                 <div>
-                  <div className="text-gray-900 font-medium">{item.medicine_name}</div>
+                  <div className="text-gray-900 font-medium">{item?.medicine_name}</div>
                   <div className="flex gap-2 text-[10px] items-center">
-                    <span className="text-gray-400">× {item.quantity} @ ₹{item.mrp}</span>
-                    {item.batch_number && <span className="bg-gray-100 text-gray-500 px-1 rounded">Batch: {item.batch_number}</span>}
+                    <span className="text-gray-400">× {item?.quantity} @ ₹{item?.mrp}</span>
+                    {item?.batch_number && <span className="bg-gray-100 text-gray-500 px-1 rounded">Batch: {item.batch_number}</span>}
                   </div>
                 </div>
-                <span className="font-semibold text-gray-900">{fmtCurrency(item.line_total)}</span>
+                <span className="font-semibold text-gray-900">{fmtCurrency(item?.line_total || 0)}</span>
               </div>
             ))}
           </div>
@@ -1801,7 +1801,7 @@ function WalkInSaleTab() {
               <div className="mt-6 text-center">
                 <h2 className="text-xl font-bold text-gray-900 mb-2">E-Way Bill Required</h2>
                 <p className="text-sm text-gray-500 mb-6 font-medium leading-relaxed">
-                  Invoice <span className="font-bold text-gray-700">{createdBill.bill_number}</span> exceeds ₹50,000.<br/>
+                  Invoice <span className="font-bold text-gray-700">{createdBill?.bill_number}</span> exceeds ₹50,000.<br/>
                   Do you want to generate an E-Way Bill now before dispatching the goods?
                 </p>
                 <div className="flex gap-3 justify-center">
