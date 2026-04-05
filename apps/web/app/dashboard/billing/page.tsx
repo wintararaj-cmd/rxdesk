@@ -1377,6 +1377,78 @@ function BillHistoryTab() {
   );
 }
 
+function EWayBillDashboardTab() {
+  const qc = useQueryClient();
+  const [selectedBill, setSelectedBill] = useState<BillData | null>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['bill-history', { ewb_status: 'generated' }],
+    queryFn: () => billApi.list({ ewb_status: 'generated', limit: 50 }).then(r => r.data.data),
+  });
+
+  const bills: BillData[] = data?.bills ?? [];
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white rounded-2xl border border-gray-100 p-6 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-yellow-50 text-yellow-600 rounded-2xl flex items-center justify-center font-bold">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>
+          </div>
+          <div>
+            <h2 className="text-xl font-black text-gray-900 tracking-tight">E-Way Bill Dashboard</h2>
+            <p className="text-gray-400 text-sm font-medium">Track your generated transportation permits</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 text-right">
+          <div>
+             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Active Permits</p>
+             <p className="text-lg font-black text-gray-900">{bills.length}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden min-h-[400px]">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50/80 border-b border-gray-100">
+              {['Bill No.', 'EWB Number', 'Status', 'Valid Till', 'Amount', 'Actions'].map(h => (
+                <th key={h} className="px-5 py-3.5 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {isLoading ? (
+              <tr><td colSpan={6} className="text-center py-20 text-gray-400">Loading EWBs...</td></tr>
+            ) : bills.length === 0 ? (
+              <tr><td colSpan={6} className="text-center py-20 text-gray-400">No generated E-Way bills found.</td></tr>
+            ) : bills.map((bill) => (
+              <tr key={bill.id} className="hover:bg-gray-50 transition-colors">
+                <td className="px-5 py-4 font-bold text-violet-700">{bill.bill_number}</td>
+                <td className="px-5 py-4 font-mono text-gray-900">{bill.ewb_number}</td>
+                <td className="px-5 py-4">
+                  <span className="bg-green-100 text-green-700 font-bold px-2 py-1 rounded text-[10px] uppercase flex items-center justify-center w-fit gap-1 border border-green-200/50">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>Generated
+                  </span>
+                </td>
+                <td className="px-5 py-4 text-gray-600 font-medium">{bill.ewb_valid_till ? fmtDateTime(bill.ewb_valid_till) : 'N/A'}</td>
+                <td className="px-5 py-4 font-bold text-gray-900">{fmtCurrency(bill.total_amount)}</td>
+                <td className="px-5 py-4">
+                   <button onClick={() => setSelectedBill(bill)} className="text-violet-600 hover:text-violet-800 font-bold text-xs uppercase tracking-wider">View Details</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {selectedBill && (
+        <BillDetailModal bill={selectedBill} onClose={() => setSelectedBill(null)} onPay={() => {}} />
+      )}
+    </div>
+  );
+}
+
 // ── Walk-in Sale Tab ─────────────────────────────────────────────────────────
 
 interface WalkInItem {
@@ -2400,7 +2472,7 @@ function WalkInSaleTab() {
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 
-type Tab = 'walkin' | 'new' | 'history';
+type Tab = 'walkin' | 'new' | 'history' | 'ewaybill';
 
 export default function BillingPage() {
   const [tab, setTab] = useState<Tab>('walkin');
@@ -2450,6 +2522,10 @@ export default function BillingPage() {
             icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
           },
           {
+            id: 'ewaybill' as Tab, label: 'E-Way Bill',
+            icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>
+          },
+          {
             id: 'new' as Tab, label: 'Prescription Bill',
             icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" /></svg>
           },
@@ -2471,6 +2547,7 @@ export default function BillingPage() {
       {tab === 'walkin' && <WalkInSaleTab />}
       {tab === 'new' && <NewBillTab />}
       {tab === 'history' && <BillHistoryTab />}
+      {tab === 'ewaybill' && <EWayBillDashboardTab />}
     </div>
   );
 }
