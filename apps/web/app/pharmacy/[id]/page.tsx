@@ -43,6 +43,9 @@ export async function generateMetadata(
       description,
       url: `https://rxdesk.in/pharmacy/${params.id}`,
     },
+    alternates: {
+      canonical: `https://rxdesk.in/pharmacy/${params.id}`,
+    },
   };
 }
 
