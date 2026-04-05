@@ -1615,7 +1615,7 @@ function WalkInSaleTab() {
     setPaymentMethod('cash'); setGlobalDiscount(''); setItems([{ ...EMPTY_ITEM }]);
     setCustomerSearchResults([]); setShowCustomerDropdown(false); setCustomerHighlight(-1); setSuggHighlights({});
     setTriedToSubmit(false); setValidationError(null);
-    setEwbData({ transport_mode: '', vehicle_number: '', transporter_name: '' });
+    setEwbData({ transport_mode: 'Road', vehicle_number: '', transporter_name: '', transport_doc_no: '', transport_date: new Date().toISOString().split('T')[0] });
     setShowEwbModal(false);
     ewbMutation.reset();
     createMutation.reset();
