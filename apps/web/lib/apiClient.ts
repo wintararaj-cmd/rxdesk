@@ -323,6 +323,7 @@ export const adminApi = {
   // Users
   getUsers: (role?: string, q?: string) => apiClient.get('/admin/users', { params: { role, q } }),
   toggleUserActive: (id: string) => apiClient.patch(`/admin/users/${id}/toggle-active`),
+  deleteUser: (id: string) => apiClient.delete(`/admin/users/${id}`),
   exportUsersCsvUrl: (role?: string) => `${apiClient.defaults.baseURL}/admin/users/export-csv${role ? `?role=${role}` : ''}`,
   // Subscriptions
   getSubscriptions: (status?: string) => apiClient.get('/admin/subscriptions', { params: { status } }),

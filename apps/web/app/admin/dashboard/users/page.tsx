@@ -30,6 +30,7 @@ function UsersContent() {
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const role = searchParams.get('role') ?? '';
 
@@ -64,6 +65,19 @@ function UsersContent() {
       alert(err?.response?.data?.error?.message ?? 'Failed');
     } finally {
       setTogglingId(null);
+    }
+  };
+
+  const handleDelete = async (u: User) => {
+    if (!confirm(`PERMANENTLY DELETE user ${u.phone}?\nThis action CANNOT be undone and will delete ALL associated data (shops, doctors, patients, bills, etc).`)) return;
+    setDeletingId(u.id);
+    try {
+      await adminApi.deleteUser(u.id);
+      setUsers(prev => prev.filter(x => x.id !== u.id));
+    } catch (err: any) {
+      alert(err?.response?.data?.error?.message ?? 'Failed to delete');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -139,12 +153,23 @@ function UsersContent() {
                     {new Date(u.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </td>
                   <td className="px-4 py-3">
-                    {u.role !== 'admin' && (
-                      <button onClick={() => handleToggle(u)} disabled={togglingId === u.id}
-                        className={`text-xs px-3 py-1 rounded-lg border font-semibold transition-all disabled:opacity-50 ${u.is_active ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'}`}>
-                        {togglingId === u.id ? '…' : u.is_active ? 'Deactivate' : 'Reactivate'}
-                      </button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {u.role !== 'admin' && (
+                        <>
+                          <button onClick={() => handleToggle(u)} disabled={togglingId === u.id || deletingId === u.id}
+                            className={`text-xs px-3 py-1 rounded-lg border font-semibold transition-all disabled:opacity-50 ${u.is_active ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'}`}>
+                            {togglingId === u.id ? '…' : u.is_active ? 'Deactivate' : 'Reactivate'}
+                          </button>
+                          
+                          {!u.is_active && (
+                            <button onClick={() => handleDelete(u)} disabled={togglingId === u.id || deletingId === u.id}
+                              className="text-xs px-3 py-1 rounded-lg border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 font-semibold transition-all disabled:opacity-50">
+                              {deletingId === u.id ? '…' : 'Delete Permanent'}
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
