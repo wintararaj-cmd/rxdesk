@@ -100,6 +100,8 @@ const INDIAN_STATES = [
   'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal'
 ];
 
+const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+
 // ── Thermal Print & WhatsApp ─────────────────────────────────────────────────
 
 function printInvoice(bill: BillData, shopData: any) {
@@ -862,7 +864,23 @@ function BillDetailModal({ bill, onClose, onPay }: {
                 </div>
                 <div>
                   <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">GSTIN</label>
-                  <input type="text" value={formData.customer_gstin} onChange={e => setFormData({...formData, customer_gstin: e.target.value})} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-500" />
+                  <input 
+                    type="text" 
+                    maxLength={15}
+                    placeholder="e.g. 29AABCT1332L1ZX"
+                    value={formData.customer_gstin} 
+                    onChange={e => setFormData({...formData, customer_gstin: e.target.value.toUpperCase()})} 
+                    className={`w-full bg-white border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 uppercase font-mono ${
+                      formData.customer_gstin && !GSTIN_REGEX.test(formData.customer_gstin)
+                        ? 'border-red-400 focus:ring-red-100'
+                        : formData.customer_gstin && GSTIN_REGEX.test(formData.customer_gstin)
+                        ? 'border-green-400'
+                        : 'border-gray-200'
+                    }`}
+                  />
+                  {formData.customer_gstin && !GSTIN_REGEX.test(formData.customer_gstin) && (
+                    <p className="text-[10px] text-red-500 mt-1">Invalid GSTIN format (13th char must be Z)</p>
+                  )}
                 </div>
                 <div className="col-span-2">
                   <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Address</label>
@@ -1763,6 +1781,13 @@ function WalkInSaleTab() {
       return;
     }
 
+    if (customerGstin && !GSTIN_REGEX.test(customerGstin)) {
+      setValidationError('Invalid Customer GSTIN format. The 13th character must be "Z".');
+      setTriedToSubmit(true);
+      setShowCustomerDetails(true);
+      return;
+    }
+
     const validItems = activeItems.filter((it) => it.medicine_name.trim() && Number(it.mrp) > 0 && Number(it.quantity) > 0);
 
     createMutation.mutate({
@@ -2061,11 +2086,21 @@ function WalkInSaleTab() {
                     <label className="block text-xs font-medium text-gray-500 mb-1">GSTIN</label>
                     <input
                       type="text"
+                      maxLength={15}
                       placeholder="19XXXXX..."
                       value={customerGstin}
                       onChange={(e) => setCustomerGstin(e.target.value.toUpperCase())}
-                      className="w-full border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500"
+                      className={`w-full border rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:ring-2 uppercase font-mono ${
+                        customerGstin && !GSTIN_REGEX.test(customerGstin)
+                          ? 'border-red-400 focus:ring-red-100'
+                          : customerGstin && GSTIN_REGEX.test(customerGstin)
+                          ? 'border-green-400 focus:ring-green-100'
+                          : 'border-gray-200 focus:border-violet-500'
+                      }`}
                     />
+                    {customerGstin && !GSTIN_REGEX.test(customerGstin) && (
+                      <p className="text-[10px] text-red-500 mt-1 font-medium">Invalid: 13th character must be &apos;Z&apos;</p>
+                    )}
                   </div>
                   <div className="col-span-1">
                     <label className="block text-xs font-medium text-gray-500 mb-1">State / Place of Supply</label>
