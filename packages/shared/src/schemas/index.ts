@@ -98,12 +98,16 @@ export const createShopSchema = z.object({
   shop_type: z
     .enum(['medical_shop', 'clinic', 'pharmacy', 'dispensary'])
     .default('medical_shop'),
+  gst_type: z.enum(['unregistered', 'composite', 'regular']).default('unregistered'),
   gst_number: z
     .string()
-    .regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/, 'Invalid GST number')
-    .or(z.literal(''))
     .nullable()
-    .optional(),
+    .optional()
+    .transform((val) => (val === '' ? null : val))
+    .refine(
+      (val) => !val || /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(val),
+      { message: 'Invalid GST number' }
+    ),
   drug_license_no: z.string().min(5).max(50),
   address_line: z.string().min(5).max(300),
   city: z.string().min(2).max(100),

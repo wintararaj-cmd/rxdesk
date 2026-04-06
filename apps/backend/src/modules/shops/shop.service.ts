@@ -9,6 +9,7 @@ export async function registerShop(
     shop_name: string;
     shop_type?: 'medical_shop' | 'clinic' | 'pharmacy' | 'dispensary';
     gst_number?: string | null;
+    gst_type?: 'unregistered' | 'composite' | 'regular';
     drug_license_no: string;
     address_line: string;
     city: string;
