@@ -308,11 +308,29 @@ export default function SettingsPage() {
       }
     }
     setFormError('');
+
+    // HTML number inputs return strings — coerce to numbers before sending
+    const parseCoord = (v: unknown): number | null => {
+      if (v === null || v === undefined || v === '') return null;
+      const n = parseFloat(String(v));
+      return isNaN(n) ? null : n;
+    };
+    const parseAmount = (v: unknown): number => {
+      const n = parseFloat(String(v ?? 0));
+      return isNaN(n) ? 0 : n;
+    };
+
     const payload = {
       ...activeForm,
       contact_phone: normalisePhone(activeForm.contact_phone ?? ''),
       // Clear gst_number when not needed — prevents validation errors on the server
       gst_number: activeForm.gst_type === 'regular' ? (activeForm.gst_number ?? null) : null,
+      // Coerce coord strings → numbers (HTML inputs always return strings)
+      latitude: parseCoord(activeForm.latitude),
+      longitude: parseCoord(activeForm.longitude),
+      // Coerce balance strings → numbers
+      opening_cash_balance: parseAmount(activeForm.opening_cash_balance),
+      opening_bank_balance: parseAmount(activeForm.opening_bank_balance),
     };
     if (isNewShop) {
       createMutation.mutate(payload);

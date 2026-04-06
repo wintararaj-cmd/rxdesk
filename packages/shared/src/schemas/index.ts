@@ -114,8 +114,8 @@ export const createShopSchema = z.object({
   district: z.string().max(100).optional(),
   state: z.string().min(2).max(100),
   pin_code: pinCodeSchema,
-  latitude: z.number().min(-90).max(90).nullable().optional(),
-  longitude: z.number().min(-180).max(180).nullable().optional(),
+  latitude: z.coerce.number().min(-90).max(90).nullable().optional(),
+  longitude: z.coerce.number().min(-180).max(180).nullable().optional(),
   contact_phone: phoneSchema,
   contact_email: z.string().email().or(z.literal('')).nullable().optional(),
   opening_time: z
