@@ -279,6 +279,8 @@ export default function SettingsPage() {
     return raw.trim(); // return as-is and let server validate edge cases
   };
 
+  const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeForm.shop_name?.trim()) {
@@ -293,10 +295,24 @@ export default function SettingsPage() {
       setFormError('Contact phone is required.');
       return;
     }
+    // Validate GSTIN format client-side for Regular registrations
+    if (activeForm.gst_type === 'regular') {
+      const gstin = (activeForm.gst_number as string)?.trim() ?? '';
+      if (!gstin) {
+        setFormError('GSTIN is required for Regular GST registration.');
+        return;
+      }
+      if (!GSTIN_REGEX.test(gstin)) {
+        setFormError('Invalid GSTIN format. Expected: 29AABCT1332L1ZX (2-digit state, 10-char PAN, entity no, Z, check digit). The 13th character must be the letter Z.');
+        return;
+      }
+    }
     setFormError('');
     const payload = {
       ...activeForm,
       contact_phone: normalisePhone(activeForm.contact_phone ?? ''),
+      // Clear gst_number when not needed — prevents validation errors on the server
+      gst_number: activeForm.gst_type === 'regular' ? (activeForm.gst_number ?? null) : null,
     };
     if (isNewShop) {
       createMutation.mutate(payload);
@@ -634,9 +650,42 @@ export default function SettingsPage() {
                     value={(activeForm.gst_number as string) ?? ''}
                     onChange={(e) => handleChange('gst_number', e.target.value.toUpperCase())}
                     placeholder="e.g. 29AABCT1332L1ZX"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-violet-400 bg-white"
+                    className={`w-full px-3 py-2 border rounded-lg text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-violet-400 bg-white ${
+                      activeForm.gst_number && !GSTIN_REGEX.test(activeForm.gst_number as string)
+                        ? 'border-red-400 focus:ring-red-400'
+                        : activeForm.gst_number && GSTIN_REGEX.test(activeForm.gst_number as string)
+                        ? 'border-green-400'
+                        : 'border-gray-300'
+                    }`}
                   />
-                  <p className="text-xs text-gray-400 mt-1">15-character GSTIN as on your GST certificate.</p>
+                  {/* Format guide */}
+                  <div className="mt-2 p-2.5 bg-gray-50 rounded-lg border border-gray-100">
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">GSTIN Format Guide</p>
+                    <div className="flex flex-wrap gap-1 font-mono text-[11px]">
+                      <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">29</span>
+                      <span className="text-gray-400 self-center">State</span>
+                      <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 font-bold">AABCT</span>
+                      <span className="text-gray-400 self-center">PAN (letters)</span>
+                      <span className="px-1.5 py-0.5 rounded bg-orange-100 text-orange-800 font-bold">1332</span>
+                      <span className="text-gray-400 self-center">PAN (digits)</span>
+                      <span className="px-1.5 py-0.5 rounded bg-green-100 text-green-800 font-bold">L</span>
+                      <span className="text-gray-400 self-center">PAN check</span>
+                      <span className="px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800 font-bold">1</span>
+                      <span className="text-gray-400 self-center">Entity</span>
+                      <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-800 font-bold">Z</span>
+                      <span className="text-gray-400 self-center">← Must be Z</span>
+                      <span className="px-1.5 py-0.5 rounded bg-gray-200 text-gray-800 font-bold">X</span>
+                      <span className="text-gray-400 self-center">Check digit</span>
+                    </div>
+                    {activeForm.gst_number && !GSTIN_REGEX.test(activeForm.gst_number as string) && (
+                      <p className="text-red-500 text-[11px] mt-1.5 font-medium">
+                        ⚠️ Invalid format — character 13 must be the letter &apos;Z&apos; (not a number)
+                      </p>
+                    )}
+                    {activeForm.gst_number && GSTIN_REGEX.test(activeForm.gst_number as string) && (
+                      <p className="text-green-600 text-[11px] mt-1.5 font-medium">✓ Valid GSTIN format</p>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
