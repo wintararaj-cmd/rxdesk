@@ -197,14 +197,31 @@ router.patch('/users/:id/toggle-active', requireRole('admin'), async (req, res, 
 router.delete('/users/:id', requireRole('admin'), async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.params.id } });
-    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+    if (!user) return res.status(404).json({ success: false, error: { message: 'User not found' } });
     
     if (user.is_active) {
-      return res.status(400).json({ success: false, error: 'Only deactivated users can be permanently deleted. Please deactivate first.' });
+      return res.status(400).json({ success: false, error: { message: 'Only deactivated users can be permanently deleted. Please deactivate first.' } });
     }
 
     const userInfo = `${user.phone} (${user.role})`;
-    await prisma.user.delete({ where: { id: req.params.id } });
+    
+    // We attempt to nullify optional references to avoid common P2003 (Foreign Key Constraint) errors.
+    // Required references (like Shop in Bill) will still block deletion unless we cascade them.
+    await prisma.$transaction(async (tx) => {
+      // Nullify references in various models
+      await tx.bill.updateMany({ where: { staff_id: req.params.id }, data: { staff_id: null } });
+      await tx.doctor.updateMany({ where: { verified_by: req.params.id }, data: { verified_by: null } });
+      await tx.purchaseEntry.updateMany({ where: { created_by: req.params.id }, data: { created_by: null } });
+      await tx.supplierPayment.updateMany({ where: { created_by: req.params.id }, data: { created_by: null } });
+      await tx.incomeEntry.updateMany({ where: { created_by: req.params.id }, data: { created_by: null } });
+      await tx.expenseEntry.updateMany({ where: { created_by: req.params.id }, data: { created_by: null } });
+      await tx.creditTransaction.updateMany({ where: { created_by: req.params.id }, data: { created_by: null } });
+      await tx.dailyCashRegister.updateMany({ where: { closed_by: req.params.id }, data: { closed_by: null } });
+      await tx.auditLog.updateMany({ where: { user_id: req.params.id }, data: { user_id: null } });
+
+      // Now attempt the actual deletion
+      await tx.user.delete({ where: { id: req.params.id } });
+    });
 
     await prisma.adminActivityLog.create({ 
       data: { 
@@ -217,7 +234,18 @@ router.delete('/users/:id', requireRole('admin'), async (req, res, next) => {
     }).catch(() => {});
 
     res.json({ success: true, message: 'User and all associated data permanently deleted' });
-  } catch (err) { next(err); }
+  } catch (err: any) {
+    // Handle Prisma specific constraint errors (P2003)
+    if (err.code === 'P2003') {
+      return res.status(400).json({ 
+        success: false, 
+        error: { 
+          message: 'Cannot delete user: Active records (bills, financial entries, etc.) depend on this account. Please delete those records first or contact support for a system reset.' 
+        } 
+      });
+    }
+    next(err);
+  }
 });
 
 // â”€â”€â”€ Analytics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
