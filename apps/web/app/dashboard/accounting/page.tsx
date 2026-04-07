@@ -5252,7 +5252,17 @@ function SettingsTab() {
           </div>
           <div className="w-full">
             <h3 className="text-xl font-black text-gray-900 tracking-tight mb-1">Set Opening Balances</h3>
-            <p className="text-sm text-gray-500 font-medium leading-relaxed mb-6">Enter your starting liquidity (Cash and Bank) when you first joined RxDesk.</p>
+            <p className="text-sm text-gray-500 font-medium leading-relaxed mb-4">Enter your starting liquidity (Cash and Bank) for this business.</p>
+            
+            <div className="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-2xl flex items-start gap-3 shadow-sm">
+              <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 shrink-0 mt-0.5">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[11px] font-black text-blue-800 uppercase tracking-[0.15em] leading-none">Financial Year Anchoring</p>
+                <p className="text-xs text-blue-700 font-medium leading-tight">These balances will be anchored to the <b>Start of the Financial Year (April 1st, 2026)</b>. All reports and ledger balances will be calculated from this starting point forward.</p>
+              </div>
+            </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full">
               <div className="space-y-2">
@@ -5636,6 +5646,10 @@ function ChartOfAccountsTab() {
   const [accountName, setAccountName] = useState('');
   const [opBal, setOpBal] = useState('0');
 
+  const [editingOpBal, setEditingOpBal] = useState<string | null>(null);
+  const [tempOpBal, setTempOpBal] = useState('0');
+
+
   const { data: groups, isLoading } = useQuery<AccountGroup[]>({
     queryKey: ['coa-groups'],
     queryFn: () => accountingApi.listAccountGroups().then(r => r.data.data)
@@ -5654,6 +5668,14 @@ function ChartOfAccountsTab() {
   const initMutation = useMutation({
     mutationFn: () => accountingApi.initializeCOA(),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['coa-groups'] })
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string, data: any }) => accountingApi.updateChartOfAccount(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['coa-groups'] });
+      setEditingOpBal(null);
+    }
   });
 
   if (isLoading) return <div className="p-20 text-center animate-pulse">Loading Ledger System...</div>;
@@ -5762,10 +5784,43 @@ function ChartOfAccountsTab() {
                     <p className="text-xs font-black text-gray-800">{acc.name}</p>
                     {acc.code && <p className="text-[10px] text-gray-400 font-mono">Code: {acc.code}</p>}
                   </div>
-                  <div className="flex items-center gap-4">
-                    <span className="text-[10px] font-black text-gray-900">{acc.opening_balance ? fmt(Number(acc.opening_balance)) : '₹0'}</span>
-                    {acc.is_system_locked && (
-                      <svg className="w-3.5 h-3.5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
+                  <div className="flex items-center gap-3">
+                    {editingOpBal === acc.id ? (
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="number"
+                          value={tempOpBal}
+                          onChange={e => setTempOpBal(e.target.value)}
+                          className="w-24 bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold text-gray-900"
+                        />
+                        <button 
+                          onClick={() => updateMutation.mutate({ id: acc.id, data: { opening_balance: parseFloat(tempOpBal) } })}
+                          disabled={updateMutation.isPending}
+                          className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-emerald-200"
+                        >
+                          Save
+                        </button>
+                        <button 
+                          onClick={() => setEditingOpBal(null)}
+                          className="bg-gray-100 text-gray-500 px-2 py-1 rounded text-[10px] font-bold hover:bg-gray-200"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="text-[10px] font-black text-gray-900">{acc.opening_balance ? fmt(Number(acc.opening_balance)) : '₹0'}</span>
+                        <button 
+                          onClick={() => { setEditingOpBal(acc.id); setTempOpBal(String(acc.opening_balance || 0)); }}
+                          className="text-violet-400 hover:text-violet-600 transition-colors bg-violet-50 p-1.5 rounded-lg border border-violet-100"
+                          title="Set Opening Balance"
+                        >
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        </button>
+                      </>
+                    )}
+                    {acc.is_system_locked && editingOpBal !== acc.id && (
+                      <svg className="w-3.5 h-3.5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" title="System Ledger (Name locked)"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
                     )}
                   </div>
                 </div>

@@ -274,6 +274,7 @@ export const accountingApi = {
   listChartOfAccounts: (type?: string) => 
     apiClient.get('/accounting/chart-of-accounts', { params: type ? { type } : undefined }),
   createChartOfAccount: (data: object) => apiClient.post('/accounting/chart-of-accounts', data),
+  updateChartOfAccount: (id: string, data: object) => apiClient.patch(`/accounting/chart-of-accounts/${id}`, data),
   initializeCOA: () => apiClient.post('/accounting/initialize-coa'),
   getGLStatement: (id: string, from: string, to: string) =>
     apiClient.get('/accounting/reports/gl-statement', { params: { id, from, to } }),

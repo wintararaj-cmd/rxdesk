@@ -715,6 +715,13 @@ router.post('/chart-of-accounts', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.patch('/chart-of-accounts/:id', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.updateChartOfAccount(req.user!.id, req.params.id, req.body);
+    res.json({ success: true, data, message: 'Account updated successfully' });
+  } catch (err) { next(err); }
+});
+
 router.post('/initialize-coa', shopAuth, async (req, res, next) => {
   try {
     const shop = await service.getShopOrThrow(req.user!.id);

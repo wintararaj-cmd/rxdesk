@@ -29,6 +29,14 @@ function normalizeState(s?: string | null): string {
 //  Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Returns the start date of the financial year (April 1st) for a given date.
+ */
+export function getFinancialYearStart(date: Date = new Date()) {
+  const year = date.getMonth() < 3 ? date.getFullYear() - 1 : date.getFullYear();
+  return new Date(year, 3, 1); // 3 = April (0-indexed)
+}
+
 export async function getShopOrThrow(userId: string) {
   const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });
   if (!shop) throw new AppError(403, 'FORBIDDEN', 'Only shop owners can access accounting');
@@ -2433,13 +2441,14 @@ export async function getBankbook(userId: string, opts: { from: string; to: stri
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function calculateBalanceBefore(shopId: string, date: Date, methods: string[]) {
+  const fyStart = getFinancialYearStart(date);
   const [shop, inc, exp, sup, sret, contra] = await Promise.all([
     prisma.medicalShop.findUnique({ where: { id: shopId }, select: { opening_cash_balance: true, opening_bank_balance: true } }),
-    prisma.incomeEntry.aggregate({ where: { shop_id: shopId, payment_method: { in: methods as any }, entry_date: { lt: date } }, _sum: { amount: true } }),
-    prisma.expenseEntry.aggregate({ where: { shop_id: shopId, payment_method: { in: methods as any }, entry_date: { lt: date }, linked_purchase_id: null }, _sum: { amount: true } }),
-    prisma.supplierPayment.aggregate({ where: { shop_id: shopId, payment_method: { in: methods as any }, payment_date: { lt: date } }, _sum: { amount: true } }),
-    prisma.saleReturn.aggregate({ where: { shop_id: shopId, refund_method: { in: methods as any }, return_date: { lt: date } }, _sum: { total_amount: true } }),
-    prisma.contraEntry.findMany({ where: { shop_id: shopId, entry_date: { lt: date }, OR: [{ from_account: { in: methods as any } }, { to_account: { in: methods as any } }] } }),
+    prisma.incomeEntry.aggregate({ where: { shop_id: shopId, payment_method: { in: methods as any }, entry_date: { lt: date, gte: fyStart } }, _sum: { amount: true } }),
+    prisma.expenseEntry.aggregate({ where: { shop_id: shopId, payment_method: { in: methods as any }, entry_date: { lt: date, gte: fyStart }, linked_purchase_id: null }, _sum: { amount: true } }),
+    prisma.supplierPayment.aggregate({ where: { shop_id: shopId, payment_method: { in: methods as any }, payment_date: { lt: date, gte: fyStart } }, _sum: { amount: true } }),
+    prisma.saleReturn.aggregate({ where: { shop_id: shopId, refund_method: { in: methods as any }, return_date: { lt: date, gte: fyStart } }, _sum: { total_amount: true } }),
+    prisma.contraEntry.findMany({ where: { shop_id: shopId, entry_date: { lt: date, gte: fyStart }, OR: [{ from_account: { in: methods as any } }, { to_account: { in: methods as any } }] } }),
   ]);
 
   if (!shop) return 0;
@@ -2461,7 +2470,7 @@ async function calculateBalanceBefore(shopId: string, date: Date, methods: strin
     where: {
       account: { shop_id: shopId, name: { in: accountNames } },
       type: 'debit',
-      journal: { entry_date: { lt: date } }
+      journal: { entry_date: { lt: date, gte: fyStart } }
     },
     _sum: { amount: true }
   });
@@ -2469,7 +2478,7 @@ async function calculateBalanceBefore(shopId: string, date: Date, methods: strin
     where: {
       account: { shop_id: shopId, name: { in: accountNames } },
       type: 'credit',
-      journal: { entry_date: { lt: date } }
+      journal: { entry_date: { lt: date, gte: fyStart } }
     },
     _sum: { amount: true }
   });
@@ -3579,12 +3588,30 @@ export async function updateContraEntry(userId: string, id: string, data: any) {
 
 export async function updateOpeningBalances(userId: string, data: { cash: number; bank: number }) {
   const shop = await getShopOrThrow(userId);
-  return await prisma.medicalShop.update({
-    where: { id: shop.id },
-    data: {
-      opening_cash_balance: data.cash,
-      opening_bank_balance: data.bank,
-    },
+
+  return await prisma.$transaction(async (tx) => {
+    // 1. Update shop level opening balances
+    const updatedShop = await tx.medicalShop.update({
+      where: { id: shop.id },
+      data: {
+        opening_cash_balance: data.cash,
+        opening_bank_balance: data.bank,
+      },
+    });
+
+    // 2. Sync to Chart of Accounts (Cash in Hand)
+    await tx.chartOfAccount.updateMany({
+      where: { shop_id: shop.id, name: 'Cash in Hand' },
+      data: { opening_balance: data.cash }
+    });
+
+    // 3. Sync to Chart of Accounts (Bank Account)
+    await tx.chartOfAccount.updateMany({
+      where: { shop_id: shop.id, name: 'Bank Account' },
+      data: { opening_balance: data.bank }
+    });
+
+    return updatedShop;
   });
 }
 
@@ -3681,6 +3708,29 @@ export async function createChartOfAccount(userId: string, input: {
       opening_balance: input.opening_balance ?? 0,
     },
     include: { group: true }
+  });
+}
+
+export async function updateChartOfAccount(
+  userId: string,
+  accountId: string,
+  input: {
+    name?: string;
+    code?: string;
+    description?: string;
+    opening_balance?: number;
+  }
+) {
+  const shop = await getShopOrThrow(userId);
+  return prisma.chartOfAccount.update({
+    where: { id: accountId, shop_id: shop.id },
+    data: {
+      name: input.name,
+      code: input.code,
+      description: input.description,
+      opening_balance: input.opening_balance !== undefined ? Number(input.opening_balance) : undefined,
+    },
+    include: { group: true },
   });
 }
 
@@ -3893,6 +3943,8 @@ export async function getTrialBalance(userId: string, date: string) {
   const shop = await getShopOrThrow(userId);
   const asOfDate = new Date(date);
   asOfDate.setHours(23, 59, 59, 999);
+  const fyStart = getFinancialYearStart(asOfDate);
+
 
   // Fetch ALL account groups
   const groups = await prisma.accountGroup.findMany({
@@ -3910,11 +3962,11 @@ export async function getTrialBalance(userId: string, date: string) {
     const accountsWithBalance = await Promise.all(group.accounts.map(async (acc) => {
       // 1. Journal impacts
       const jvDebits = await prisma.journalItem.aggregate({
-        where: { account_id: acc.id, type: 'debit', journal: { entry_date: { lte: asOfDate } } },
+        where: { account_id: acc.id, type: 'debit', journal: { entry_date: { lte: asOfDate, gte: fyStart } } },
         _sum: { amount: true }
       });
       const jvCredits = await prisma.journalItem.aggregate({
-        where: { account_id: acc.id, type: 'credit', journal: { entry_date: { lte: asOfDate } } },
+        where: { account_id: acc.id, type: 'credit', journal: { entry_date: { lte: asOfDate, gte: fyStart } } },
         _sum: { amount: true }
       });
 
@@ -3923,11 +3975,11 @@ export async function getTrialBalance(userId: string, date: string) {
       
       // 2. Integration with Phase 1 entries
       if (acc.name === 'Cash in Hand') {
-        const inc = await prisma.incomeEntry.aggregate({ where: { shop_id: shop.id, payment_method: 'cash', entry_date: { lte: asOfDate } }, _sum: { amount: true } });
-        const exp = await prisma.expenseEntry.aggregate({ where: { shop_id: shop.id, payment_method: 'cash', entry_date: { lte: asOfDate }, linked_purchase_id: null }, _sum: { amount: true } });
-        const sup = await prisma.supplierPayment.aggregate({ where: { shop_id: shop.id, payment_method: 'cash', payment_date: { lte: asOfDate } }, _sum: { amount: true } });
-        const sret = await prisma.saleReturn.aggregate({ where: { shop_id: shop.id, refund_method: 'cash', return_date: { lte: asOfDate } }, _sum: { total_amount: true } });
-        const contras = await prisma.contraEntry.findMany({ where: { shop_id: shop.id, entry_date: { lte: asOfDate }, OR: [{ from_account: 'cash' }, { to_account: 'cash' }] } });
+        const inc = await prisma.incomeEntry.aggregate({ where: { shop_id: shop.id, payment_method: 'cash', entry_date: { lte: asOfDate, gte: fyStart } }, _sum: { amount: true } });
+        const exp = await prisma.expenseEntry.aggregate({ where: { shop_id: shop.id, payment_method: 'cash', entry_date: { lte: asOfDate, gte: fyStart }, linked_purchase_id: null }, _sum: { amount: true } });
+        const sup = await prisma.supplierPayment.aggregate({ where: { shop_id: shop.id, payment_method: 'cash', payment_date: { lte: asOfDate, gte: fyStart } }, _sum: { amount: true } });
+        const sret = await prisma.saleReturn.aggregate({ where: { shop_id: shop.id, refund_method: 'cash', return_date: { lte: asOfDate, gte: fyStart } }, _sum: { total_amount: true } });
+        const contras = await prisma.contraEntry.findMany({ where: { shop_id: shop.id, entry_date: { lte: asOfDate, gte: fyStart }, OR: [{ from_account: 'cash' }, { to_account: 'cash' }] } });
         
         debits += Number(inc._sum.amount || 0);
         credits += Number(exp._sum.amount || 0) + Number(sup._sum.amount || 0) + Number(sret._sum.total_amount || 0);
@@ -3938,11 +3990,11 @@ export async function getTrialBalance(userId: string, date: string) {
         debits += Number(acc.opening_balance || 0);
       } else if (acc.name === 'Bank Account') {
         const methods = ['upi', 'neft', 'cheque', 'card', 'bank_transfer'];
-        const inc = await prisma.incomeEntry.aggregate({ where: { shop_id: shop.id, payment_method: { in: methods as any }, entry_date: { lte: asOfDate } }, _sum: { amount: true } });
-        const exp = await prisma.expenseEntry.aggregate({ where: { shop_id: shop.id, payment_method: { in: methods as any }, entry_date: { lte: asOfDate }, linked_purchase_id: null }, _sum: { amount: true } });
-        const sup = await prisma.supplierPayment.aggregate({ where: { shop_id: shop.id, payment_method: { in: methods as any }, payment_date: { lte: asOfDate } }, _sum: { amount: true } });
-        const sret = await prisma.saleReturn.aggregate({ where: { shop_id: shop.id, refund_method: { in: methods as any }, return_date: { lte: asOfDate } }, _sum: { total_amount: true } });
-        const contras = await prisma.contraEntry.findMany({ where: { shop_id: shop.id, entry_date: { lte: asOfDate }, OR: [{ from_account: { in: methods as any } }, { to_account: { in: methods as any } }] } });
+        const inc = await prisma.incomeEntry.aggregate({ where: { shop_id: shop.id, payment_method: { in: methods as any }, entry_date: { lte: asOfDate, gte: fyStart } }, _sum: { amount: true } });
+        const exp = await prisma.expenseEntry.aggregate({ where: { shop_id: shop.id, payment_method: { in: methods as any }, entry_date: { lte: asOfDate, gte: fyStart }, linked_purchase_id: null }, _sum: { amount: true } });
+        const sup = await prisma.supplierPayment.aggregate({ where: { shop_id: shop.id, payment_method: { in: methods as any }, payment_date: { lte: asOfDate, gte: fyStart } }, _sum: { amount: true } });
+        const sret = await prisma.saleReturn.aggregate({ where: { shop_id: shop.id, refund_method: { in: methods as any }, return_date: { lte: asOfDate, gte: fyStart } }, _sum: { total_amount: true } });
+        const contras = await prisma.contraEntry.findMany({ where: { shop_id: shop.id, entry_date: { lte: asOfDate, gte: fyStart }, OR: [{ from_account: { in: methods as any } }, { to_account: { in: methods as any } }] } });
 
         debits += Number(inc._sum.amount || 0);
         credits += Number(exp._sum.amount || 0) + Number(sup._sum.amount || 0) + Number(sret._sum.total_amount || 0);
@@ -3953,21 +4005,21 @@ export async function getTrialBalance(userId: string, date: string) {
         debits += Number(acc.opening_balance || 0);
       } else if (acc.name === 'Sales Account') {
         const saleSum = await prisma.bill.aggregate({
-          where: { shop_id: shop.id, created_at: { lte: asOfDate }, payment_status: 'paid' },
+          where: { shop_id: shop.id, created_at: { lte: asOfDate, gte: fyStart }, payment_status: 'paid' },
           _sum: { total_amount: true }
         });
         credits += Number(saleSum._sum.total_amount || 0);
         credits += Number(acc.opening_balance || 0);
       } else if (acc.name === 'Purchase Account') {
         const purSum = await prisma.purchaseEntry.aggregate({
-          where: { shop_id: shop.id, received_date: { lte: asOfDate } },
+          where: { shop_id: shop.id, received_date: { lte: asOfDate, gte: fyStart } },
           _sum: { total_amount: true }
         });
         debits += Number(purSum._sum.total_amount || 0);
         debits += Number(acc.opening_balance || 0);
       } else {
         const exp = await prisma.expenseEntry.aggregate({
-          where: { account_id: acc.id, entry_date: { lte: asOfDate } },
+          where: { account_id: acc.id, entry_date: { lte: asOfDate, gte: fyStart } },
           _sum: { amount: true }
         });
         debits += Number(exp._sum.amount || 0);
@@ -4014,6 +4066,8 @@ export async function getBalanceSheet(userId: string, date: string) {
   const shop = await getShopOrThrow(userId);
   const asOfDate = new Date(date);
   asOfDate.setHours(23, 59, 59, 999);
+  const fyStart = getFinancialYearStart(asOfDate);
+
 
   // We fetch groups of type asset, liability, equity
   const groups = await prisma.accountGroup.findMany({
@@ -4033,11 +4087,11 @@ export async function getBalanceSheet(userId: string, date: string) {
     const accountsWithBalance = await Promise.all(group.accounts.map(async (acc) => {
       // 1. Journal impacts (Most accurate for Phase 2+)
       const jvDebits = await prisma.journalItem.aggregate({
-        where: { account_id: acc.id, type: 'debit', journal: { entry_date: { lte: asOfDate } } },
+        where: { account_id: acc.id, type: 'debit', journal: { entry_date: { lte: asOfDate, gte: fyStart } } },
         _sum: { amount: true }
       });
       const jvCredits = await prisma.journalItem.aggregate({
-        where: { account_id: acc.id, type: 'credit', journal: { entry_date: { lte: asOfDate } } },
+        where: { account_id: acc.id, type: 'credit', journal: { entry_date: { lte: asOfDate, gte: fyStart } } },
         _sum: { amount: true }
       });
 
@@ -4046,11 +4100,11 @@ export async function getBalanceSheet(userId: string, date: string) {
       
       // 2. Integration with Phase 1 entries
       if (acc.name === 'Cash in Hand') {
-        const inc = await prisma.incomeEntry.aggregate({ where: { shop_id: shop.id, payment_method: 'cash', entry_date: { lte: asOfDate } }, _sum: { amount: true } });
-        const exp = await prisma.expenseEntry.aggregate({ where: { shop_id: shop.id, payment_method: 'cash', entry_date: { lte: asOfDate }, linked_purchase_id: null }, _sum: { amount: true } });
-        const sup = await prisma.supplierPayment.aggregate({ where: { shop_id: shop.id, payment_method: 'cash', payment_date: { lte: asOfDate } }, _sum: { amount: true } });
-        const sret = await prisma.saleReturn.aggregate({ where: { shop_id: shop.id, refund_method: 'cash', return_date: { lte: asOfDate } }, _sum: { total_amount: true } });
-        const contras = await prisma.contraEntry.findMany({ where: { shop_id: shop.id, entry_date: { lte: asOfDate }, OR: [{ from_account: 'cash' }, { to_account: 'cash' }] } });
+        const inc = await prisma.incomeEntry.aggregate({ where: { shop_id: shop.id, payment_method: 'cash', entry_date: { lte: asOfDate, gte: fyStart } }, _sum: { amount: true } });
+        const exp = await prisma.expenseEntry.aggregate({ where: { shop_id: shop.id, payment_method: 'cash', entry_date: { lte: asOfDate, gte: fyStart }, linked_purchase_id: null }, _sum: { amount: true } });
+        const sup = await prisma.supplierPayment.aggregate({ where: { shop_id: shop.id, payment_method: 'cash', payment_date: { lte: asOfDate, gte: fyStart } }, _sum: { amount: true } });
+        const sret = await prisma.saleReturn.aggregate({ where: { shop_id: shop.id, refund_method: 'cash', return_date: { lte: asOfDate, gte: fyStart } }, _sum: { total_amount: true } });
+        const contras = await prisma.contraEntry.findMany({ where: { shop_id: shop.id, entry_date: { lte: asOfDate, gte: fyStart }, OR: [{ from_account: 'cash' }, { to_account: 'cash' }] } });
         
         debits += Number(inc._sum.amount || 0);
         credits += Number(exp._sum.amount || 0) + Number(sup._sum.amount || 0) + Number(sret._sum.total_amount || 0);
@@ -4060,11 +4114,11 @@ export async function getBalanceSheet(userId: string, date: string) {
         }
       } else if (acc.name === 'Bank Account') {
         const methods = ['upi', 'neft', 'cheque', 'card', 'bank_transfer'];
-        const inc = await prisma.incomeEntry.aggregate({ where: { shop_id: shop.id, payment_method: { in: methods as any }, entry_date: { lte: asOfDate } }, _sum: { amount: true } });
-        const exp = await prisma.expenseEntry.aggregate({ where: { shop_id: shop.id, payment_method: { in: methods as any }, entry_date: { lte: asOfDate }, linked_purchase_id: null }, _sum: { amount: true } });
-        const sup = await prisma.supplierPayment.aggregate({ where: { shop_id: shop.id, payment_method: { in: methods as any }, payment_date: { lte: asOfDate } }, _sum: { amount: true } });
-        const sret = await prisma.saleReturn.aggregate({ where: { shop_id: shop.id, refund_method: { in: methods as any }, return_date: { lte: asOfDate } }, _sum: { total_amount: true } });
-        const contras = await prisma.contraEntry.findMany({ where: { shop_id: shop.id, entry_date: { lte: asOfDate }, OR: [{ from_account: { in: methods as any } }, { to_account: { in: methods as any } }] } });
+        const inc = await prisma.incomeEntry.aggregate({ where: { shop_id: shop.id, payment_method: { in: methods as any }, entry_date: { lte: asOfDate, gte: fyStart } }, _sum: { amount: true } });
+        const exp = await prisma.expenseEntry.aggregate({ where: { shop_id: shop.id, payment_method: { in: methods as any }, entry_date: { lte: asOfDate, gte: fyStart }, linked_purchase_id: null }, _sum: { amount: true } });
+        const sup = await prisma.supplierPayment.aggregate({ where: { shop_id: shop.id, payment_method: { in: methods as any }, payment_date: { lte: asOfDate, gte: fyStart } }, _sum: { amount: true } });
+        const sret = await prisma.saleReturn.aggregate({ where: { shop_id: shop.id, refund_method: { in: methods as any }, return_date: { lte: asOfDate, gte: fyStart } }, _sum: { total_amount: true } });
+        const contras = await prisma.contraEntry.findMany({ where: { shop_id: shop.id, entry_date: { lte: asOfDate, gte: fyStart }, OR: [{ from_account: { in: methods as any } }, { to_account: { in: methods as any } }] } });
 
         debits += Number(inc._sum.amount || 0);
         credits += Number(exp._sum.amount || 0) + Number(sup._sum.amount || 0) + Number(sret._sum.total_amount || 0);
@@ -4074,23 +4128,24 @@ export async function getBalanceSheet(userId: string, date: string) {
         }
       } else if (acc.name === 'Sales Account') {
         const saleSum = await prisma.bill.aggregate({
-          where: { shop_id: shop.id, created_at: { lte: asOfDate }, payment_status: 'paid' },
+          where: { shop_id: shop.id, created_at: { lte: asOfDate, gte: fyStart }, payment_status: 'paid' },
           _sum: { total_amount: true }
         });
         credits += Number(saleSum._sum.total_amount || 0);
       } else if (acc.name === 'Purchase Account') {
         const purSum = await prisma.purchaseEntry.aggregate({
-          where: { shop_id: shop.id, received_date: { lte: asOfDate } },
+          where: { shop_id: shop.id, received_date: { lte: asOfDate, gte: fyStart } },
           _sum: { total_amount: true }
         });
         debits += Number(purSum._sum.total_amount || 0);
       } else {
         // Generic integration for accounts that might be used in Expense Entries
         const exp = await prisma.expenseEntry.aggregate({
-          where: { account_id: acc.id, entry_date: { lte: asOfDate } },
+          where: { account_id: acc.id, entry_date: { lte: asOfDate, gte: fyStart } },
           _sum: { amount: true }
         });
         debits += Number(exp._sum.amount || 0);
+        debits += Number(acc.opening_balance || 0);
       }
 
       // 3. Final Balance based on Account Type
