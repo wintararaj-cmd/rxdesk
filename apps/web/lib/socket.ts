@@ -1,9 +1,13 @@
 import { io } from 'socket.io-client';
 
 const getSocketUrl = () => {
-  const envUrl = process.env.NEXT_PUBLIC_API_URL || '';
   if (typeof window !== 'undefined') {
-    // If running in browser and the API matches the same domain (or is relative)
+    // Priority 1: If we are on production domain, use it directly (bypass env stuck issues)
+    if (window.location.hostname.includes('rxdesk.in')) {
+      return 'https://rxdesk.in';
+    }
+    // Priority 2: Use current origin if API URL is relative or missing
+    const envUrl = process.env.NEXT_PUBLIC_API_URL || '';
     if (!envUrl || envUrl.startsWith('/')) return window.location.origin;
     try {
       return new URL(envUrl).origin;
@@ -11,12 +15,7 @@ const getSocketUrl = () => {
       return window.location.origin;
     }
   }
-  // Server-side fallback
-  try {
-    return new URL(envUrl).origin;
-  } catch {
-    return 'http://localhost:3000';
-  }
+  return 'http://localhost:3000';
 };
 
 export const socket = io(getSocketUrl(), {
@@ -24,6 +23,10 @@ export const socket = io(getSocketUrl(), {
   autoConnect: false,
   withCredentials: true,
   transports: ['websocket', 'polling'],
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  timeout: 20000,
 });
 
 // Helper to connect with auth token
