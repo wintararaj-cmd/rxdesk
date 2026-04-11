@@ -4397,9 +4397,9 @@ export async function generateGstr1Json(userId: string, month: number, year: num
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 0, 23, 59, 59);
 
-  const sales = await prisma.sale.findMany({
-    where: { shop_id: shop.id, date: { gte: start, lte: end }, status: 'completed' },
-    include: { items: { include: { medicine: true } } },
+  const bills = await prisma.bill.findMany({
+    where: { shop_id: shop.id, created_at: { gte: start, lte: end }, payment_status: 'paid' },
+    include: { items: { include: { inventory: { include: { medicine: true } } } } },
   });
 
   const b2b: any[] = [];
@@ -4409,15 +4409,15 @@ export async function generateGstr1Json(userId: string, month: number, year: num
   // Helper to format date DD-MM-YYYY
   const fd = (d: Date) => d.toLocaleDateString('en-GB').split('/').join('-');
 
-  for (const sale of sales) {
-    const isB2B = !!(sale as any).customer_gstin;
-    const pos = (sale as any).customer_pos || (shop.state_code || '27'); // Fallback to shop state
+  for (const bill of bills) {
+    const isB2B = !!bill.customer_gstin;
+    const pos = bill.billing_state || (shop.state_code || '27'); // Fallback to shop state
     
     // Grouping for HSN
-    for (const item of sale.items) {
-      const hsn = (item.medicine as any)?.hsn_code || '3004'; // Default pharma HSN
-      const txval = Number(item.total_price) / (1 + Number(item.gst_rate) / 100);
-      const tax = Number(item.total_price) - txval;
+    for (const item of bill.items) {
+      const hsn = item.hsn_code || (item.inventory?.medicine as any)?.hsn_code || '3004'; 
+      const txval = Number(item.line_total) / (1 + Number(item.gst_rate) / 100);
+      const tax = Number(item.line_total) - txval;
       
       const key = `${hsn}-${item.gst_rate}`;
       if (!hsnMap.has(key)) {
@@ -4425,65 +4425,62 @@ export async function generateGstr1Json(userId: string, month: number, year: num
       }
       const hEntry = hsnMap.get(key);
       hEntry.qty += Number(item.quantity);
-      hEntry.val += Number(item.total_price);
+      hEntry.val += Number(item.line_total);
       hEntry.txval += txval;
       if (pos !== shop.state_code) hEntry.iamt += tax;
       else { hEntry.camt += tax / 2; hEntry.samt += tax / 2; }
     }
 
     if (isB2B) {
-      // Find or create ctin entry
-      let ctinEntry = b2b.find(b => b.ctin === (sale as any).customer_gstin);
+      let ctinEntry = b2b.find(b => b.ctin === bill.customer_gstin);
       if (!ctinEntry) {
-        ctinEntry = { ctin: (sale as any).customer_gstin, inv: [] };
+        ctinEntry = { ctin: bill.customer_gstin, inv: [] };
         b2b.push(ctinEntry);
       }
       
       const invItems: any[] = [];
-      // Group items by rate for B2B inv
-      const rates = Array.from(new Set(sale.items.map(i => Number(i.gst_rate))));
-      rates.forEach((rt, idx) => {
-        const rateItems = sale.items.filter(i => Number(i.gst_rate) === rt);
-        const txval = rateItems.reduce((acc, i) => acc + (Number(i.total_price) / (1 + rt / 100)), 0);
-        const tax = rateItems.reduce((acc, i) => acc + (Number(i.total_price) - (Number(i.total_price) / (1 + rt / 100))), 0);
+      const rates = Array.from(new Set(bill.items.map(i => Number(i.gst_rate))));
+      rates.forEach((rt: number, idx) => {
+        const rateItems = bill.items.filter(i => Number(i.gst_rate) === rt);
+        const txvalTotal = rateItems.reduce((acc, i) => acc + (Number(i.line_total) / (1 + rt / 100)), 0);
+        const taxTotal = rateItems.reduce((acc, i) => acc + (Number(i.line_total) - (Number(i.line_total) / (1 + rt / 100))), 0);
         
         invItems.push({
           num: idx + 1,
           itm_det: {
             rt,
-            txval: Math.round(txval * 100) / 100,
-            iamt: pos !== shop.state_code ? Math.round(tax * 100) / 100 : 0,
-            camt: pos === shop.state_code ? Math.round((tax / 2) * 100) / 100 : 0,
-            samt: pos === shop.state_code ? Math.round((tax / 2) * 100) / 100 : 0,
+            txval: Math.round(txvalTotal * 100) / 100,
+            iamt: pos !== shop.state_code ? Math.round(taxTotal * 100) / 100 : 0,
+            camt: pos === shop.state_code ? Math.round((taxTotal / 2) * 100) / 100 : 0,
+            samt: pos === shop.state_code ? Math.round((taxTotal / 2) * 100) / 100 : 0,
           }
         });
       });
 
       ctinEntry.inv.push({
-        inum: sale.bill_number,
-        idt: fd(sale.date),
-        val: Math.round(Number(sale.total_amount) * 100) / 100,
+        inum: bill.bill_number,
+        idt: fd(bill.created_at),
+        val: Math.round(Number(bill.total_amount) * 100) / 100,
         pos,
         rchrg: 'N',
         inv_typ: 'R',
         itms: invItems
       });
     } else {
-      // B2CS - Grouped by POS and Rate
-      const rates = Array.from(new Set(sale.items.map(i => Number(i.gst_rate))));
-      rates.forEach(rt => {
-        const rateItems = sale.items.filter(i => Number(i.gst_rate) === rt);
-        const txval = rateItems.reduce((acc, i) => acc + (Number(i.total_price) / (1 + rt / 100)), 0);
-        const tax = rateItems.reduce((acc, i) => acc + (Number(i.total_price) - (Number(i.total_price) / (1 + rt / 100))), 0);
+      const rates = Array.from(new Set(bill.items.map(i => Number(i.gst_rate))));
+      rates.forEach((rt: number) => {
+        const rateItems = bill.items.filter(i => Number(i.gst_rate) === rt);
+        const txvalTotal = rateItems.reduce((acc, i) => acc + (Number(i.line_total) / (1 + rt / 100)), 0);
+        const taxTotal = rateItems.reduce((acc, i) => acc + (Number(i.line_total) - (Number(i.line_total) / (1 + rt / 100))), 0);
 
         let b2csEntry = b2cs.find(b => b.pos === pos && b.rt === rt);
         if (!b2csEntry) {
           b2csEntry = { pos, rt, txval: 0, iamt: 0, camt: 0, samt: 0, typ: 'OE' };
           b2cs.push(b2csEntry);
         }
-        b2csEntry.txval += txval;
-        if (pos !== shop.state_code) b2csEntry.iamt += tax;
-        else { b2csEntry.camt += tax / 2; b2csEntry.samt += tax / 2; }
+        b2csEntry.txval += txvalTotal;
+        if (pos !== shop.state_code) b2csEntry.iamt += taxTotal;
+        else { b2csEntry.camt += taxTotal / 2; b2csEntry.samt += taxTotal / 2; }
       });
     }
   }
@@ -4511,7 +4508,7 @@ export async function generateGstr1Json(userId: string, month: number, year: num
   }));
 
   return {
-    gstin: shop.gstin || 'NOT_FOUND',
+    gstin: shop.gst_number || 'NOT_FOUND',
     fp: `${month.toString().padStart(2, '0')}${year}`,
     gt: 0.0,
     cur_gt: 0.0,

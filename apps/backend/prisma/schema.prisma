@@ -322,6 +322,7 @@ model MedicalShop {
   backup_api_key      String?            @unique
   last_backup_system  String?
   last_backup_at      DateTime?
+  state_code          String?            // GST State Code (e.g. "19" for WB)
   created_at          DateTime           @default(now())
   updated_at          DateTime           @updatedAt
 
@@ -490,6 +491,7 @@ model Medicine {
   strength      String?
   manufacturer  String?
   hsn_code      String?
+  barcode       String?       @unique
   gst_rate      Decimal       @default(5.0) @db.Decimal(5, 2)
   is_schedule_h Boolean       @default(false)
   is_active     Boolean       @default(true)
@@ -546,6 +548,7 @@ model ShopInventory {
   unit             String       @default("strip")
   discount_type    DiscountType @default(percentage)
   discount_value   Decimal      @default(0) @db.Decimal(10, 2)
+  barcode          String?
   created_at       DateTime     @default(now())
   updated_at       DateTime     @updatedAt
 
