@@ -959,6 +959,63 @@ export default function InventoryPage() {
                       <option value="percentage">Percentage (%)</option>
                       <option value="amount">Amount (₹)</option>
                     </select>
+                  ) : key === 'barcode' ? (
+                    <div className="flex gap-2">
+                       <input
+                        type="text"
+                        className="flex-1 border border-gray-200 rounded-lg px-3 h-9 text-sm text-gray-900 outline-none focus:border-violet-500 transition-all font-mono"
+                        value={editForm.barcode ?? ''}
+                        onChange={(e) => setEditForm({ ...editForm, barcode: e.target.value })}
+                        placeholder="Scan or type barcode"
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => setEditForm(prev => ({ ...prev, barcode: Math.floor(Math.random() * 900000000000 + 100000000000).toString() }))}
+                        className="px-2 h-9 bg-violet-50 text-violet-600 rounded-lg border border-violet-100 hover:bg-violet-100 text-[10px] font-black uppercase transition-colors"
+                        title="Generate Unique Barcode"
+                      >
+                        Generate
+                      </button>
+                      <button 
+                         type="button"
+                         onClick={() => {
+                           const win = window.open('', '_blank');
+                           if (win) {
+                             const barcodeValue = editForm.barcode || 'NOBARCODE';
+                             const medName = editForm.medicine_name || 'Medicine';
+                             win.document.write(`
+                               <html>
+                                 <head>
+                                   <title>Print Label - ${medName}</title>
+                                   <style>
+                                     @page { size: 50mm 25mm; margin: 0; }
+                                     body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                                     .label { text-align: center; width: 45mm; overflow: hidden; }
+                                     .name { font-size: 10px; font-weight: bold; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                                     .barcode { font-family: 'Libre Barcode 39', 'IDAutomationHC39M', monospace; font-size: 30px; margin: 2px 0; }
+                                     .code-text { font-size: 8px; letter-spacing: 2px; }
+                                     .price { font-size: 9px; font-weight: bold; margin-top: 2px; }
+                                   </style>
+                                 </head>
+                                 <body>
+                                   <div class="label">
+                                     <div class="name">${medName}</div>
+                                     <img src="https://bwipjs-api.metafloor.com/?bcid=code128&text=${barcodeValue}&scale=2&rotate=N&includetext=true" alt="Barcode" style="max-width: 100%; height: auto;">
+                                     <div class="price">MRP: ₹${editForm.mrp || '0.00'}</div>
+                                   </div>
+                                   <script>setTimeout(() => { window.print(); window.close(); }, 500);</script>
+                                 </body>
+                               </html>
+                             `);
+                             win.document.close();
+                           }
+                         }}
+                         className="px-2 h-9 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 hover:bg-emerald-100 text-[10px] font-black uppercase transition-colors"
+                         title="Print Barcode Label"
+                      >
+                        Print
+                      </button>
+                    </div>
                   ) : (
                     <input
                       type={type}
