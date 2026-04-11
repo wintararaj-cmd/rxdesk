@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import 'medicine_finder_screen.dart';
 import 'nearby_shops_screen.dart';
+import 'remote_scanner_screen.dart';
 
 class ShopDashboardTab extends StatefulWidget {
   const ShopDashboardTab({
@@ -162,6 +163,15 @@ class _ShopDashboardTabState extends State<ShopDashboardTab> {
              label: 'Sales Report',
              color: const Color(0xFF059669),
              onTap: widget.onReportTap,
+           ),
+           const SizedBox(height: 10),
+           _QuickAction(
+             icon: Icons.qr_code_scanner_rounded,
+             label: 'Remote Billing Scanner',
+             color: const Color(0xFFEA580C),
+             onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const RemoteScannerScreen()));
+             },
            ),
            const SizedBox(height: 10),
            _QuickAction(
