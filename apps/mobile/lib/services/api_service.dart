@@ -336,10 +336,6 @@ class ApiService {
     return _request('POST', '/medicines/check-interactions', body: {'medicine_names': medicineNames});
   }
 
-  static Future<Map<String, dynamic>> getInventoryByBarcode(String barcode) async {
-    return _request('GET', '/inventory/barcode/$barcode');
-  }
-
   static Future<Map<String, dynamic>> getGstSummary({required int month, required int year}) async {
     return _request('GET', '/accounting/reports/gst-summary', query: {
       'month': month.toString(),

@@ -2,6 +2,13 @@
 
 import React, { useState, useRef, Fragment, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { 
+  TrendingUp, Activity, Wallet, CreditCard, ArrowUpRight, ArrowDownRight, 
+  Download, Plus, Search, Filter, Trash2, Edit2, ChevronRight, ChevronLeft,
+  X, Save, Calendar, Clock, ShoppingCart, Users, MoreVertical,
+  ArrowRight, FileText, PieChart, BarChart3, AlertCircle, CheckCircle2,
+  Settings, Info, Printer, Share2, Upload, ExternalLink, RefreshCcw, Eye
+} from 'lucide-react';
 import { accountingApi, inventoryApi, medicinesApi, shopApi, billApi } from '../../../lib/apiClient';
 
 // ── helpers ───────────────────────────────────────────────────────────────────

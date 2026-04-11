@@ -381,6 +381,49 @@ class _DoctorPrescribeScreenState extends State<DoctorPrescribeScreen> {
     );
   }
 
+  Widget _buildVitalInput(String label, TextEditingController ctrl, String hint, IconData icon) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 12, color: Colors.blueGrey),
+              const SizedBox(width: 4),
+              Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          TextField(
+            controller: ctrl,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.blueGrey.shade200)),
+              filled: true,
+              fillColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _runInteractionCheck(String medName) async {
+    try {
+      final res = await ApiService.checkInteractions([medName]);
+      if (mounted) {
+        setState(() {
+          _interactionWarnings = (res['warnings'] as List?) ?? [];
+        });
+      }
+    } catch (_) {}
+  }
+
   void _showTemplatePicker() async {
     setState(() => _isLoading = true);
     try {
