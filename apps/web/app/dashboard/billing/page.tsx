@@ -1740,6 +1740,7 @@ function WalkInSaleTab() {
     const joinRooms = () => {
       if (shopData?.id) {
         socket.emit('join_shop', { shop_id: shopData.id });
+        setScannerStatus('connected');
       }
     };
 
@@ -1749,7 +1750,12 @@ function WalkInSaleTab() {
       processBarcode(data.barcode);
     };
 
+    const handleError = () => setScannerStatus('error');
+    const handleDisconnect = () => setScannerStatus(null);
+
     socket.on('connect', joinRooms);
+    socket.on('connect_error', handleError);
+    socket.on('disconnect', handleDisconnect);
     socket.on('item_scanned', handleRemoteScan);
 
     // If already connected, join rooms immediately
@@ -1757,6 +1763,8 @@ function WalkInSaleTab() {
 
     return () => {
       socket.off('connect', joinRooms);
+      socket.off('connect_error', handleError);
+      socket.off('disconnect', handleDisconnect);
       socket.off('item_scanned', handleRemoteScan);
     };
   }, [shopData?.id, processBarcode]);
@@ -2306,16 +2314,20 @@ function WalkInSaleTab() {
               <span className="w-6 h-6 bg-violet-100 text-violet-600 rounded-full flex items-center justify-center text-xs font-bold">2</span>
               Medicines / Items
             </h3>
-            {scannerStatus && (
-              <div className={`text-[10px] uppercase font-black px-3 py-1 rounded-lg flex items-center gap-1.5 border transition-all duration-300 ${
-                scannerStatus === 'scanning' ? 'bg-amber-50 text-amber-600 border-amber-200 animate-pulse shadow-sm shadow-amber-100' :
-                scannerStatus === 'connected' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 shadow-sm shadow-emerald-100' :
-                'bg-red-50 text-red-600 border-red-200'
-              }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${scannerStatus === 'scanning' ? 'bg-amber-500' : scannerStatus === 'connected' ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                Remote Scanner: {scannerStatus.toUpperCase()}
-              </div>
-            )}
+            <div className={`text-[10px] uppercase font-black px-3 py-1 rounded-lg flex items-center gap-1.5 border transition-all duration-300 ${
+              scannerStatus === 'scanning' ? 'bg-amber-50 text-amber-600 border-amber-200 animate-pulse shadow-sm shadow-amber-100' :
+              scannerStatus === 'connected' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 shadow-sm shadow-emerald-100' :
+              scannerStatus === 'error' ? 'bg-red-50 text-red-600 border-red-200' :
+              'bg-gray-50 text-gray-400 border-gray-200'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${
+                scannerStatus === 'scanning' ? 'bg-amber-500' : 
+                scannerStatus === 'connected' ? 'bg-emerald-500' : 
+                scannerStatus === 'error' ? 'bg-red-500' : 
+                'bg-gray-300'
+              }`} />
+              Remote Scanner: {scannerStatus ? scannerStatus.toUpperCase() : 'DISCONNECTED'}
+            </div>
           </div>
           <div className="space-y-2">
             {/* Header row */}
