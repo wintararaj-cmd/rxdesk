@@ -1,8 +1,25 @@
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:3000';
+const getSocketUrl = () => {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL || '';
+  if (typeof window !== 'undefined') {
+    // If running in browser and the API matches the same domain (or is relative)
+    if (!envUrl || envUrl.startsWith('/')) return window.location.origin;
+    try {
+      return new URL(envUrl).origin;
+    } catch {
+      return window.location.origin;
+    }
+  }
+  // Server-side fallback
+  try {
+    return new URL(envUrl).origin;
+  } catch {
+    return 'http://localhost:3000';
+  }
+};
 
-export const socket = io(SOCKET_URL, {
+export const socket = io(getSocketUrl(), {
   autoConnect: false,
   withCredentials: true,
   transports: ['websocket', 'polling'],
