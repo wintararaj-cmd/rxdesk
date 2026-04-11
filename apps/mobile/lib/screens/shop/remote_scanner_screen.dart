@@ -42,7 +42,7 @@ class _RemoteScannerScreenState extends State<RemoteScannerScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('✅ $barcode sent to Web POS'),
-            backgroundColor: Colors.emerald.shade700,
+            backgroundColor: Colors.green.shade700,
             duration: const Duration(seconds: 1),
             behavior: SnackBarBehavior.floating,
           ),
@@ -75,31 +75,11 @@ class _RemoteScannerScreenState extends State<RemoteScannerScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: ValueListenableBuilder(
-              valueListenable: _controller.torchState,
-              builder: (context, state, child) {
-                switch (state) {
-                  case TorchState.off:
-                    return const Icon(Icons.flash_off, color: Colors.grey);
-                  case TorchState.on:
-                    return const Icon(Icons.flash_on, color: Colors.yellow);
-                }
-              },
-            ),
+            icon: const Icon(Icons.flash_on),
             onPressed: () => _controller.toggleTorch(),
           ),
           IconButton(
-            icon: ValueListenableBuilder(
-              valueListenable: _controller.cameraFacingState,
-              builder: (context, state, child) {
-                switch (state) {
-                  case CameraFacing.front:
-                    return const Icon(Icons.camera_front);
-                  case CameraFacing.back:
-                    return const Icon(Icons.camera_rear);
-                }
-              },
-            ),
+            icon: const Icon(Icons.camera_front),
             onPressed: () => _controller.switchCamera(),
           ),
         ],
@@ -127,10 +107,10 @@ class _RemoteScannerScreenState extends State<RemoteScannerScreen> {
                 border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Stack(
+              child: const Stack(
                 children: [
                    // Animated scanner line
-                   const ScanningLine(),
+                   ScanningLine(),
                 ],
               ),
             ),
@@ -167,7 +147,7 @@ class _RemoteScannerScreenState extends State<RemoteScannerScreen> {
                       child: SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.violetAccent),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.purpleAccent),
                       ),
                     ),
                 ],
