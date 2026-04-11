@@ -1589,6 +1589,7 @@ const EMPTY_ITEM: WalkInItem = {
 
 function WalkInSaleTab() {
   const qc = useQueryClient();
+  const [scannerStatus, setScannerStatus] = useState<'connected' | 'error' | 'scanning' | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerGstin, setCustomerGstin] = useState('');
@@ -1660,20 +1661,23 @@ function WalkInSaleTab() {
   });
 
   const processBarcode = useCallback(async (barcode: string) => {
+    setScannerStatus('scanning');
     try {
       const res = await inventoryApi.getByBarcode(barcode);
       const inv = res.data.data;
+      const catalogMed = (res.data as any).medicine;
+
       if (inv) {
         setItems(prev => {
           const lastIdx = prev.length - 1;
           const lastItem = prev[lastIdx];
-          const newItem = {
+          const newItem: WalkInItem = {
             medicine_name: inv.medicine_name,
             unit: inv.unit || 'strip',
             mrp: String(inv.mrp),
             quantity: '1',
             gst_rate: String(inv.gst_rate || 5),
-            discount_type: inv.discount_type || 'percentage',
+            discount_type: (inv.discount_type as any) || 'percentage',
             discount_value: String(inv.discount_value || 0),
             batch_number: inv.batch_number,
             expiry_date: inv.expiry_date,
@@ -1688,7 +1692,6 @@ function WalkInSaleTab() {
             updated[lastIdx] = newItem;
             return updated;
           } else {
-            // Check if item already exists, if so increment qty
             const existingIdx = prev.findIndex(it => it.inventory_id === inv.id);
             if (existingIdx > -1) {
                const updated = [...prev];
@@ -1698,12 +1701,33 @@ function WalkInSaleTab() {
             return [...prev, newItem];
           }
         });
+        setScannerStatus('connected');
+      } else if (catalogMed) {
+        // Fallback to catalog: load the name but user fills the rest
+        setItems(prev => {
+          const newItem: WalkInItem = {
+            ...EMPTY_ITEM,
+            medicine_name: catalogMed.name,
+            gst_rate: String(catalogMed.gst_rate || 12),
+          };
+          const lastItem = prev[prev.length - 1];
+          if (!lastItem.medicine_name) {
+            const updated = [...prev];
+            updated[prev.length - 1] = newItem;
+            return updated;
+          }
+          return [...prev, newItem];
+        });
+        setScannerStatus('connected');
+        alert(`${catalogMed.name} পাওয়া গেছে, কিন্তু আপনার ইনভেন্টরিতে নেই। দয়া করে ব্যাচ ও দাম বসিয়ে দিন।`);
       } else {
-        alert(`Barcode ${barcode} found but no matching item in your inventory.`);
+        setScannerStatus('error');
+        alert(`Barcode ${barcode} found but no matching item in your inventory or catalog.`);
       }
     } catch (err) {
       console.error('Barcode processing error', err);
-      alert(`Error scanning barcode ${barcode}: Item may not exist in your inventory list.`);
+      setScannerStatus('error');
+      alert(`Error scanning barcode ${barcode}: Item may not exist.`);
     }
   }, [setItems]);
 
@@ -2277,10 +2301,22 @@ function WalkInSaleTab() {
 
         {/* Items */}
         <div>
-          <h3 className="font-semibold text-gray-800 text-sm mb-3 flex items-center gap-2">
-            <span className="w-6 h-6 bg-violet-100 text-violet-600 rounded-full flex items-center justify-center text-xs font-bold">2</span>
-            Medicines / Items
-          </h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
+              <span className="w-6 h-6 bg-violet-100 text-violet-600 rounded-full flex items-center justify-center text-xs font-bold">2</span>
+              Medicines / Items
+            </h3>
+            {scannerStatus && (
+              <div className={`text-[10px] uppercase font-black px-3 py-1 rounded-lg flex items-center gap-1.5 border transition-all duration-300 ${
+                scannerStatus === 'scanning' ? 'bg-amber-50 text-amber-600 border-amber-200 animate-pulse shadow-sm shadow-amber-100' :
+                scannerStatus === 'connected' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 shadow-sm shadow-emerald-100' :
+                'bg-red-50 text-red-600 border-red-200'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${scannerStatus === 'scanning' ? 'bg-amber-500' : scannerStatus === 'connected' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                Remote Scanner: {scannerStatus.toUpperCase()}
+              </div>
+            )}
+          </div>
           <div className="space-y-2">
             {/* Header row */}
             <div className="grid gap-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-1" style={{ gridTemplateColumns: isTaxInvoice ? '2fr 0.8fr 1fr 1fr 0.7fr 1.1fr 1.2fr 0.8fr 40px' : '2fr 0.8fr 1fr 1fr 0.7fr 1.2fr 1.2fr 40px' }}>
