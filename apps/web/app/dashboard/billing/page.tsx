@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { billApi, prescriptionApi, inventoryApi, shopApi, medicinesApi } from '../../../lib/apiClient';
+import { socket, connectSocket, disconnectSocket } from '../../../lib/socket';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1658,6 +1659,74 @@ function WalkInSaleTab() {
     },
   });
 
+  const processBarcode = useCallback(async (barcode: string) => {
+    try {
+      const res = await inventoryApi.getByBarcode(barcode);
+      const inv = res.data.data;
+      if (inv) {
+        setItems(prev => {
+          const lastIdx = prev.length - 1;
+          const lastItem = prev[lastIdx];
+          const newItem = {
+            medicine_name: inv.medicine_name,
+            unit: inv.unit || 'strip',
+            mrp: String(inv.mrp),
+            quantity: '1',
+            gst_rate: String(inv.gst_rate || 5),
+            discount_type: inv.discount_type || 'percentage',
+            discount_value: String(inv.discount_value || 0),
+            batch_number: inv.batch_number,
+            expiry_date: inv.expiry_date,
+            inventory_id: inv.id,
+            stock_qty: inv.stock_qty,
+          };
+
+          if (!lastItem.medicine_name && prev.length === 1) {
+            return [newItem];
+          } else if (!lastItem.medicine_name) {
+            const updated = [...prev];
+            updated[lastIdx] = newItem;
+            return updated;
+          } else {
+            // Check if item already exists, if so increment qty
+            const existingIdx = prev.findIndex(it => it.inventory_id === inv.id);
+            if (existingIdx > -1) {
+               const updated = [...prev];
+               updated[existingIdx].quantity = String(Number(updated[existingIdx].quantity) + 1);
+               return updated;
+            }
+            return [...prev, newItem];
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Barcode processing error', err);
+    }
+  }, [setItems]);
+
+  useEffect(() => {
+    // Connect socket and listen for remote scans
+    const token = localStorage.getItem('access_token');
+    if (token) connectSocket(token);
+
+    if (shopData?.id) {
+      socket.emit('join_shop', { shop_id: shopData.id });
+    }
+
+    const handleRemoteScan = (data: { barcode: string }) => {
+      console.log('Remote scan received:', data.barcode);
+      processBarcode(data.barcode);
+    };
+
+    socket.on('item_scanned', handleRemoteScan);
+
+    return () => {
+      socket.off('item_scanned', handleRemoteScan);
+      // We don't disconnect globally because other tabs might use it, 
+      // but we could leave the shop room if needed.
+    };
+  }, [shopData, processBarcode]);
+
   useEffect(() => {
     const handleGlobalKeys = async (e: KeyboardEvent) => {
       if (e.altKey && e.key === 'n') {
@@ -1677,50 +1746,13 @@ function WalkInSaleTab() {
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
 
       const currentTime = Date.now();
-      if (currentTime - lastKeyTimeRef.current > 50) {
+      if (currentTime - lastKeyTimeRef.current > 70) {
         barcodeRef.current = '';
       }
 
       if (e.key === 'Enter') {
         if (barcodeRef.current.length >= 8) {
-          const barcode = barcodeRef.current;
-          barcodeRef.current = '';
-          try {
-            const res = await inventoryApi.getByBarcode(barcode);
-            const inv = res.data.data;
-            if (inv) {
-              // Find first empty row or add new
-              setItems(prev => {
-                const lastIdx = prev.length - 1;
-                const lastItem = prev[lastIdx];
-                const newItem = {
-                  medicine_name: inv.medicine_name,
-                  unit: inv.unit || 'strip',
-                  mrp: String(inv.mrp),
-                  quantity: '1',
-                  gst_rate: String(inv.gst_rate || 12),
-                  discount_type: inv.discount_type || 'percentage',
-                  discount_value: String(inv.discount_value || 0),
-                  batch_number: inv.batch_number,
-                  expiry_date: inv.expiry_date,
-                  inventory_id: inv.id,
-                  stock_qty: inv.stock_qty,
-                };
-
-                if (!lastItem.medicine_name && prev.length === 1) {
-                  return [newItem];
-                } else if (!lastItem.medicine_name) {
-                  const updated = [...prev];
-                  updated[lastIdx] = newItem;
-                  return updated;
-                } else {
-                  return [...prev, newItem];
-                }
-              });
-            }
-          } catch (err) {
-            console.error('Barcode scanner error', err);
-          }
+          processBarcode(barcodeRef.current);
         }
         barcodeRef.current = '';
       } else if (/^\d$/.test(e.key)) {
@@ -1730,7 +1762,7 @@ function WalkInSaleTab() {
     };
     window.addEventListener('keydown', handleGlobalKeys);
     return () => window.removeEventListener('keydown', handleGlobalKeys);
-  }, [items, customerName, customerPhone, paymentMethod, globalDiscount]);
+  }, [items, customerName, customerPhone, paymentMethod, globalDiscount, processBarcode]);
 
   const reset = () => {
     setCreatedBill(null); setCustomerName(''); setCustomerPhone('');

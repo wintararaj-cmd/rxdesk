@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'new_sale_screen.dart';
+import 'shop/remote_scanner_screen.dart';
 
 class ShopDashboardScreen extends StatefulWidget {
   const ShopDashboardScreen({Key? key}) : super(key: key);
@@ -162,14 +163,17 @@ class _ShopDashboardScreenState extends State<ShopDashboardScreen> {
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 1.5,
+                crossAxisCount: 3, // Changed to 3 for better fit
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 1.0,
                 children: [
-                  _buildActionCard(context, 'Manage Inventory', Icons.inventory, Colors.indigo),
-                  _buildActionCard(context, 'Account Reports', Icons.receipt_long, Colors.teal),
-                  _buildActionCard(context, 'Shop Settings', Icons.settings, Colors.blueAccent),
+                   _buildActionCard(context, 'Billing Scanner', Icons.qr_code_scanner, Colors.deepOrange, onTrigger: () {
+                     Navigator.push(context, MaterialPageRoute(builder: (_) => const RemoteScannerScreen()));
+                   }),
+                  _buildActionCard(context, 'Inventory', Icons.inventory, Colors.indigo),
+                  _buildActionCard(context, 'Accounting', Icons.receipt_long, Colors.teal),
+                  _buildActionCard(context, 'Settings', Icons.settings, Colors.blueAccent),
                   _buildActionCard(context, 'Payments', Icons.account_balance_wallet, Colors.green),
                 ],
               ),
@@ -246,29 +250,33 @@ class _ShopDashboardScreenState extends State<ShopDashboardScreen> {
     );
   }
 
-  Widget _buildActionCard(BuildContext context, String title, IconData icon, Color color) {
+  Widget _buildActionCard(BuildContext context, String title, IconData icon, Color color, {VoidCallback? onTrigger}) {
     return InkWell(
-      onTap: () {},
+      onTap: onTrigger ?? () {},
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withOpacity(0.08),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withOpacity(0.2)),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(height: 8),
             Text(
               title,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: color.withOpacity(0.8),
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade800,
               ),
             ),
           ],
