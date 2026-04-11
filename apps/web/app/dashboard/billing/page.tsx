@@ -1698,34 +1698,45 @@ function WalkInSaleTab() {
             return [...prev, newItem];
           }
         });
+      } else {
+        alert(`Barcode ${barcode} found but no matching item in your inventory.`);
       }
     } catch (err) {
       console.error('Barcode processing error', err);
+      alert(`Error scanning barcode ${barcode}: Item may not exist in your inventory list.`);
     }
   }, [setItems]);
 
   useEffect(() => {
     // Connect socket and listen for remote scans
-    const token = localStorage.getItem('access_token');
+    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
     if (token) connectSocket(token);
 
-    if (shopData?.id) {
-      socket.emit('join_shop', { shop_id: shopData.id });
-    }
+    const handleConnect = () => {
+      console.log('WS: Connected to server');
+      if (shopData?.id) {
+        socket.emit('join_shop', { shop_id: shopData.id });
+      }
+    };
 
     const handleRemoteScan = (data: { barcode: string }) => {
       console.log('Remote scan received:', data.barcode);
       processBarcode(data.barcode);
     };
 
+    socket.on('connect', handleConnect);
     socket.on('item_scanned', handleRemoteScan);
 
+    // If already connected, join room now
+    if (socket.connected && shopData?.id) {
+      socket.emit('join_shop', { shop_id: shopData.id });
+    }
+
     return () => {
+      socket.off('connect', handleConnect);
       socket.off('item_scanned', handleRemoteScan);
-      // We don't disconnect globally because other tabs might use it, 
-      // but we could leave the shop room if needed.
     };
-  }, [shopData, processBarcode]);
+  }, [shopData?.id, processBarcode]);
 
   useEffect(() => {
     const handleGlobalKeys = async (e: KeyboardEvent) => {
