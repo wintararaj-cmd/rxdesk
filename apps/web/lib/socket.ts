@@ -17,17 +17,16 @@ const getSocketUrl = () => {
   }
   return 'http://localhost:3000';
 };
-
 export const socket = io(getSocketUrl(), {
   path: '/api/v1/socket.io',
   autoConnect: false,
   withCredentials: true,
-  transports: ['websocket', 'polling'],
   reconnection: true,
   reconnectionAttempts: Infinity,
   reconnectionDelay: 1000,
   timeout: 20000,
 });
+
 
 // Helper to connect with auth token
 export const connectSocket = (token: string) => {

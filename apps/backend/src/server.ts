@@ -28,7 +28,6 @@ const io = new SocketIOServer(server, {
     ],
     credentials: true,
   },
-  transports: ['websocket', 'polling'],
 });
 
 // Attach io to app so route handlers can emit events
