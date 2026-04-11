@@ -342,6 +342,9 @@ class ApiService {
       'year': year.toString(),
     });
   }
+  static Future<Map<String, dynamic>> transmitBarcode(String barcode) async {
+    return _request('POST', '/realtime/scan', body: {'barcode': barcode});
+  }
 }
 
 class ApiException implements Exception {
@@ -350,7 +353,4 @@ class ApiException implements Exception {
   ApiException(this.message, this.statusCode);
   @override
   String toString() => message;
-  static Future<Map<String, dynamic>> transmitBarcode(String barcode) async {
-    return _request('POST', '/realtime/scan', body: {'barcode': barcode});
-  }
 }
