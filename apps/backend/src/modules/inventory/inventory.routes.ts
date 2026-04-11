@@ -870,4 +870,65 @@ router.delete('/:id', requireRole('shop_owner'), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /inventory/barcode/:barcode — Look up inventory item by barcode (EAN-13/UPC/QR)
+router.get('/barcode/:barcode', requireRole('shop_owner'), async (req, res, next) => {
+  try {
+    const shop = await getShopByUser(req.user!.id);
+    const barcode = req.params.barcode.trim();
+    if (!barcode) throw new AppError(400, 'VALIDATION_ERROR', 'Barcode is required');
+
+    // 1. Search shop_inventory by barcode directly (custom/assigned barcodes)
+    const invItem = await prisma.shopInventory.findFirst({
+      where: { shop_id: shop.id, barcode },
+      orderBy: { expiry_date: 'asc' }, // FEFO - First Expiry, First Out
+    });
+    if (invItem) return res.json({ success: true, data: invItem, source: 'inventory_barcode' });
+
+    // 2. Fallback: search global medicines catalog by barcode (EAN-13 from manufacturer)
+    const globalMed = await prisma.medicine.findFirst({ where: { barcode } });
+    if (globalMed) {
+      const invByName = await prisma.shopInventory.findFirst({
+        where: {
+          shop_id: shop.id,
+          medicine_name: { equals: globalMed.name, mode: 'insensitive' },
+          stock_qty: { gt: 0 },
+        },
+        orderBy: { expiry_date: 'asc' },
+      });
+      if (invByName) return res.json({ success: true, data: invByName, source: 'medicine_barcode' });
+
+      // Medicine in catalog but not in shop stock
+      return res.json({
+        success: true, data: null, medicine: globalMed, source: 'medicine_catalog',
+        message: `${globalMed.name} found in catalog but not in your inventory`,
+      });
+    }
+
+    // 3. Not found
+    throw new AppError(404, 'NOT_FOUND', 'No medicine found for this barcode');
+  } catch (err) { next(err); }
+});
+
+// PATCH /inventory/:id/barcode — Assign a barcode to an inventory batch
+router.patch('/:id/barcode', requireRole('shop_owner'), async (req, res, next) => {
+  try {
+    const shop = await getShopByUser(req.user!.id);
+    const { barcode } = req.body;
+    if (!barcode || typeof barcode !== 'string') throw new AppError(400, 'VALIDATION_ERROR', 'barcode is required');
+
+    const existing = await prisma.shopInventory.findFirst({ where: { id: req.params.id, shop_id: shop.id } });
+    if (!existing) throw new AppError(404, 'NOT_FOUND', 'Inventory item not found');
+
+    // Ensure barcode is unique within shop
+    const duplicate = await prisma.shopInventory.findFirst({
+      where: { shop_id: shop.id, barcode, id: { not: req.params.id } },
+    });
+    if (duplicate) throw new AppError(409, 'CONFLICT', `Barcode already assigned to: ${duplicate.medicine_name}`);
+
+    const updated = await prisma.shopInventory.update({ where: { id: req.params.id }, data: { barcode } });
+    clearInventorySearchCache(shop.id);
+    res.json({ success: true, data: updated, message: 'Barcode assigned successfully' });
+  } catch (err) { next(err); }
+});
+
 export default router;

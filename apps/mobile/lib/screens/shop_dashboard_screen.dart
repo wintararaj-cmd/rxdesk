@@ -12,11 +12,25 @@ class ShopDashboardScreen extends StatefulWidget {
 class _ShopDashboardScreenState extends State<ShopDashboardScreen> {
   bool _isLoading = true;
   Map<String, dynamic> _data = {};
+  Map<String, dynamic> _gstSummary = {};
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _loadGstSummary();
+  }
+
+  Future<void> _loadGstSummary() async {
+    try {
+      final now = DateTime.now();
+      final res = await ApiService.getGstSummary(month: now.month, year: now.year);
+      if (mounted) {
+        setState(() {
+          _gstSummary = res['data'] ?? {};
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadData() async {
@@ -93,6 +107,53 @@ class _ShopDashboardScreenState extends State<ShopDashboardScreen> {
                 ],
               ),
               const SizedBox(height: 32),
+              
+              // GST Insights Section
+              if (_gstSummary.isNotEmpty) ...[
+                const Text('GST Compliance Insights', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: [Colors.indigo.shade900, Colors.indigo.shade800]),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [BoxShadow(color: Colors.indigo.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4))],
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Est. Tax Liability', style: TextStyle(color: Colors.white60, fontSize: 12, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 4),
+                              Text('₹${_gstSummary['total_tax']?.toStringAsFixed(2) ?? '0.00'}', style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.black)),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(10)),
+                            child: const Text('GSTR-1 Ready', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                          )
+                        ],
+                      ),
+                      const Divider(color: Colors.white10, height: 32),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildMiniGstStat('B2B Sales', '₹${_gstSummary['b2b_total'] ?? 0}'),
+                          _buildMiniGstStat('B2CS Sales', '₹${_gstSummary['b2cs_total'] ?? 0}'),
+                          _buildMiniGstStat('HSN Items', '${_gstSummary['hsn_count'] ?? 0}'),
+                        ],
+                      )
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+              ],
+
               const Text(
                 'Quick Actions',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
@@ -255,6 +316,16 @@ class _ShopDashboardScreenState extends State<ShopDashboardScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildMiniGstStat(String label, String value) {
+    return Column(
+      children: [
+        Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.black, fontSize: 16)),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
+      ],
     );
   }
 }

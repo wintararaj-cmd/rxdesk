@@ -202,6 +202,125 @@ router.get('/availability', searchRateLimiter, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// POST /medicines/check-interactions — Check drug-drug interactions for a list of medicines
+// Accepts: { medicine_names: string[] }  (can be brand names or generic names)
+router.post('/check-interactions', async (req, res, next) => {
+  try {
+    const { medicine_names } = req.body;
+    if (!Array.isArray(medicine_names) || medicine_names.length < 2) {
+      return res.json({ success: true, data: { interactions: [], safe: true } });
+    }
+
+    // 1. Resolve each name to its generic_name from the medicines catalog
+    const resolved = await Promise.all(
+      medicine_names.map(async (name: string) => {
+        const med = await prisma.medicine.findFirst({
+          where: {
+            is_active: true,
+            OR: [
+              { name: { contains: name.trim(), mode: 'insensitive' } },
+              { brand_name: { contains: name.trim(), mode: 'insensitive' } },
+              { generic_name: { contains: name.trim(), mode: 'insensitive' } },
+            ],
+          },
+          select: { id: true, name: true, generic_name: true, brand_name: true, is_schedule_h: true },
+        });
+        return { input: name, found: med };
+      })
+    );
+
+    const generics = resolved
+      .map(r => r.found?.generic_name?.toLowerCase().trim())
+      .filter(Boolean) as string[];
+
+    // 2. Curated interaction rules (expanded Indian pharma context)
+    // Format: { pair: [generic_a_keyword, generic_b_keyword], severity, message }
+    const INTERACTION_RULES = [
+      // ── NSAIDs & Anticoagulants ──────────────────────────────────────────────
+      { pair: ['aspirin', 'warfarin'], severity: 'HIGH', message: 'Aspirin + Warfarin: High bleeding risk. Avoid combination; monitor INR closely.' },
+      { pair: ['ibuprofen', 'warfarin'], severity: 'HIGH', message: 'Ibuprofen + Warfarin: Increased bleeding risk. Use paracetamol instead.' },
+      { pair: ['diclofenac', 'warfarin'], severity: 'HIGH', message: 'Diclofenac + Warfarin: Potentiates anticoagulant effect. Monitor closely.' },
+      // ── Antibiotics ──────────────────────────────────────────────────────────
+      { pair: ['metronidazole', 'alcohol'], severity: 'HIGH', message: 'Metronidazole reacts with alcohol causing severe nausea and vomiting. Advise no alcohol.' },
+      { pair: ['ciprofloxacin', 'antacid'], severity: 'MODERATE', message: 'Antacids reduce ciprofloxacin absorption. Take 2 hours apart.' },
+      { pair: ['azithromycin', 'antacid'], severity: 'LOW', message: 'Antacids may slightly reduce azithromycin absorption. Take separately.' },
+      { pair: ['doxycycline', 'antacid'], severity: 'MODERATE', message: 'Calcium/Mg antacids chelate doxycycline, reducing efficacy. Take 2-3 hours apart.' },
+      // ── Cardiac ──────────────────────────────────────────────────────────────
+      { pair: ['digoxin', 'amiodarone'], severity: 'HIGH', message: 'Amiodarone inhibits digoxin clearance. Risk of digoxin toxicity — reduce digoxin dose.' },
+      { pair: ['metoprolol', 'verapamil'], severity: 'HIGH', message: 'Combined beta-blocker + CCB can cause severe bradycardia and heart block.' },
+      { pair: ['atenolol', 'verapamil'], severity: 'HIGH', message: 'Combined beta-blocker + verapamil risk of AV block and cardiac failure.' },
+      { pair: ['amlodipine', 'simvastatin'], severity: 'MODERATE', message: 'Amlodipine increases simvastatin exposure 1.4–1.6x. Limit simvastatin to 20mg/day.' },
+      // ── Diabetes ─────────────────────────────────────────────────────────────
+      { pair: ['metformin', 'alcohol'], severity: 'HIGH', message: 'Metformin + heavy alcohol use increases lactic acidosis risk. Warn patient.' },
+      { pair: ['glimepiride', 'fluconazole'], severity: 'HIGH', message: 'Fluconazole increases glimepiride levels causing severe hypoglycemia.' },
+      { pair: ['glibenclamide', 'fluconazole'], severity: 'HIGH', message: 'Fluconazole inhibits glibenclamide metabolism — profound hypoglycemia risk.' },
+      // ── CNS ──────────────────────────────────────────────────────────────────
+      { pair: ['tramadol', 'ssri'], severity: 'HIGH', message: 'Tramadol + SSRIs risk serotonin syndrome. Avoid or monitor extremely closely.' },
+      { pair: ['tramadol', 'sertraline'], severity: 'HIGH', message: 'Tramadol + sertraline: Serotonin syndrome and seizure risk.' },
+      { pair: ['tramadol', 'fluoxetine'], severity: 'HIGH', message: 'Tramadol + fluoxetine: Serotoninergic crisis risk. Use alternative analgesic.' },
+      { pair: ['clonazepam', 'alcohol'], severity: 'HIGH', message: 'Benzodiazepine + alcohol: CNS/respiratory depression. Strictly avoid.' },
+      { pair: ['alprazolam', 'alcohol'], severity: 'HIGH', message: 'Alprazolam + alcohol: Severe respiratory depression. Contraindicated.' },
+      // ── Steroids ─────────────────────────────────────────────────────────────
+      { pair: ['dexamethasone', 'ibuprofen'], severity: 'MODERATE', message: 'Corticosteroid + NSAID: Increased risk of GI ulceration and bleeding.' },
+      { pair: ['prednisolone', 'aspirin'], severity: 'MODERATE', message: 'Prednisolone reduces salicylate levels; discontinuation may cause toxicity.' },
+      // ── Schedule H drugs ─────────────────────────────────────────────────────
+      { pair: ['phenytoin', 'carbamazepine'], severity: 'MODERATE', message: 'Both induce CYP450 — mutual reduction in plasma levels. Monitor levels.' },
+      { pair: ['phenytoin', 'warfarin'], severity: 'HIGH', message: 'Phenytoin can both inhibit and induce warfarin metabolism — unpredictable INR.' },
+      // ── Antifungals ──────────────────────────────────────────────────────────
+      { pair: ['ketoconazole', 'simvastatin'], severity: 'HIGH', message: 'Ketoconazole greatly increases simvastatin plasma levels — myopathy/rhabdomyolysis risk.' },
+      { pair: ['fluconazole', 'simvastatin'], severity: 'HIGH', message: 'Fluconazole increases simvastatin AUC ~5-fold. Risk of rhabdomyolysis.' },
+      // ── Antihistamines ───────────────────────────────────────────────────────
+      { pair: ['cetirizine', 'alcohol'], severity: 'MODERATE', message: 'Cetirizine + alcohol can worsen sedation. Warn patients who drive.' },
+      { pair: ['chlorpheniramine', 'alcohol'], severity: 'MODERATE', message: 'First-gen antihistamine + alcohol: Excessive sedation.' },
+    ];
+
+    // 3. Check each pair of generics against rules
+    const interactions: { medicine_a: string; medicine_b: string; severity: string; message: string }[] = [];
+
+    for (let i = 0; i < generics.length; i++) {
+      for (let j = i + 1; j < generics.length; j++) {
+        const a = generics[i];
+        const b = generics[j];
+
+        for (const rule of INTERACTION_RULES) {
+          const [ruleA, ruleB] = rule.pair;
+          const matchesAB = a.includes(ruleA) && b.includes(ruleB);
+          const matchesBA = b.includes(ruleA) && a.includes(ruleB);
+
+          if (matchesAB || matchesBA) {
+            // Resolve back to original input names for display
+            const nameA = resolved.find(r => r.found?.generic_name?.toLowerCase().trim() === a)?.input ?? a;
+            const nameB = resolved.find(r => r.found?.generic_name?.toLowerCase().trim() === b)?.input ?? b;
+            interactions.push({ medicine_a: nameA, medicine_b: nameB, ...rule });
+          }
+        }
+      }
+    }
+
+    // 4. Also flag Schedule H combinations
+    const scheduleHMeds = resolved.filter(r => r.found?.is_schedule_h).map(r => r.input);
+
+    const hasCritical = interactions.some(i => i.severity === 'HIGH');
+
+    res.json({
+      success: true,
+      data: {
+        interactions,
+        schedule_h_medicines: scheduleHMeds,
+        safe: interactions.length === 0,
+        has_critical: hasCritical,
+        resolved_medicines: resolved.map(r => ({
+          input: r.input,
+          name: r.found?.name ?? null,
+          generic_name: r.found?.generic_name ?? null,
+          is_schedule_h: r.found?.is_schedule_h ?? false,
+          not_found: !r.found,
+        })),
+      },
+    });
+  } catch (err) { next(err); }
+});
+
 // GET /medicines/:id
 router.get('/:id', async (req, res, next) => {
   try {

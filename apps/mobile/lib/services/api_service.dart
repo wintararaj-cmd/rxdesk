@@ -179,6 +179,10 @@ class ApiService {
     return (res['data'] as List?) ?? [];
   }
 
+  static Future<Map<String, dynamic>> getInventoryByBarcode(String barcode) async {
+    return _request('GET', '/inventory/barcode/$barcode');
+  }
+
   // ── BILLING ──────────────────────────────────────────────────────────────
   static Future<List<dynamic>> searchCustomers(String phone) async {
     final res = await _request('GET', '/bills/customers/search', query: {'phone': phone});
@@ -325,6 +329,22 @@ class ApiService {
 
   static Future<Map<String, dynamic>> markChamberLeave(String chamberId, String date, String reason) async {
     return _request('POST', '/chambers/$chamberId/leave', body: {'leave_date': date, 'reason': reason});
+  }
+
+  // ── ELITE TOOLS & COMPLIANCE ─────────────────────────────────────────────
+  static Future<Map<String, dynamic>> checkInteractions(List<String> medicineNames) async {
+    return _request('POST', '/medicines/check-interactions', body: {'medicine_names': medicineNames});
+  }
+
+  static Future<Map<String, dynamic>> getInventoryByBarcode(String barcode) async {
+    return _request('GET', '/inventory/barcode/$barcode');
+  }
+
+  static Future<Map<String, dynamic>> getGstSummary({required int month, required int year}) async {
+    return _request('GET', '/accounting/reports/gst-summary', query: {
+      'month': month.toString(),
+      'year': year.toString(),
+    });
   }
 }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:async';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import '../services/api_service.dart';
 
 class NewSaleScreen extends StatefulWidget {
@@ -176,6 +177,77 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
     } catch (_) {}
   }
 
+  void _onBarcodeScan() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Text('Scan Medicine Barcode', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: MobileScanner(
+                  onDetect: (capture) async {
+                    final List<Barcode> barcodes = capture.barcodes;
+                    if (barcodes.isNotEmpty) {
+                      final String? code = barcodes.first.rawValue;
+                      if (code != null) {
+                        Navigator.pop(context);
+                        _lookupBarcode(code);
+                      }
+                    }
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 48),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _lookupBarcode(String barcode) async {
+    setState(() => _isLoading = true);
+    try {
+      final res = await ApiService.getInventoryByBarcode(barcode);
+      final item = res['data'];
+      if (item != null) {
+        // Add to items list or update last empty one
+        setState(() {
+          int index = _items.indexWhere((it) => it['medicine_name_ctrl'].text.isEmpty);
+          if (index == -1) {
+            _addItem();
+            index = _items.length - 1;
+          }
+          
+          final master = item['master'];
+          _items[index]['medicine_name_ctrl'].text = master['medicine_name'];
+          _items[index]['inventory_id'] = item['id'];
+          _items[index]['batch_number'] = item['batch_number'];
+          _items[index]['mrp'].text = item['mrp'].toString();
+          _items[index]['available_batches'] = [item];
+        });
+        _calculateTotals();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Barcode Error: $e')));
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _generateBill() async {
     // validation
     List<Map<String, dynamic>> payloadItems = [];
@@ -321,6 +393,11 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
         foregroundColor: Colors.black,
         elevation: 1,
         actions: [
+          IconButton(
+            onPressed: _onBarcodeScan,
+            icon: const Icon(Icons.qr_code_scanner, color: Colors.deepPurple),
+            tooltip: 'Scan Barcode',
+          ),
           TextButton(
             onPressed: _reset,
             child: const Text('Reset', style: TextStyle(color: Colors.deepPurple)),

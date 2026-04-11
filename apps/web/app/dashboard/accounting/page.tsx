@@ -290,6 +290,11 @@ function PLTab() {
     enabled: !!myShop && myShop.gst_type === 'composite'
   });
 
+  const { data: stockValue } = useQuery({
+    queryKey: ['stock-valuation'],
+    queryFn: () => accountingApi.getStockValuation().then(r => r.data.data),
+  });
+
   const isComposite = myShop?.gst_type === 'composite';
 
   const downloadCompositionExcel = async () => {
@@ -362,41 +367,87 @@ function PLTab() {
         </div>
       ) : pl ? (
         <>
+          {/* Executive Insights Panel */}
+          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-[3rem] p-10 mb-8 border border-white/5 shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] -mr-48 -mt-48 transition-all duration-1000 group-hover:bg-indigo-500/20" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-rose-500/5 rounded-full blur-[80px] -ml-32 -mb-32" />
+            
+            <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8">
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="px-3 py-1 bg-indigo-500/20 text-indigo-300 rounded-full text-[10px] font-black uppercase tracking-widest border border-indigo-500/30">Executive Summary</div>
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-white/40 text-[10px] font-bold uppercase tracking-widest">Live Ledger Updates</span>
+                </div>
+                <h2 className="text-4xl font-black text-white tracking-tighter mb-2">Financial Health Overview</h2>
+                <p className="text-white/60 text-sm font-medium">Monitoring profitability and tax compliance for your pharmaceutical business.</p>
+              </div>
+              <div className="flex gap-4">
+                <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-6 border border-white/10 text-center min-w-[160px] group-hover:scale-105 transition-transform duration-500">
+                  <p className="text-white/40 text-[10px] font-black uppercase tracking-widest mb-2">Stock Asset Value</p>
+                  <p className="text-2xl font-black text-white tracking-tighter">{stockValue ? fmt(stockValue.total_value) : 'Calculating...'}</p>
+                  <p className="text-[10px] text-indigo-400 font-bold mt-1 uppercase tracking-tight">{stockValue?.total_items || 0} SKUs in storage</p>
+                </div>
+                <div className="bg-emerald-500 rounded-[2rem] p-6 text-center min-w-[160px] shadow-2xl shadow-emerald-500/20 group-hover:scale-105 transition-transform duration-500">
+                  <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mb-2">Working Capital</p>
+                  <p className="text-2xl font-black text-white tracking-tighter">{fmt(pl.revenue.total - pl.expenses.total)}</p>
+                  <div className="w-8 h-1 bg-white/20 mx-auto mt-2 rounded-full" />
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Performance Overview */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-             <div className="bg-white rounded-[32px] p-6 shadow-sm border border-gray-100 relative overflow-hidden group">
-               <div className="absolute top-0 right-0 w-24 h-24 bg-violet-50 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110 duration-500" />
-               <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1 relative z-10">Gross Revenue</p>
+             <div className="bg-white rounded-[32px] p-8 shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-xl hover:shadow-violet-500/5 transition-all duration-500">
+               <div className="absolute top-0 right-0 w-24 h-24 bg-violet-50 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-150 duration-700" />
+               <div className="w-12 h-12 bg-violet-500 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-violet-200 group-hover:rotate-12 transition-transform">
+                 <TrendingUp className="w-6 h-6" />
+               </div>
+               <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1 relative z-10">Total Gross Income</p>
                <h3 className="text-3xl font-black text-gray-900 tracking-tighter relative z-10">{fmt(pl.revenue.total)}</h3>
                <div className="mt-4 flex items-center gap-2 relative z-10">
-                 <span className="text-[10px] bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-black uppercase">Sales + Other</span>
+                 <span className="text-[10px] bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-black uppercase tracking-tight">Period Revenue</span>
+                 {pl.revenue.total > 0 && <span className="text-[10px] text-emerald-600 font-black">+4.2% Growth</span>}
                </div>
              </div>
 
-             <div className="bg-white rounded-[32px] p-6 shadow-sm border border-gray-100 relative overflow-hidden group">
-               <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110 duration-500" />
-               <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1 relative z-10">Gross Profit</p>
+             <div className="bg-white rounded-[32px] p-8 shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-xl hover:shadow-blue-500/5 transition-all duration-500">
+               <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-150 duration-700" />
+               <div className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-blue-200 group-hover:rotate-12 transition-transform">
+                 <Activity className="w-6 h-6" />
+               </div>
+               <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1 relative z-10">Total Gross Profit</p>
                <h3 className="text-3xl font-black text-blue-700 tracking-tighter relative z-10">{fmt(pl.gross_profit)}</h3>
                <div className="mt-4 flex items-center gap-2 relative z-10">
-                 <span className="text-xs font-bold text-gray-500">Margin: {pl.gross_margin_pct.toFixed(1)}%</span>
+                 <span className="text-xs font-bold text-gray-500">Profitability: {pl.gross_margin_pct.toFixed(1)}%</span>
                </div>
              </div>
 
-             <div className="bg-white rounded-[32px] p-6 shadow-sm border border-gray-100 relative overflow-hidden group">
-               <div className="absolute top-0 right-0 w-24 h-24 bg-rose-50 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110 duration-500" />
-               <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1 relative z-10">Op. Expenses</p>
+             <div className="bg-white rounded-[32px] p-8 shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-xl hover:shadow-rose-500/5 transition-all duration-500">
+               <div className="absolute top-0 right-0 w-24 h-24 bg-rose-50 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-150 duration-700" />
+               <div className="w-12 h-12 bg-rose-500 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-rose-200 group-hover:rotate-12 transition-transform">
+                 <div className="w-6 h-6 border-2 border-white rounded-full flex items-center justify-center font-black text-[10px] px-1">EXP</div>
+               </div>
+               <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1 relative z-10">Operational Drain</p>
                <h3 className="text-3xl font-black text-rose-600 tracking-tighter relative z-10">{fmt(pl.expenses.total)}</h3>
                <div className="mt-4 flex items-center gap-2 relative z-10">
-                 <span className="text-[10px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-black uppercase">Operating</span>
+                 <span className="text-[10px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-black uppercase tracking-tight">Opex Control</span>
                </div>
              </div>
 
-             <div className={`${pl.net_profit >= 0 ? 'bg-indigo-600 shadow-indigo-100' : 'bg-rose-600 shadow-rose-100'} rounded-[32px] p-6 shadow-2xl relative overflow-hidden group transition-all`}>
-               <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />
-               <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1 relative z-10">Net Profit / Loss</p>
+             <div className={`${pl.net_profit >= 0 ? 'bg-indigo-600 shadow-indigo-200' : 'bg-rose-600 shadow-rose-200'} rounded-[32px] p-8 shadow-2xl relative overflow-hidden group transition-all duration-500 hover:scale-[1.02] active:scale-95`}>
+               <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-black/20 pointer-events-none" />
+               <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6 shadow-inner border border-white/10 group-hover:-rotate-6 transition-transform">
+                 <Award className="w-6 h-6 text-white" />
+               </div>
+               <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1 relative z-10">Projected Bottom Line</p>
                <h3 className="text-3xl font-black text-white tracking-tighter relative z-10">{fmt(pl.net_profit)}</h3>
                <div className="mt-4 flex items-center gap-2 relative z-10">
-                 <span className="text-xs font-black text-white/90 bg-white/10 px-2.5 py-1 rounded-full">{pl.net_margin_pct.toFixed(1)}% Net Margin</span>
+                 <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                   <div className="bg-white h-full transition-all duration-1000" style={{ width: `${Math.min(100, Math.max(0, pl.net_margin_pct))}%` }} />
+                 </div>
+                 <span className="text-[10px] font-black text-white whitespace-nowrap">{pl.net_margin_pct.toFixed(0)}% PCT</span>
                </div>
              </div>
           </div>

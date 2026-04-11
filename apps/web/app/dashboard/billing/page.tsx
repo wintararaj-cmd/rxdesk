@@ -432,6 +432,50 @@ function NewBillTab() {
   const qc = useQueryClient();
   const [qrContent, setQrContent] = useState('');
   const [bill, setBill] = useState<BillData | null>(null);
+  const barcodeRef = useRef<string>('');
+  const lastKeyTimeRef = useRef<number>(0);
+
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      // Ignore if focus is in an input/textarea (unless it's deliberate, but for global scanner it's usually outside)
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+
+      const currentTime = Date.now();
+      
+      // If interval between keys is too long, it's manual typing, reset
+      if (currentTime - lastKeyTimeRef.current > 50) {
+        barcodeRef.current = '';
+      }
+
+      if (e.key === 'Enter') {
+        if (barcodeRef.current.length >= 8) {
+          const barcode = barcodeRef.current;
+          barcodeRef.current = '';
+          try {
+            const res = await inventoryApi.getByBarcode(barcode);
+            const inv = res.data.data;
+            if (inv) {
+              // If we already have a bill, we could add to it, but NewBillTab initially creates one.
+              // For now, let's show an alert or toast that item found.
+              // In a real POS, this would append to an 'items' state.
+              alert(`Scanned: ${inv.medicine_name} (Batch: ${inv.batch_number})`);
+            }
+          } catch {
+            console.error('Barcode not found');
+          }
+        }
+        barcodeRef.current = '';
+      } else if (/^\d$/.test(e.key)) {
+        barcodeRef.current += e.key;
+      }
+
+      lastKeyTimeRef.current = currentTime;
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
   const [prescriptionId, setPrescriptionId] = useState<string | null>(null);
   const { data: shopData } = useQuery({ queryKey: ['shop-me'], queryFn: () => shopApi.getMyShop().then(r => r.data.data), staleTime: 5 * 60 * 1000 });
   const shopName = (shopData as any)?.shop_name ?? 'Medical Shop';
@@ -1574,6 +1618,8 @@ function WalkInSaleTab() {
   const [suggHighlights, setSuggHighlights] = useState<Record<number, number>>({});
   const [triedToSubmit, setTriedToSubmit] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const barcodeRef = useRef<string>('');
+  const lastKeyTimeRef = useRef<number>(0);
   const { data: shopData } = useQuery({ queryKey: ['shop-me'], queryFn: () => shopApi.getMyShop().then(r => r.data.data), staleTime: 5 * 60 * 1000 });
   const shopName = (shopData as any)?.shop_name ?? 'Medical Shop';
   const isTaxInvoice = (shopData as any)?.gst_type === 'regular';
@@ -1613,16 +1659,74 @@ function WalkInSaleTab() {
   });
 
   useEffect(() => {
-    const handleGlobalKeys = (e: KeyboardEvent) => {
+    const handleGlobalKeys = async (e: KeyboardEvent) => {
       if (e.altKey && e.key === 'n') {
         e.preventDefault();
         addItem();
         setTimeout(() => medicineInputRefs.current[items.length]?.focus(), 50);
+        return;
       }
       if (e.altKey && e.key === 'g') {
         e.preventDefault();
         handleCreate();
+        return;
       }
+
+      // Barcode Scanner Logic
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+
+      const currentTime = Date.now();
+      if (currentTime - lastKeyTimeRef.current > 50) {
+        barcodeRef.current = '';
+      }
+
+      if (e.key === 'Enter') {
+        if (barcodeRef.current.length >= 8) {
+          const barcode = barcodeRef.current;
+          barcodeRef.current = '';
+          try {
+            const res = await inventoryApi.getByBarcode(barcode);
+            const inv = res.data.data;
+            if (inv) {
+              // Find first empty row or add new
+              setItems(prev => {
+                const lastIdx = prev.length - 1;
+                const lastItem = prev[lastIdx];
+                const newItem = {
+                  medicine_name: inv.medicine_name,
+                  unit: inv.unit || 'strip',
+                  mrp: String(inv.mrp),
+                  quantity: '1',
+                  gst_rate: String(inv.gst_rate || 12),
+                  discount_type: inv.discount_type || 'percentage',
+                  discount_value: String(inv.discount_value || 0),
+                  batch_number: inv.batch_number,
+                  expiry_date: inv.expiry_date,
+                  inventory_id: inv.id,
+                  stock_qty: inv.stock_qty,
+                };
+
+                if (!lastItem.medicine_name && prev.length === 1) {
+                  return [newItem];
+                } else if (!lastItem.medicine_name) {
+                  const updated = [...prev];
+                  updated[lastIdx] = newItem;
+                  return updated;
+                } else {
+                  return [...prev, newItem];
+                }
+              });
+            }
+          } catch (err) {
+            console.error('Barcode scanner error', err);
+          }
+        }
+        barcodeRef.current = '';
+      } else if (/^\d$/.test(e.key)) {
+        barcodeRef.current += e.key;
+      }
+      lastKeyTimeRef.current = currentTime;
     };
     window.addEventListener('keydown', handleGlobalKeys);
     return () => window.removeEventListener('keydown', handleGlobalKeys);

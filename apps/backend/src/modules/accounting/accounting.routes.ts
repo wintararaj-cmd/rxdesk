@@ -318,6 +318,16 @@ router.get('/reports/gst-summary', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/reports/gstr1-json', shopAuth, async (req, res, next) => {
+  try {
+    const month = parseInt(req.query.month as string);
+    const year = parseInt(req.query.year as string);
+    if (!month || !year) return res.status(400).json({ success: false, message: 'Month and year are required' });
+    const data = await service.generateGstr1Json(req.user!.id, month, year);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 router.get('/reports/gst-composition', shopAuth, async (req, res, next) => {
   try {
     const quarter = req.query.quarter ? Number(req.query.quarter) : Math.floor(new Date().getMonth() / 3) + 1;

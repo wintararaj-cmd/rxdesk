@@ -21,6 +21,14 @@ class _DoctorPrescribeScreenState extends State<DoctorPrescribeScreen> {
   final _durationCtrl = TextEditingController();
   final _instructionsCtrl = TextEditingController();
 
+  // Vitals
+  final _bpCtrl = TextEditingController();
+  final _pulseCtrl = TextEditingController();
+  final _spo2Ctrl = TextEditingController();
+  final _weightCtrl = TextEditingController();
+
+  List<dynamic> _interactionWarnings = [];
+
   List<Map<String, dynamic>> _patientSuggestions = [];
   Timer? _patientDebounce;
   List<Map<String, dynamic>> _medicineSuggestions = [];
@@ -40,6 +48,10 @@ class _DoctorPrescribeScreenState extends State<DoctorPrescribeScreen> {
     _frequencyCtrl.dispose();
     _durationCtrl.dispose();
     _instructionsCtrl.dispose();
+    _bpCtrl.dispose();
+    _pulseCtrl.dispose();
+    _spo2Ctrl.dispose();
+    _weightCtrl.dispose();
     _patientDebounce?.cancel();
     _medicineDebounce?.cancel();
     super.dispose();
@@ -168,7 +180,66 @@ class _DoctorPrescribeScreenState extends State<DoctorPrescribeScreen> {
                   )).toList(),
                 ),
               ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
+
+            // --- Clinical Vitals Section ---
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blueGrey.shade50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.blueGrey.shade100),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Patient Vitals', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _buildVitalInput('BP', _bpCtrl, '120/80', Icons.monitor_heart),
+                      const SizedBox(width: 8),
+                      _buildVitalInput('Pulse', _pulseCtrl, '72', Icons.favorite),
+                      const SizedBox(width: 8),
+                      _buildVitalInput('SpO2', _spo2Ctrl, '98%', Icons.air),
+                      const SizedBox(width: 8),
+                      _buildVitalInput('Weight', _weightCtrl, 'kg', Icons.scale),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // --- Interaction Warning Banner ---
+            if (_interactionWarnings.isNotEmpty)
+              ..._interactionWarnings.map((w) => Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: w['severity'] == 'HIGH' ? Colors.red.shade50 : Colors.amber.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: w['severity'] == 'HIGH' ? Colors.red.shade200 : Colors.amber.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: w['severity'] == 'HIGH' ? Colors.red : Colors.amber.shade800),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${w['severity']} RISK: ${w['medicine_a']} + ${w['medicine_b']}',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: w['severity'] == 'HIGH' ? Colors.red.shade900 : Colors.amber.shade900),
+                          ),
+                          Text(w['description'] ?? '', style: const TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              )).toList(),
             
             // --- Templates Row ---
             Row(
@@ -218,6 +289,7 @@ class _DoctorPrescribeScreenState extends State<DoctorPrescribeScreen> {
                     subtitle: Text(m['generic_name'] ?? ''),
                     onTap: () {
                       _medicineNameCtrl.text = m['medicine_name'] ?? '';
+                      _runInteractionCheck(_medicineNameCtrl.text);
                       setState(() => _medicineSuggestions = []);
                     },
                   )).toList(),

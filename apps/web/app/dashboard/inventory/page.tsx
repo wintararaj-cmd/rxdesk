@@ -94,6 +94,7 @@ const EMPTY_ADD_FORM = {
   discount_type: 'percentage',
   discount_value: '0',
   rack_location: '',
+  barcode: '',
 };
 
 // Edit form — all fields (manual stock corrections + purchase-invoice fields)
@@ -111,6 +112,7 @@ const EMPTY_EDIT_FORM = {
   discount_type: 'percentage',
   discount_value: '0',
   rack_location: '',
+  barcode: '',
 };
 
 // Component for each medicine in the master list
@@ -410,7 +412,7 @@ export default function InventoryPage() {
       gst_rate: Number(form.gst_rate) || 5,
       discount_type: form.discount_type,
       discount_value: Number(form.discount_value) || 0,
-      // stock starts at 0 — populated via purchase invoices
+      barcode: (form as any).barcode || '',
       stock_qty: 0,
     });
   };
@@ -430,6 +432,7 @@ export default function InventoryPage() {
       expiry_date: item.expiry_date ? item.expiry_date.split('T')[0] : '',
       discount_type: item.discount_type,
       discount_value: String(item.discount_value),
+      barcode: (item as any).barcode || '',
     });
   };
 
@@ -450,6 +453,7 @@ export default function InventoryPage() {
           rack_location: editForm.rack_location,
           reorder_level: editForm.reorder_level ? Number(editForm.reorder_level) : undefined,
           hsn_code: editForm.hsn_code || undefined,
+          barcode: editForm.barcode || '',
         }
       });
     } else {
@@ -468,6 +472,7 @@ export default function InventoryPage() {
           expiry_date: editForm.expiry_date || undefined,
           discount_type: editForm.discount_type,
           discount_value: editForm.discount_value ? Number(editForm.discount_value) : undefined,
+          barcode: editForm.barcode || '',
         },
       });
     }
@@ -497,6 +502,7 @@ export default function InventoryPage() {
     { key: 'discount_value', label: 'Disc. Val', type: 'number', span: 1 },
     { key: 'reorder_level', label: 'Reorder Level', type: 'number', span: 1, placeholder: '10' },
     { key: 'rack_location', label: 'Rack Location', type: 'text', span: 1, placeholder: 'e.g. A-1' },
+    { key: 'barcode', label: 'Barcode', type: 'text', span: 2, placeholder: 'Scan or type barcode' },
   ];
 
   // Edit form — all fields
@@ -514,6 +520,7 @@ export default function InventoryPage() {
     { key: 'purchase_price', label: 'Purchase Price (₹)', type: 'number', span: 1, note: 'Auto-updated from purchase invoices' },
     { key: 'batch_number', label: 'Batch No.', type: 'text', span: 1, note: 'Auto-updated from purchase invoices' },
     { key: 'expiry_date', label: 'Expiry Date', type: 'date', span: 1, note: 'Auto-updated from purchase invoices' },
+    { key: 'barcode', label: 'Barcode', type: 'text', span: 2 },
   ];
 
   return (

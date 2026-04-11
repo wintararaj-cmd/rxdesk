@@ -113,6 +113,9 @@ export const medicinesApi = {
     apiClient.get('/medicines/composition-search', { params: { q, ...(shopId ? { shop_id: shopId } : {}) } }),
   checkAvailability: (name: string, pincode?: string) =>
     apiClient.get('/medicines/availability', { params: { name, ...(pincode ? { pincode } : {}) } }),
+  /** Drug Interaction Check — pass array of generic_names or medicine IDs */
+  checkInteractions: (medicine_names: string[]) =>
+    apiClient.post('/medicines/check-interactions', { medicine_names }),
 };
 
 
@@ -135,6 +138,7 @@ export const inventoryApi = {
   getDeadStock: () => apiClient.get('/inventory/insights/dead-stock'),
   getPredictiveOrders: () => apiClient.get('/inventory/insights/predictive-orders'),
   getRefillReminders: () => apiClient.get('/inventory/insights/refill-reminders'),
+  getByBarcode: (barcode: string) => apiClient.get(`/inventory/barcode/${barcode}`),
 };
 
 export const billApi = {
@@ -225,6 +229,8 @@ export const accountingApi = {
     apiClient.get('/accounting/reports/gstr3b-excel', { params: { month, year }, responseType: 'blob' }),
   getGstr4Excel: (year: number) =>
     apiClient.get('/accounting/reports/gstr4-excel', { params: { year }, responseType: 'blob' }),
+  getGstr1Json: (month: number, year: number) =>
+    apiClient.get('/accounting/reports/gstr1-json', { params: { month, year } }),
   getStockValuation: () => apiClient.get('/accounting/reports/stock-valuation'),
   getPaymentSplit: (from: string, to: string) =>
     apiClient.get('/accounting/reports/payment-split', { params: { from, to } }),
