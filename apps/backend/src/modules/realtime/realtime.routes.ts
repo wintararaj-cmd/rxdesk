@@ -36,10 +36,17 @@ router.post('/scan', authenticate, async (req: Request, res: Response) => {
       return res.status(400).json({ status: 'error', message: 'Shop session required. Please ensure you are logged in as a shop owner.' });
     }
 
-    // Emit event to all web clients joined in this shop's room
+    // Emit event to target shop room (for all staff in that shop)
     io.to(`shop:${targetShopId}`).emit('item_scanned', { 
       barcode, 
       scanned_by: user.name || user.id,
+      timestamp: new Date()
+    });
+
+    // Also emit directly to the current user's room (for redundancy)
+    io.to(`user:${user.id}`).emit('item_scanned', { 
+      barcode, 
+      scanned_by: 'You (Mobile)',
       timestamp: new Date()
     });
 

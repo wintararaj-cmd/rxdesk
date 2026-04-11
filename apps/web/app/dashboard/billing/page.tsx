@@ -1708,32 +1708,31 @@ function WalkInSaleTab() {
   }, [setItems]);
 
   useEffect(() => {
-    // Connect socket and listen for remote scans
+    // 1. Initial Connection
     const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
     if (token) connectSocket(token);
 
-    const handleConnect = () => {
-      console.log('WS: Connected to server');
+    // 2. Room Joining
+    const joinRooms = () => {
       if (shopData?.id) {
         socket.emit('join_shop', { shop_id: shopData.id });
       }
     };
 
-    const handleRemoteScan = (data: { barcode: string }) => {
-      console.log('Remote scan received:', data.barcode);
+    // 3. Scan Listener
+    const handleRemoteScan = (data: { barcode: string; scanned_by?: string }) => {
+      console.log('SCAN EVENT RECEIVED:', data);
       processBarcode(data.barcode);
     };
 
-    socket.on('connect', handleConnect);
+    socket.on('connect', joinRooms);
     socket.on('item_scanned', handleRemoteScan);
 
-    // If already connected, join room now
-    if (socket.connected && shopData?.id) {
-      socket.emit('join_shop', { shop_id: shopData.id });
-    }
+    // If already connected, join rooms immediately
+    if (socket.connected) joinRooms();
 
     return () => {
-      socket.off('connect', handleConnect);
+      socket.off('connect', joinRooms);
       socket.off('item_scanned', handleRemoteScan);
     };
   }, [shopData?.id, processBarcode]);
