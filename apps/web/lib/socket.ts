@@ -20,6 +20,7 @@ const getSocketUrl = () => {
 };
 
 export const socket = io(getSocketUrl(), {
+  path: '/api/v1/socket.io',
   autoConnect: false,
   withCredentials: true,
   transports: ['websocket', 'polling'],

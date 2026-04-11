@@ -14,6 +14,7 @@ const server = http.createServer(app);
 
 // ─── Socket.IO Setup ──────────────────────────
 const io = new SocketIOServer(server, {
+  path: '/api/v1/socket.io',
   cors: {
     origin: [
       env.FRONTEND_URL,
