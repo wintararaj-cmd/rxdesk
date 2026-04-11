@@ -1732,38 +1732,61 @@ function WalkInSaleTab() {
   }, [setItems]);
 
   useEffect(() => {
-    // 1. Initial Connection
+    // 1. Initial Connection & Heartbeat
     const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-    if (token) connectSocket(token);
+    const establishConnection = () => {
+      if (token && !socket.connected) {
+        console.log('🔗 Attempting scanner connection...');
+        connectSocket(token);
+      }
+    };
+
+    establishConnection();
+    const heartbeat = setInterval(establishConnection, 5000);
 
     // 2. Room Joining
     const joinRooms = () => {
       if (shopData?.id) {
+        console.log('🏠 Joining shop room:', shopData.id);
         socket.emit('join_shop', { shop_id: shopData.id });
         setScannerStatus('connected');
       }
     };
 
-    // 3. Scan Listener
+    // 3. Status Mapping
+    const handleConnect = () => {
+      console.log('✅ Remote Scanner Connected | ID:', socket.id);
+      joinRooms();
+    };
+
+    const handleConnectError = (err: any) => {
+      console.error('❌ Scanner Connection Error:', err.message);
+      setScannerStatus('error');
+    };
+
+    const handleDisconnect = (reason: string) => {
+      console.warn('⚠️ Scanner Disconnected:', reason);
+      setScannerStatus(null);
+      if (reason === 'io server disconnect') socket.connect();
+    };
+
     const handleRemoteScan = (data: { barcode: string; scanned_by?: string }) => {
-      console.log('SCAN EVENT RECEIVED:', data);
+      console.log('📥 BARCODE RECEIVED:', data.barcode);
       processBarcode(data.barcode);
     };
 
-    const handleError = () => setScannerStatus('error');
-    const handleDisconnect = () => setScannerStatus(null);
-
-    socket.on('connect', joinRooms);
-    socket.on('connect_error', handleError);
+    socket.on('connect', handleConnect);
+    socket.on('connect_error', handleConnectError);
     socket.on('disconnect', handleDisconnect);
     socket.on('item_scanned', handleRemoteScan);
 
-    // If already connected, join rooms immediately
-    if (socket.connected) joinRooms();
+    // If shopData loaded after connection
+    if (socket.connected && shopData?.id) joinRooms();
 
     return () => {
-      socket.off('connect', joinRooms);
-      socket.off('connect_error', handleError);
+      clearInterval(heartbeat);
+      socket.off('connect', handleConnect);
+      socket.off('connect_error', handleConnectError);
       socket.off('disconnect', handleDisconnect);
       socket.off('item_scanned', handleRemoteScan);
     };
