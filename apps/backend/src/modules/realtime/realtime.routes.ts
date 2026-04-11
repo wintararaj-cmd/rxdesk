@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { Server } from 'socket.io';
 import { authenticate } from '../../middleware/auth';
+import prisma from '../../config/database';
+import logger from '../../utils/logger';
 
 const router = Router();
 
@@ -18,12 +20,20 @@ router.post('/scan', authenticate, async (req: Request, res: Response) => {
       return res.status(400).json({ status: 'error', message: 'Barcode is required' });
     }
 
-    // Target the specific shop room. 
-    // Shop_id can come from body or user's active shop session
-    const targetShopId = shop_id || user.shop_id; 
+    let targetShopId = shop_id || user.shop_id; 
+
+    // Auto-resolve shop ID if not present in token or body
+    if (!targetShopId) {
+      const shop = await prisma.medicalShop.findFirst({
+        where: { owner_user_id: user.id },
+        select: { id: true }
+      });
+      if (shop) targetShopId = shop.id;
+    }
 
     if (!targetShopId) {
-      return res.status(400).json({ status: 'error', message: 'Shop session required' });
+      logger.error(`WS: Failed to resolve shop for user ${user.id}`);
+      return res.status(400).json({ status: 'error', message: 'Shop session required. Please ensure you are logged in as a shop owner.' });
     }
 
     // Emit event to all web clients joined in this shop's room
@@ -35,7 +45,7 @@ router.post('/scan', authenticate, async (req: Request, res: Response) => {
 
     res.json({ status: 'success', message: 'Barcode transmitted to POS' });
   } catch (error) {
-    console.error('Remote scan error:', error);
+    logger.error('Remote scan error:', error);
     res.status(500).json({ status: 'error', message: 'Internal server error during remote scan' });
   }
 });
