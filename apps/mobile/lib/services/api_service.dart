@@ -345,6 +345,12 @@ class ApiService {
   static Future<Map<String, dynamic>> transmitBarcode(String barcode) async {
     return _request('POST', '/realtime/scan', body: {'barcode': barcode});
   }
+
+  static Future<void> transmitSessionStatus(String status) async {
+    try {
+      await _request('POST', '/realtime/session', body: {'status': status});
+    } catch (_) {}
+  }
 }
 
 class ApiException implements Exception {

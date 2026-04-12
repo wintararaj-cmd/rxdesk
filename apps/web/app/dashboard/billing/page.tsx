@@ -1703,7 +1703,6 @@ function WalkInSaleTab() {
             return [...prev, newItem];
           }
         });
-        setScannerStatus('connected');
       } else if (catalogMed) {
         // Fallback to catalog: load the name but user fills the rest
         setItems(prev => {
@@ -1720,17 +1719,14 @@ function WalkInSaleTab() {
           }
           return [...prev, newItem];
         });
-        setScannerStatus('connected');
         alert(`${catalogMed.name} পাওয়া গেছে, কিন্তু আপনার ইনভেন্টরিতে নেই। দয়া করে ব্যাচ ও দাম বসিয়ে দিন।`);
       } else {
-        setScannerStatus('error');
-        alert(`Barcode ${barcode} found but no matching item in your inventory or catalog.`);
-      }
-    } catch (err) {
-      console.error('Barcode processing error', err);
-      setScannerStatus('error');
-      alert(`Error scanning barcode ${barcode}: Item may not exist.`);
+      alert(`Barcode ${barcode} found but no matching item in your inventory or catalog.`);
     }
+  } catch (err) {
+    console.error('Barcode processing error', err);
+    alert(`Error scanning barcode ${barcode}: Item may not exist.`);
+  }
   }, [setItems]);
 
   useEffect(() => {
@@ -1751,36 +1747,48 @@ function WalkInSaleTab() {
       if (shopData?.id) {
         console.log('🏠 Joining shop room:', shopData.id);
         socket.emit('join_shop', { shop_id: shopData.id });
-        setScannerStatus('connected');
       }
     };
 
     // 3. Status Mapping
     const handleConnect = () => {
-      console.log('✅ Remote Scanner Connected | ID:', socket.id);
+      console.log('✅ Remote Scanner Socket Connected | ID:', socket.id);
       joinRooms();
     };
 
     const handleConnectError = (err: any) => {
       console.error('❌ Scanner Connection Error:', err.message);
-      setScannerStatus('error');
+      // We don't set global error status here because the UI should only care if mobile is connected
     };
 
     const handleDisconnect = (reason: string) => {
-      console.warn('⚠️ Scanner Disconnected:', reason);
+      console.warn('⚠️ Scanner Socket Disconnected:', reason);
       setScannerStatus(null);
       if (reason === 'io server disconnect') socket.connect();
     };
 
     const handleRemoteScan = (data: { barcode: string; scanned_by?: string }) => {
       console.log('📥 BARCODE RECEIVED:', data.barcode);
+      setScannerStatus('scanning');
       processBarcode(data.barcode);
+      // Status will be restored to 'connected' by the session status if session is still active
+      setTimeout(() => setScannerStatus('connected'), 1500);
+    };
+
+    const handleSessionStatus = (data: { status: 'started' | 'ended' }) => {
+      console.log('📱 Scanner Session Status:', data.status);
+      if (data.status === 'started') {
+        setScannerStatus('connected');
+      } else {
+        setScannerStatus(null);
+      }
     };
 
     socket.on('connect', handleConnect);
     socket.on('connect_error', handleConnectError);
     socket.on('disconnect', handleDisconnect);
     socket.on('item_scanned', handleRemoteScan);
+    socket.on('scanner_session_status', handleSessionStatus);
 
     // If shopData loaded after connection
     if (socket.connected && shopData?.id) joinRooms();
@@ -1791,6 +1799,7 @@ function WalkInSaleTab() {
       socket.off('connect_error', handleConnectError);
       socket.off('disconnect', handleDisconnect);
       socket.off('item_scanned', handleRemoteScan);
+      socket.off('scanner_session_status', handleSessionStatus);
     };
   }, [shopData?.id, processBarcode, accessToken]);
 

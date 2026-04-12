@@ -57,4 +57,37 @@ router.post('/scan', authenticate, async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Scanner Session Toggle
+ * Mobile app calls this to notify web app when scanner screen opens/closes
+ */
+router.post('/session', authenticate, async (req: Request, res: Response) => {
+  try {
+    const { status, shop_id } = req.body; // status: 'started' | 'ended'
+    const user = (req as any).user;
+    const io: Server = req.app.get('io');
+
+    let targetShopId = shop_id || user.shop_id;
+    if (!targetShopId) {
+      const shop = await prisma.medicalShop.findFirst({
+        where: { owner_user_id: user.id },
+        select: { id: true }
+      });
+      if (shop) targetShopId = shop.id;
+    }
+
+    if (targetShopId) {
+      io.to(`shop:${targetShopId}`).emit('scanner_session_status', { 
+        status,
+        user_name: user.name || 'Mobile User'
+      });
+    }
+
+    res.json({ status: 'success' });
+  } catch (error) {
+    logger.error('Scanner session toggle error:', error);
+    res.status(500).json({ status: 'error' });
+  }
+});
+
 export default router;

@@ -16,7 +16,14 @@ class _RemoteScannerScreenState extends State<RemoteScannerScreen> {
   DateTime? _lastScanTime;
 
   @override
+  void initState() {
+    super.initState();
+    ApiService.transmitSessionStatus('started');
+  }
+
+  @override
   void dispose() {
+    ApiService.transmitSessionStatus('ended');
     _controller.dispose();
     super.dispose();
   }
