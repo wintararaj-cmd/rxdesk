@@ -1618,6 +1618,8 @@ function WalkInSaleTab() {
   const globalDiscountRef = useRef<HTMLInputElement | null>(null);
   const paymentMethodRef = useRef<HTMLDivElement | null>(null);
   const generateBillBtnRef = useRef<HTMLButtonElement | null>(null);
+  const lastScannedBarcodeRef = useRef<string | null>(null);
+  const lastScanTimestampRef = useRef<number>(0);
   const [customerHighlight, setCustomerHighlight] = useState(-1);
   const [suggHighlights, setSuggHighlights] = useState<Record<number, number>>({});
   const [triedToSubmit, setTriedToSubmit] = useState(false);
@@ -1663,8 +1665,17 @@ function WalkInSaleTab() {
   });
 
   const processBarcode = useCallback(async (barcode: string) => {
-    setScannerStatus('scanning');
+    // 1. Debounce duplicate scans of the same barcode within 1.5 seconds
+    const now = Date.now();
+    if (barcode === lastScannedBarcodeRef.current && now - lastScanTimestampRef.current < 1500) {
+      console.log('🚫 Debouncing duplicate scan:', barcode);
+      return;
+    }
+    lastScannedBarcodeRef.current = barcode;
+    lastScanTimestampRef.current = now;
+
     try {
+      setScannerStatus('scanning');
       const res = await inventoryApi.getByBarcode(barcode);
       const inv = res.data.data;
       const catalogMed = (res.data as any).medicine;
@@ -1769,9 +1780,8 @@ function WalkInSaleTab() {
 
     const handleRemoteScan = (data: { barcode: string; scanned_by?: string }) => {
       console.log('📥 BARCODE RECEIVED:', data.barcode);
-      setScannerStatus('scanning');
       processBarcode(data.barcode);
-      // Status will be restored to 'connected' by the session status if session is still active
+      // 'scanning' status is now set inside processBarcode
       setTimeout(() => setScannerStatus('connected'), 1500);
     };
 
