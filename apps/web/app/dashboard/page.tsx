@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { io, Socket } from 'socket.io-client';
+import { socket, connectSocket } from '../../lib/socket';
 import Link from 'next/link';
 import {
   AreaChart, Area, XAxis, Tooltip, ResponsiveContainer,
@@ -14,7 +14,7 @@ import {
 import { shopApi, appointmentApi, reportsApi } from '../../lib/apiClient';
 import { useAuthStore } from '../../store/authStore';
 
-const WS_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1').replace('/api/v1', '');
+
 
 interface QueueItem {
   id: string;
@@ -84,7 +84,6 @@ const QUICK_ACTIONS = [
 export default function DashboardPage() {
   const { accessToken } = useAuthStore();
   const [queue, setQueue] = useState<QueueItem[]>([]);
-  const socketRef = useRef<Socket | null>(null);
 
   const { data: shop } = useQuery<ShopData>({
     queryKey: ['web-shop'],
@@ -110,19 +109,30 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!accessToken || !shop?.id) return;
 
-    const socket = io(WS_URL, {
-      auth: { token: accessToken },
-      transports: ['polling', 'websocket'],
-    });
+    connectSocket(accessToken);
+    
+    const handleJoin = () => {
+      socket.emit('join_shop', { shop_id: shop.id });
+    };
 
-    socketRef.current = socket;
-    socket.on('connect', () => socket.emit('join_shop', { shop_id: shop.id }));
-    socket.on('appointment:new', (data: QueueItem) => setQueue((p) => [...p, data]));
-    socket.on('appointment:status_updated', (data: { id: string; status: string }) => {
+    const handleNewAppointment = (data: QueueItem) => setQueue((p) => [...p, data]);
+    const handleStatusUpdate = (data: { id: string; status: string }) => {
       setQueue((p) => p.map((q) => (q.id === data.id ? { ...q, status: data.status } : q)));
-    });
+    };
 
-    return () => { socket.disconnect(); };
+    if (socket.connected) {
+      handleJoin();
+    }
+
+    socket.on('connect', handleJoin);
+    socket.on('appointment:new', handleNewAppointment);
+    socket.on('appointment:status_updated', handleStatusUpdate);
+
+    return () => {
+      socket.off('connect', handleJoin);
+      socket.off('appointment:new', handleNewAppointment);
+      socket.off('appointment:status_updated', handleStatusUpdate);
+    };
   }, [accessToken, shop?.id]);
 
   const waitingQueue = queue.filter((q) =>

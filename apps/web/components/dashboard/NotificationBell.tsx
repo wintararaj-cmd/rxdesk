@@ -1,12 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { notificationApi } from '../../lib/apiClient';
-import { Bell, Check, Info, AlertTriangle, X } from 'lucide-react';
-import { io, Socket } from 'socket.io-client';
+import { Bell, Info } from 'lucide-react';
+import { socket, connectSocket } from '../../lib/socket';
 import { useAuthStore } from '../../store/authStore';
-
-const WS_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1').replace('/api/v1', '');
 
 function timeAgo(date: Date) {
   const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
@@ -33,7 +31,6 @@ export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const unreadCount = notifications.filter(n => !n.is_read).length;
-  const socketRef = useRef<Socket | null>(null);
 
   const fetchNotifications = useCallback(async () => {
     if (!accessToken) return;
@@ -56,20 +53,17 @@ export function NotificationBell() {
   useEffect(() => {
     if (!accessToken) return;
 
-    const socket = io(WS_URL, {
-      auth: { token: accessToken },
-      transports: ['polling', 'websocket'],
-    });
-
-    socketRef.current = socket;
+    connectSocket(accessToken);
     
-    socket.on('new_notification', () => {
-      // Play a subtle sound or just refetch
+    const handleNewNotification = () => {
       fetchNotifications();
-      // Optional: Show a temporary toast if we have a toast system
-    });
+    };
 
-    return () => { socket.disconnect(); };
+    socket.on('new_notification', handleNewNotification);
+
+    return () => { 
+      socket.off('new_notification', handleNewNotification);
+    };
   }, [accessToken, fetchNotifications]);
 
   const markAllRead = async () => {

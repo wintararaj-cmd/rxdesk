@@ -4,19 +4,21 @@ const getSocketUrl = () => {
   if (typeof window !== 'undefined') {
     // Priority 1: If we are on production domain, use it directly (bypass env stuck issues)
     if (window.location.hostname.includes('rxdesk.in')) {
-      return 'https://rxdesk.in';
+      return 'https://backend.rxdesk.in';
     }
     // Priority 2: Use current origin if API URL is relative or missing
     const envUrl = process.env.NEXT_PUBLIC_API_URL || '';
     if (!envUrl || envUrl.startsWith('/')) return window.location.origin;
     try {
-      return new URL(envUrl).origin;
+      const url = new URL(envUrl);
+      return url.origin;
     } catch {
       return window.location.origin;
     }
   }
   return 'http://localhost:3000';
 };
+
 export const socket = io(getSocketUrl(), {
   path: '/api/v1/socket.io',
   autoConnect: false,
