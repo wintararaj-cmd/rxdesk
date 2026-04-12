@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { billApi, prescriptionApi, inventoryApi, shopApi, medicinesApi } from '../../../lib/apiClient';
 import { socket, connectSocket, disconnectSocket } from '../../../lib/socket';
+import { useAuthStore } from '../../../store/authStore';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1589,6 +1590,7 @@ const EMPTY_ITEM: WalkInItem = {
 
 function WalkInSaleTab() {
   const qc = useQueryClient();
+  const accessToken = useAuthStore(s => s.accessToken);
   const [scannerStatus, setScannerStatus] = useState<'connected' | 'error' | 'scanning' | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -1733,7 +1735,7 @@ function WalkInSaleTab() {
 
   useEffect(() => {
     // 1. Initial Connection & Heartbeat
-    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+    const token = accessToken;
     const establishConnection = () => {
       if (token && !socket.connected) {
         console.log('🔗 Attempting scanner connection...');
@@ -1790,7 +1792,7 @@ function WalkInSaleTab() {
       socket.off('disconnect', handleDisconnect);
       socket.off('item_scanned', handleRemoteScan);
     };
-  }, [shopData?.id, processBarcode]);
+  }, [shopData?.id, processBarcode, accessToken]);
 
   useEffect(() => {
     const handleGlobalKeys = async (e: KeyboardEvent) => {
