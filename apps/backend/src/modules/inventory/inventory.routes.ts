@@ -882,14 +882,39 @@ router.get('/barcode/:barcode', requireRole('shop_owner'), async (req, res, next
     const barcode = req.params.barcode.trim();
     if (!barcode) throw new AppError(400, 'VALIDATION_ERROR', 'Barcode is required');
 
-    // 1. Search shop_inventory by barcode directly (custom/assigned barcodes)
+    // 1. Search shop_inventory by barcode directly (custom/assigned barcodes on specific batches)
     const invItem = await prisma.shopInventory.findFirst({
       where: { shop_id: shop.id, barcode },
-      orderBy: { expiry_date: 'asc' }, // FEFO - First Expiry, First Out
+      orderBy: { expiry_date: 'asc' }, // FEFO
     });
     if (invItem) return res.json({ success: true, data: invItem, source: 'inventory_barcode' });
 
-    // 2. Fallback: search global medicines catalog by barcode (EAN-13 from manufacturer)
+    // 2. Search shop_medicines (Master) by barcode
+    const shopMed = await prisma.shopMedicine.findFirst({
+      where: { shop_id: shop.id, barcode },
+    });
+    if (shopMed) {
+      // Find the best batch for this master medicine
+      const bestBatch = await prisma.shopInventory.findFirst({
+        where: { shop_id: shop.id, shop_medicine_id: shopMed.id, stock_qty: { gt: 0 } },
+        orderBy: { expiry_date: 'asc' },
+      });
+      
+      if (bestBatch) {
+        return res.json({ success: true, data: bestBatch, source: 'master_barcode' });
+      }
+
+      // Found medicine but no stock
+      return res.json({
+        success: true,
+        data: null,
+        shop_medicine: shopMed,
+        source: 'master_no_stock',
+        message: `${shopMed.medicine_name} found but no stock available`
+      });
+    }
+
+    // 3. Fallback: search global medicines catalog by barcode (EAN-13 from manufacturer)
     const globalMed = await prisma.medicine.findFirst({ where: { barcode } });
     if (globalMed) {
       const invByName = await prisma.shopInventory.findFirst({
@@ -909,7 +934,7 @@ router.get('/barcode/:barcode', requireRole('shop_owner'), async (req, res, next
       });
     }
 
-    // 3. Not found
+    // 4. Not found
     throw new AppError(404, 'NOT_FOUND', 'No medicine found for this barcode');
   } catch (err) { next(err); }
 });
