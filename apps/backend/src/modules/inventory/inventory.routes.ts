@@ -36,6 +36,7 @@ router.get('/master', requireRole('shop_owner'), async (req, res, next) => {
         sm.hsn_code,
         sm.unit,
         sm.rack_location,
+        sm.barcode,
         sm.reorder_level,
         COALESCE(SUM(si.stock_qty), 0) as total_stock,
         MIN(CASE WHEN si.stock_qty > 0 THEN si.expiry_date ELSE NULL END) as nearest_expiry,
@@ -193,13 +194,14 @@ router.patch('/master/:id', requireRole('shop_owner'), async (req, res, next) =>
   try {
     const shop = await getShopByUser(req.user!.id);
     const id = req.params.id;
-    const { rack_location, reorder_level, hsn_code } = req.body;
+    const { rack_location, reorder_level, hsn_code, barcode } = req.body;
 
     const updated = await prisma.shopMedicine.update({
       where: { id, shop_id: shop.id },
       data: {
         ...(rack_location !== undefined ? { rack_location } : {}),
         ...(hsn_code !== undefined ? { hsn_code } : {}),
+        ...(barcode !== undefined ? { barcode } : {}),
         ...(reorder_level !== undefined ? { reorder_level: Number(reorder_level) } : {}),
       }
     });
@@ -541,6 +543,7 @@ router.post('/', requireRole('shop_owner'), async (req, res, next) => {
       update: {
         rack_location: data.rack_location || undefined,
         hsn_code: hsn || undefined,
+        barcode: data.barcode || undefined,
         medicine_id: medicine_id || undefined,
       },
       create: {
@@ -548,6 +551,7 @@ router.post('/', requireRole('shop_owner'), async (req, res, next) => {
         medicine_id: medicine_id || undefined,
         medicine_name: data.medicine_name.trim(),
         hsn_code: hsn || undefined,
+        barcode: data.barcode || undefined,
         unit: data.unit || 'strip',
         reorder_level: data.reorder_level || 10,
         rack_location: data.rack_location || undefined,
@@ -571,6 +575,7 @@ router.post('/', requireRole('shop_owner'), async (req, res, next) => {
         reorder_level: data.reorder_level || 10,
         discount_type: data.discount_type,
         discount_value: data.discount_value,
+        barcode: data.barcode,
         medicine_id: medicine_id || undefined,
       },
     });

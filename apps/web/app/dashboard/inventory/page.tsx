@@ -47,6 +47,7 @@ interface MasterInventoryItem {
   medicine_id?: string;
   medicine_name: string;
   hsn_code?: string;
+  barcode?: string;
   unit?: string;
   rack_location?: string;
   reorder_level: number;
@@ -1079,6 +1080,7 @@ export default function InventoryPage() {
                    reorder_level: String(it.reorder_level),
                    unit: it.unit || 'strip',
                    hsn_code: it.hsn_code || '',
+                   barcode: it.barcode || '',
                 });
               }} />
             ))}

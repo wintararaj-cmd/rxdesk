@@ -514,6 +514,7 @@ model ShopMedicine {
   medicine_name  String       // Snapshot of name
   hsn_code       String?
   rack_location  String?
+  barcode        String?
   unit           String       @default("strip")
   reorder_level  Int          @default(10)
   is_active      Boolean      @default(true)
