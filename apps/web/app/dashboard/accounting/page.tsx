@@ -460,71 +460,103 @@ function PLTab() {
              </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white rounded-[32px] p-8 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Revenue Mix</h3>
-                <div className="w-8 h-8 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" /></svg>
-                </div>
-              </div>
-              
-              <div className="space-y-6">
-                {(['sales_income', 'other_income'] as const).map((m) => {
-                  const val = pl.revenue[m] as number;
-                  const p = pl.revenue.total > 0 ? (val / pl.revenue.total) * 100 : 0;
-                  const clr: Record<string, string> = { sales_income: 'bg-indigo-500', other_income: 'bg-emerald-400' };
-                  const label: Record<string, string> = { sales_income: 'Sales Revenue', other_income: 'Miscellaneous Income' };
-                  return (
-                    <div key={m} className="group">
-                      <div className="flex justify-between items-end mb-2">
-                        <div>
-                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{label[m]}</p>
-                          <p className="text-base font-black text-gray-800">{fmt(val)}</p>
-                        </div>
-                        <span className="text-xl font-black text-gray-200 group-hover:text-gray-400 transition-colors uppercase tracking-widest">{p.toFixed(0)}%</span>
-                      </div>
-                      <div className="h-3 bg-gray-50 rounded-full overflow-hidden shadow-inner border border-gray-100">
-                        <div className={`h-full rounded-full transition-all duration-1000 ease-out shadow-sm ${clr[m]}`} style={{ width: `${p}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-[32px] p-8 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Expense Breakdown</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            {/* Left Side: Expenses & COGS (Debit) */}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between px-6">
+                <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Expenditure</h3>
                 <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
                 </div>
               </div>
-
-              <div className="space-y-1">
-                {Object.entries(pl.expenses).filter(([k]) => k !== 'total').length === 0 ? (
-                  <div className="py-12 flex flex-col items-center justify-center text-center opacity-40">
-                    <svg className="w-10 h-10 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                    <p className="text-xs font-black uppercase tracking-widest">No Expenditures</p>
+              
+              <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm space-y-6">
+                {/* COGS Section */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center pb-2 border-b border-gray-50">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Direct Costs (COGS)</span>
+                    <span className="text-xs font-black text-gray-900">{fmt(pl.cogs.medicine_purchase_cost)}</span>
                   </div>
-                ) : (
-                  Object.entries(pl.expenses)
-                    .filter(([k]) => k !== 'total')
-                    .sort(([, a], [, b]) => (b as number) - (a as number))
-                    .map(([cat, amt]) => (
-                      <div key={cat} className="flex justify-between items-center py-3.5 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors px-2 rounded-xl">
-                        <div>
-                          <p className="capitalize text-gray-700 font-bold text-xs">{cat.replace('_', ' ')}</p>
-                          <p className="text-[10px] text-gray-400 font-medium tracking-tight">Operating Cost</p>
-                        </div>
-                        <span className="text-gray-900 font-black text-sm">{fmt(amt as number)}</span>
-                      </div>
-                    ))
-                )}
+                  <div className="space-y-2 pl-4">
+                    <div className="flex justify-between text-[11px] font-bold text-gray-600">
+                      <span>Medicine Purchase Cost</span>
+                      <span className="font-medium">{fmt(pl.cogs.medicine_purchase_cost)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Indirect Expenses Section */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center pb-2 border-b border-gray-50">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Indirect Expenses</span>
+                    <span className="text-xs font-black text-gray-900">{fmt(pl.expenses.total)}</span>
+                  </div>
+                  <div className="space-y-1 pl-4">
+                    {Object.entries(pl.expenses).filter(([k]) => k !== 'total').length === 0 ? (
+                      <p className="text-[10px] text-gray-300 italic py-2">No indirect expenses recorded</p>
+                    ) : (
+                      Object.entries(pl.expenses)
+                        .filter(([k]) => k !== 'total')
+                        .sort(([, a], [, b]) => (b as number) - (a as number))
+                        .map(([cat, amt]) => (
+                          <div key={cat} className="flex justify-between text-[11px] font-bold text-gray-600 py-1">
+                            <span className="capitalize">{cat.replace('_', ' ')}</span>
+                            <span className="font-medium">{fmt(amt as number)}</span>
+                          </div>
+                        ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-gray-100 flex justify-between items-center">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Expenditure</span>
+                  <span className="text-lg font-black text-rose-600">{fmt(pl.cogs.medicine_purchase_cost + pl.expenses.total)}</span>
+                </div>
               </div>
-              <div className="flex justify-between items-center pt-6 border-t border-gray-100 mt-4 px-2">
-                <span className="text-gray-400 font-black text-[10px] uppercase tracking-widest">Total Operating Expenses</span>
-                <span className="text-rose-600 font-black text-lg tracking-tight">{fmt(pl.expenses.total)}</span>
+            </div>
+
+            {/* Right Side: Income (Credit) */}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between px-6">
+                <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Income</h3>
+                <div className="w-8 h-8 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" /></svg>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm space-y-6">
+                {/* Sales Income Section */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center pb-2 border-b border-gray-50">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Operating Revenue</span>
+                    <span className="text-xs font-black text-gray-900">{fmt(pl.revenue.sales_income)}</span>
+                  </div>
+                  <div className="space-y-2 pl-4">
+                    <div className="flex justify-between text-[11px] font-bold text-gray-600">
+                      <span>Gross Sales Income</span>
+                      <span className="font-medium">{fmt(pl.revenue.sales_income)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Other Income Section */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center pb-2 border-b border-gray-50">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Non-Operating Income</span>
+                    <span className="text-xs font-black text-gray-900">{fmt(pl.revenue.other_income)}</span>
+                  </div>
+                  <div className="space-y-2 pl-4">
+                    <div className="flex justify-between text-[11px] font-bold text-gray-600">
+                      <span>Miscellaneous Receipts</span>
+                      <span className="font-medium">{fmt(pl.revenue.other_income)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-gray-100 flex justify-between items-center">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Income</span>
+                  <span className="text-lg font-black text-violet-600">{fmt(pl.revenue.total)}</span>
+                </div>
               </div>
             </div>
           </div>
