@@ -142,107 +142,215 @@ export default function GstReportPage() {
 
       {report && !isComposite && (
         <>
-          {/* ── GSTR-3B Live Dashboard ──────────────────────────────── */}
-          <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-violet-700 via-indigo-700 to-blue-800 p-8 shadow-2xl shadow-violet-500/20">
-            <div className="absolute -top-20 -right-20 w-64 h-64 bg-white/5 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-20 -left-10 w-48 h-48 bg-black/10 rounded-full blur-3xl pointer-events-none" />
-
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <p className="text-violet-200/70 text-[10px] font-black uppercase tracking-[0.2em]">GSTR-3B — Net Tax Summary</p>
-                  <h2 className="text-white text-xl font-black mt-1">
-                    {MONTHS.find(m => m.value === month)?.label} {year}
-                  </h2>
-                </div>
-                <div className={`flex items-center gap-2 px-4 py-2 rounded-2xl border text-sm font-bold ${
-                  deadline.daysLeft < 0  ? 'bg-red-500/20 border-red-400/30 text-red-200' :
-                  deadline.daysLeft <= 5 ? 'bg-amber-500/20 border-amber-400/30 text-amber-200' :
-                  'bg-white/10 border-white/20 text-white/80'
-                }`}>
-                  <Clock className="w-4 h-4" />
-                  <span>
-                    {deadline.daysLeft < 0  ? 'Filing overdue!' :
-                     deadline.daysLeft === 0 ? 'Due today!' :
-                     `${deadline.daysLeft}d left — ${deadline.date}`}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                {/* GST Collected */}
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
-                  <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp className="w-4 h-4 text-emerald-300" />
-                    <span className="text-white/60 text-[10px] font-black uppercase">GST Collected</span>
-                  </div>
-                  <p className="text-white text-2xl font-black">{fmtShort(out?.total_gst_collected ?? 0)}</p>
-                  <p className="text-white/50 text-[10px] mt-1">Outward supplies</p>
-                </div>
-                {/* ITC Available */}
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Wallet className="w-4 h-4 text-sky-300" />
-                    <span className="text-white/60 text-[10px] font-black uppercase">ITC Available</span>
-                  </div>
-                  <p className="text-sky-300 text-2xl font-black">{fmtShort(itcTotal)}</p>
-                  <p className="text-white/50 text-[10px] mt-1">Inward purchases</p>
-                </div>
-                {/* ITC Utilised */}
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle2 className="w-4 h-4 text-violet-300" />
-                    <span className="text-white/60 text-[10px] font-black uppercase">ITC Utilised</span>
-                  </div>
-                  <p className="text-violet-300 text-2xl font-black">{fmtShort(itcUtilised)}</p>
-                  <p className="text-white/50 text-[10px] mt-1">Against tax liability</p>
-                </div>
-                {/* Net Payable */}
-                <div className={`rounded-2xl p-4 border ${netTax > 0 ? 'bg-red-500/20 border-red-400/30' : 'bg-emerald-500/20 border-emerald-400/30'}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Calculator className="w-4 h-4 text-white" />
-                    <span className="text-white/60 text-[10px] font-black uppercase">Net Payable</span>
-                  </div>
-                  <p className={`text-2xl font-black ${netTax > 0 ? 'text-red-200' : 'text-emerald-200'}`}>{fmtShort(netTax)}</p>
-                  <p className="text-white/50 text-[10px] mt-1">{netTax <= 0 ? '✓ Fully offset by ITC' : 'Pay via GST portal'}</p>
-                </div>
-              </div>
-
-              {/* ITC Carry Forward */}
-              {itcCarryFwd > 0 && (
-                <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-5 py-3 mb-4">
-                  <Info className="w-4 h-4 text-sky-300 flex-shrink-0" />
-                  <p className="text-white/80 text-xs font-medium">
-                    <span className="font-black text-sky-300">{fmt(itcCarryFwd)}</span> of ITC carries forward to next month due to excess credit.
-                  </p>
-                </div>
-              )}
-
-              {/* GSTR-3B Download CTA */}
-              <div className="flex items-center gap-3">
-                <button 
-                  onClick={() => handleDownload('gstr3b')} disabled={!!downloading}
-                  className="flex items-center gap-2 bg-white text-violet-700 px-6 py-3 rounded-2xl font-black text-sm hover:bg-violet-50 transition-all shadow-lg disabled:opacity-50"
-                >
-                  <Download className="w-4 h-4" />
-                  {downloading === 'gstr3b' ? 'Preparing...' : 'Download GSTR-3B Excel'}
-                </button>
-                <div className="flex items-center gap-2 text-white/50 text-xs font-bold">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  Ready for GST portal filing
-                </div>
-              </div>
-            </div>
+          {/* ── View Toggle ─────────────────────────────────────────── */}
+          <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-2xl w-fit mb-4">
+            <button 
+              onClick={() => setActiveTab('gstr3b')}
+              className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'gstr3b' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Dashboard View
+            </button>
+            <button 
+              onClick={() => setActiveTab('gstr3b_official' as any)}
+              className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === ('gstr3b_official' as any) ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Official Table (3.1 & 4)
+            </button>
           </div>
 
-          {/* ── CGST / SGST Breakup ────────────────────────────────── */}
-          {(out?.gst_collected?.cgst > 0 || out?.gst_collected?.igst > 0) && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <TaxBreakCard label="CGST Collected" amount={out?.gst_collected?.cgst ?? 0} fmt={fmt} color="border-l-emerald-500" />
-              <TaxBreakCard label="SGST Collected" amount={out?.gst_collected?.sgst ?? 0} fmt={fmt} color="border-l-sky-500" />
-              <TaxBreakCard label="IGST Collected" amount={out?.gst_collected?.igst ?? 0} fmt={fmt} color="border-l-violet-500" />
+          {activeTab === 'gstr3b' && (
+            <>
+              {/* ── GSTR-3B Live Dashboard ──────────────────────────────── */}
+              <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-violet-700 via-indigo-700 to-blue-800 p-8 shadow-2xl shadow-violet-500/20">
+                <div className="absolute -top-20 -right-20 w-64 h-64 bg-white/5 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-20 -left-10 w-48 h-48 bg-black/10 rounded-full blur-3xl pointer-events-none" />
+
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <p className="text-violet-200/70 text-[10px] font-black uppercase tracking-[0.2em]">GSTR-3B — Net Tax Summary</p>
+                      <h2 className="text-white text-xl font-black mt-1">
+                        {MONTHS.find(m => m.value === month)?.label} {year}
+                      </h2>
+                    </div>
+                    <div className={`flex items-center gap-2 px-4 py-2 rounded-2xl border text-sm font-bold ${
+                      deadline.daysLeft < 0  ? 'bg-red-500/20 border-red-400/30 text-red-200' :
+                      deadline.daysLeft <= 5 ? 'bg-amber-500/20 border-amber-400/30 text-amber-200' :
+                      'bg-white/10 border-white/20 text-white/80'
+                    }`}>
+                      <Clock className="w-4 h-4" />
+                      <span>
+                        {deadline.daysLeft < 0  ? 'Filing overdue!' :
+                         deadline.daysLeft === 0 ? 'Due today!' :
+                         `${deadline.daysLeft}d left — ${deadline.date}`}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    {/* GST Collected */}
+                    <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+                      <div className="flex items-center gap-2 mb-2">
+                        <TrendingUp className="w-4 h-4 text-emerald-300" />
+                        <span className="text-white/60 text-[10px] font-black uppercase">GST Collected</span>
+                      </div>
+                      <p className="text-white text-2xl font-black">{fmtShort(out?.total_gst_collected ?? 0)}</p>
+                      <p className="text-white/50 text-[10px] mt-1">Outward supplies</p>
+                    </div>
+                    {/* ITC Available */}
+                    <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Wallet className="w-4 h-4 text-sky-300" />
+                        <span className="text-white/60 text-[10px] font-black uppercase">ITC Available</span>
+                      </div>
+                      <p className="text-sky-300 text-2xl font-black">{fmtShort(itcTotal)}</p>
+                      <p className="text-white/50 text-[10px] mt-1">Inward purchases</p>
+                    </div>
+                    {/* ITC Utilised */}
+                    <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CheckCircle2 className="w-4 h-4 text-violet-300" />
+                        <span className="text-white/60 text-[10px] font-black uppercase">ITC Utilised</span>
+                      </div>
+                      <p className="text-violet-300 text-2xl font-black">{fmtShort(itcUtilised)}</p>
+                      <p className="text-white/50 text-[10px] mt-1">Against tax liability</p>
+                    </div>
+                    {/* Net Payable */}
+                    <div className={`rounded-2xl p-4 border ${netTax > 0 ? 'bg-red-500/20 border-red-400/30' : 'bg-emerald-500/20 border-emerald-400/30'}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Calculator className="w-4 h-4 text-white" />
+                        <span className="text-white/60 text-[10px] font-black uppercase">Net Payable</span>
+                      </div>
+                      <p className={`text-2xl font-black ${netTax > 0 ? 'text-red-200' : 'text-emerald-200'}`}>{fmtShort(netTax)}</p>
+                      <p className="text-white/50 text-[10px] mt-1">{netTax <= 0 ? '✓ Fully offset by ITC' : 'Pay via GST portal'}</p>
+                    </div>
+                  </div>
+
+                  {/* ITC Carry Forward */}
+                  {itcCarryFwd > 0 && (
+                    <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-5 py-3 mb-4">
+                      <Info className="w-4 h-4 text-sky-300 flex-shrink-0" />
+                      <p className="text-white/80 text-xs font-medium">
+                        <span className="font-black text-sky-300">{fmt(itcCarryFwd)}</span> of ITC carries forward to next month due to excess credit.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* GSTR-3B Download CTA */}
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={() => handleDownload('gstr3b')} disabled={!!downloading}
+                      className="flex items-center gap-2 bg-white text-violet-700 px-6 py-3 rounded-2xl font-black text-sm hover:bg-violet-50 transition-all shadow-lg disabled:opacity-50"
+                    >
+                      <Download className="w-4 h-4" />
+                      {downloading === 'gstr3b' ? 'Preparing...' : 'Download GSTR-3B Excel'}
+                    </button>
+                    <div className="flex items-center gap-2 text-white/50 text-xs font-bold">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      Ready for GST portal filing
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── CGST / SGST Breakup ────────────────────────────────── */}
+              {(out?.gst_collected?.cgst > 0 || out?.gst_collected?.igst > 0) && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <TaxBreakCard label="CGST Collected" amount={out?.gst_collected?.cgst ?? 0} fmt={fmt} color="border-l-emerald-500" />
+                  <TaxBreakCard label="SGST Collected" amount={out?.gst_collected?.sgst ?? 0} fmt={fmt} color="border-l-sky-500" />
+                  <TaxBreakCard label="IGST Collected" amount={out?.gst_collected?.igst ?? 0} fmt={fmt} color="border-l-violet-500" />
+                </div>
+              )}
+            </>
+          )}
+
+          {activeTab === ('gstr3b_official' as any) && (
+            <div className="bg-white rounded-[2rem] border border-gray-100 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+              <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
+                <div>
+                  <h2 className="text-xl font-black text-gray-900 tracking-tight">GSTR-3B Return View</h2>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Standard Government Format</p>
+                </div>
+                <button onClick={() => handleDownload('gstr3b')} disabled={!!downloading} className="p-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-100">
+                  <Download className="w-4 h-4" />
+                </button>
+              </div>
+              
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-gray-100/80 text-[10px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-200">
+                      <th className="px-6 py-4 w-1/3">Particulars</th>
+                      <th className="px-4 py-4 text-right">Taxable Value</th>
+                      <th className="px-4 py-4 text-right">Integrated Tax (IGST)</th>
+                      <th className="px-4 py-4 text-right">Central Tax (CGST)</th>
+                      <th className="px-4 py-4 text-right">State/UT Tax (SGST)</th>
+                      <th className="px-4 py-4 text-right">Cess</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 text-xs">
+                    {/* SECTION 3.1 */}
+                    <tr className="bg-indigo-50/30">
+                      <td colSpan={6} className="px-6 py-3 font-black text-indigo-700 uppercase tracking-wider bg-indigo-50/50">
+                        3.1 Details of Outward Supplies and inward supplies liable to reverse charge
+                      </td>
+                    </tr>
+                    <GstrRow 
+                      label="(a) Outward taxable supplies (other than zero rated, nil rated and exempted)"
+                      taxable={out?.taxable_value ?? 0}
+                      igst={out?.gst_collected?.igst ?? 0}
+                      cgst={out?.gst_collected?.cgst ?? 0}
+                      sgst={out?.gst_collected?.sgst ?? 0}
+                      fmt={fmt}
+                    />
+                    <GstrRow label="(b) Outward taxable supplies (zero rated)" fmt={fmt} />
+                    <GstrRow label="(c) Other outward supplies (Nil rated, exempted)" fmt={fmt} />
+                    <GstrRow label="(d) Inward supplies (applicable for Reverse Charge)" fmt={fmt} />
+                    <GstrRow label="(e) Non-GST outward supplies" fmt={fmt} />
+
+                    {/* SECTION 4 */}
+                    <tr className="bg-indigo-50/30">
+                      <td colSpan={6} className="px-6 py-3 font-black text-indigo-700 uppercase tracking-wider bg-indigo-50/50">
+                        4. Eligible Input Tax Credit (ITC)
+                      </td>
+                    </tr>
+                    <GstrRow 
+                      label="(A) ITC Available (whether in full or part)"
+                      igst={inw?.itc_available?.igst ?? 0}
+                      cgst={inw?.itc_available?.cgst ?? 0}
+                      sgst={inw?.itc_available?.sgst ?? 0}
+                      fmt={fmt}
+                      isHeader
+                    />
+                    <GstrRow label="1. Import of goods" depth={1} fmt={fmt} />
+                    <GstrRow label="2. Import of services" depth={1} fmt={fmt} />
+                    <GstrRow label="3. Inward supplies liable to reverse charge (other than 1 & 2 above)" depth={1} fmt={fmt} />
+                    <GstrRow label="4. Inward supplies from ISD" depth={1} fmt={fmt} />
+                    <GstrRow 
+                      label="5. All other ITC" depth={1} 
+                      igst={inw?.itc_available?.igst ?? 0}
+                      cgst={inw?.itc_available?.cgst ?? 0}
+                      sgst={inw?.itc_available?.sgst ?? 0}
+                      fmt={fmt}
+                    />
+                    <GstrRow label="(B) ITC Reversed" isHeader fmt={fmt} />
+                    <GstrRow 
+                      label="(C) Net ITC Available (A) - (B)"
+                      igst={inw?.itc_available?.igst ?? 0}
+                      cgst={inw?.itc_available?.cgst ?? 0}
+                      sgst={inw?.itc_available?.sgst ?? 0}
+                      fmt={fmt}
+                      isHeader
+                      highlight
+                    />
+                    <GstrRow label="(D) Ineligible ITC" isHeader fmt={fmt} />
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
+
+          {/* ── Tab Navigation: GSTR-1 / GSTR-2 / Rate Table ──────── */}
 
           {/* ── Tab Navigation: GSTR-1 / GSTR-2 / Rate Table ──────── */}
           <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
@@ -454,5 +562,22 @@ function GstRow({ label, value, color = 'text-gray-700', bold = false }: { label
       <span className={`text-sm ${bold ? 'font-black text-gray-900' : 'text-gray-500'}`}>{label}</span>
       <span className={`text-sm ${bold ? 'font-black' : 'font-semibold'} ${color}`}>{value}</span>
     </div>
+  );
+}
+
+function GstrRow({ 
+  label, taxable = 0, igst = 0, cgst = 0, sgst = 0, cess = 0, fmt, isHeader = false, depth = 0, highlight = false 
+}: any) {
+  return (
+    <tr className={`${isHeader ? 'bg-gray-50/50 font-bold' : ''} ${highlight ? 'bg-indigo-50/50' : 'hover:bg-gray-50/30'} transition-colors`}>
+      <td className={`px-6 py-3 text-gray-700 ${depth > 0 ? 'pl-10' : ''} ${isHeader ? 'font-black text-gray-900' : ''}`}>
+        {label}
+      </td>
+      <td className="px-4 py-3 text-right font-mono text-gray-600">{taxable > 0 ? fmt(taxable) : '0.00'}</td>
+      <td className={`px-4 py-3 text-right font-mono ${igst > 0 ? 'text-indigo-600 font-bold' : 'text-gray-400'}`}>{igst > 0 ? fmt(igst) : '0.00'}</td>
+      <td className={`px-4 py-3 text-right font-mono ${cgst > 0 ? 'text-emerald-600 font-bold' : 'text-gray-400'}`}>{cgst > 0 ? fmt(cgst) : '0.00'}</td>
+      <td className={`px-4 py-3 text-right font-mono ${sgst > 0 ? 'text-sky-600 font-bold' : 'text-gray-400'}`}>{sgst > 0 ? fmt(sgst) : '0.00'}</td>
+      <td className="px-4 py-3 text-right font-mono text-gray-400">{cess > 0 ? fmt(cess) : '0.00'}</td>
+    </tr>
   );
 }

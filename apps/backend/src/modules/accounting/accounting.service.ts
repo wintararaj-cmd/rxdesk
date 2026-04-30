@@ -3617,49 +3617,113 @@ export async function updateOpeningBalances(userId: string, data: { cash: number
 
 export async function generateGstr3bExcel(userId: string, month: number, year: number) {
   const summary = await getGstSummary(userId, month, year);
+  const shop = await prisma.medicalShop.findUnique({ where: { owner_user_id: userId } });
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet(`GSTR-3B_${month}_${year}`);
 
+  // Header Info
+  sheet.mergeCells('A1:F1');
+  sheet.getCell('A1').value = shop?.shop_name || 'Medical Shop';
+  sheet.getCell('A1').font = { size: 14, bold: true };
+  sheet.getCell('A1').alignment = { horizontal: 'center' };
+
+  sheet.mergeCells('A2:F2');
+  sheet.getCell('A2').value = `GSTR-3B Return for ${month}/${year}`;
+  sheet.getCell('A2').font = { bold: true };
+  sheet.getCell('A2').alignment = { horizontal: 'center' };
+
+  sheet.addRow([]);
+
+  // Table Structure
   sheet.columns = [
-    { header: 'Particulars', key: 'particulars', width: 40 },
+    { header: 'Particulars', key: 'particulars', width: 60 },
     { header: 'Taxable Value', key: 'taxable', width: 20 },
     { header: 'Integrated Tax (IGST)', key: 'igst', width: 20 },
     { header: 'Central Tax (CGST)', key: 'cgst', width: 20 },
     { header: 'State/UT Tax (SGST)', key: 'sgst', width: 20 },
+    { header: 'Cess', key: 'cess', width: 15 },
   ];
 
-  sheet.addRow({
-    particulars: '3.1 Details of Outward Supplies (Sales)',
-    taxable: summary.outward_supplies.taxable_value,
-    igst: summary.outward_supplies.gst_collected.igst,
-    cgst: summary.outward_supplies.gst_collected.cgst,
-    sgst: summary.outward_supplies.gst_collected.sgst,
-  });
+  const out = summary.outward_supplies;
+  const inw = summary.inward_supplies;
 
-  sheet.addRow({});
+  // Row 1 (Header)
+  const headerRow = sheet.getRow(4);
+  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } }; // Indigo-600
+  headerRow.alignment = { horizontal: 'center' };
 
-  sheet.addRow({
-    particulars: '4. Eligible ITC (Purchases)',
-    taxable: '', // Not generally reported in 3B summary Table 4
-    igst: 0,
-    cgst: summary.inward_supplies.itc_available.cgst,
-    sgst: summary.inward_supplies.itc_available.sgst,
-  });
-
-  sheet.addRow({});
+  // 3.1 Section
+  const row31 = sheet.addRow(['3.1 Details of Outward Supplies and inward supplies liable to reverse charge']);
+  row31.font = { bold: true };
+  row31.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } }; // Indigo-100
 
   sheet.addRow({
-    particulars: 'Net Tax Payable',
-    taxable: '',
-    igst: 0,
-    cgst: Math.max(0, summary.outward_supplies.gst_collected.cgst - summary.inward_supplies.itc_available.cgst),
-    sgst: Math.max(0, summary.outward_supplies.gst_collected.sgst - summary.inward_supplies.itc_available.sgst),
+    particulars: '(a) Outward taxable supplies (other than zero rated, nil rated and exempted)',
+    taxable: out.taxable_value,
+    igst: out.gst_collected.igst,
+    cgst: out.gst_collected.cgst,
+    sgst: out.gst_collected.sgst,
+    cess: 0
+  });
+  sheet.addRow({ particulars: '(b) Outward taxable supplies (zero rated)', taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 });
+  sheet.addRow({ particulars: '(c) Other outward supplies (Nil rated, exempted)', taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 });
+  sheet.addRow({ particulars: '(d) Inward supplies (applicable for Reverse Charge)', taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 });
+  sheet.addRow({ particulars: '(e) Non-GST outward supplies', taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 });
+
+  sheet.addRow([]);
+
+  // 4 Section
+  const row4 = sheet.addRow(['4. Eligible Input Tax Credit (ITC)']);
+  row4.font = { bold: true };
+  row4.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
+
+  sheet.addRow({
+    particulars: '(A) ITC Available (whether in full or part)',
+    igst: inw.itc_available.igst,
+    cgst: inw.itc_available.cgst,
+    sgst: inw.itc_available.sgst,
+    cess: 0
+  }).font = { bold: true };
+
+  sheet.addRow({ particulars: '1. Import of goods', depth: 1, igst: 0, cgst: 0, sgst: 0, cess: 0 });
+  sheet.addRow({ particulars: '2. Import of services', depth: 1, igst: 0, cgst: 0, sgst: 0, cess: 0 });
+  sheet.addRow({ particulars: '3. Inward supplies liable to reverse charge (other than 1 & 2 above)', depth: 1, igst: 0, cgst: 0, sgst: 0, cess: 0 });
+  sheet.addRow({ particulars: '4. Inward supplies from ISD', depth: 1, igst: 0, cgst: 0, sgst: 0, cess: 0 });
+  sheet.addRow({
+    particulars: '5. All other ITC',
+    igst: inw.itc_available.igst,
+    cgst: inw.itc_available.cgst,
+    sgst: inw.itc_available.sgst,
+    cess: 0
   });
 
-  // Make header bold
-  sheet.getRow(1).font = { bold: true };
-  sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+  sheet.addRow({ particulars: '(B) ITC Reversed', igst: 0, cgst: 0, sgst: 0, cess: 0 }).font = { bold: true };
+  
+  const netRow = sheet.addRow({
+    particulars: '(C) Net ITC Available (A) - (B)',
+    igst: inw.itc_available.igst,
+    cgst: inw.itc_available.cgst,
+    sgst: inw.itc_available.sgst,
+    cess: 0
+  });
+  netRow.font = { bold: true };
+  netRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFECFDF5' } }; // Emerald-50
+
+  sheet.addRow({ particulars: '(D) Ineligible ITC', igst: 0, cgst: 0, sgst: 0, cess: 0 }).font = { bold: true };
+
+  // Styling
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber >= 4) {
+      row.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' }
+      };
+    }
+  });
 
   return workbook.xlsx.writeBuffer();
 }
