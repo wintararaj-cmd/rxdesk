@@ -645,32 +645,6 @@ function BalanceSheetTab() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full items-start">
-        {/* Assets Side */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between px-6">
-            <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Assets</h3>
-            <span className="text-xl font-black text-blue-600">{fmt(totalAssets)}</span>
-          </div>
-          <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm space-y-6">
-            {report?.filter(g => g.type === 'asset').map(group => (
-              <div key={group.id} className="space-y-3">
-                <div className="flex justify-between items-center pb-2 border-b border-gray-50">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{group.name}</span>
-                  <span className="text-xs font-black text-gray-900">{fmt(group.total)}</span>
-                </div>
-                <div className="space-y-2 pl-4">
-                  {group.accounts.map((acc: any) => (
-                    <div key={acc.id} className="flex justify-between text-[11px] font-bold text-gray-600">
-                      <span>{acc.name}</span>
-                      <span className="font-medium">{fmt(acc.balance)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* Liabilities & Equity Side */}
         <div className="space-y-6 h-full">
           <div className="flex items-center justify-between px-6">
@@ -701,6 +675,32 @@ function BalanceSheetTab() {
                     {Math.abs(totalAssets + totalLiabsEquity) < 1 ? 'Balanced' : 'Imbalance Detected'}
                 </span>
              </div>
+          </div>
+        </div>
+
+        {/* Assets Side */}
+        <div className="space-y-6">
+          <div className="flex items-center justify-between px-6">
+            <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Assets</h3>
+            <span className="text-xl font-black text-blue-600">{fmt(totalAssets)}</span>
+          </div>
+          <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm space-y-6">
+            {report?.filter(g => g.type === 'asset').map(group => (
+              <div key={group.id} className="space-y-3">
+                <div className="flex justify-between items-center pb-2 border-b border-gray-50">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{group.name}</span>
+                  <span className="text-xs font-black text-gray-900">{fmt(group.total)}</span>
+                </div>
+                <div className="space-y-2 pl-4">
+                  {group.accounts.map((acc: any) => (
+                    <div key={acc.id} className="flex justify-between text-[11px] font-bold text-gray-600">
+                      <span>{acc.name}</span>
+                      <span className="font-medium">{fmt(acc.balance)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
