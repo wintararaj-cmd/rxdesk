@@ -266,84 +266,151 @@ export default function GstReportPage() {
 
           {activeTab === ('gstr3b_official' as any) && (
             <div className="bg-white rounded-[2rem] border border-gray-100 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-              <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
-                <div>
-                  <h2 className="text-xl font-black text-gray-900 tracking-tight">GSTR-3B Return View</h2>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Standard Government Format</p>
-                </div>
-                <button onClick={() => handleDownload('gstr3b')} disabled={!!downloading} className="p-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-100">
-                  <Download className="w-4 h-4" />
-                </button>
+              {/* ── Official Shop Header ───────────────────────────────── */}
+              <div className="p-8 pb-4">
+                 <h1 className="text-xl font-black text-gray-900 uppercase tracking-tight">{(report as any).shop_details?.name || 'M/S BHASWATI ENTERPRISE'}</h1>
+                 <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">{(report as any).shop_details?.address || 'MATUKPUR,PANDUA,HOOGHLY,712149'}</p>
+                 <p className="text-[11px] font-bold text-gray-500">E-Mail : {(report as any).shop_details?.email || 'msbhaswatienterprise@gmail.com'}</p>
+                 <div className="h-px bg-gray-200 my-4" />
+                 <div className="flex justify-between items-end">
+                    <div>
+                       <h2 className="text-lg font-black text-gray-900 uppercase">GSTR-3B</h2>
+                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{MONTHS.find(m => m.value === month)?.label} {year}</p>
+                    </div>
+                    <div className="text-right space-y-1">
+                       <p className="text-[11px] font-bold text-gray-900">GST Registration: <span className="font-black">{(report as any).shop_details?.gstin || '19CQCPM4223R1ZB'}</span></p>
+                       <p className="text-[11px] font-bold text-gray-900">Status: <span className="font-black text-rose-600">Not Filed</span> <span className="text-blue-600 ml-2 font-black cursor-pointer hover:underline text-[9px]">Last online GST activity: No Activity Found</span></p>
+                    </div>
+                 </div>
+              </div>
+
+              {/* ── Voucher Count Summary ──────────────────────────────── */}
+              <div className="px-8 mb-8">
+                <table className="w-full max-w-sm border-collapse text-[11px]">
+                   <thead>
+                      <tr className="bg-gray-50 border border-gray-200">
+                         <th className="px-4 py-1.5 text-left font-black text-gray-600 uppercase tracking-wider">Particulars</th>
+                         <th className="px-4 py-1.5 text-right font-black text-gray-600 uppercase tracking-wider border-l border-gray-200">Voucher Count</th>
+                      </tr>
+                   </thead>
+                   <tbody className="border border-gray-200">
+                      <tr className="border-b border-gray-200">
+                         <td className="px-4 py-1 font-bold text-gray-700">Total Vouchers</td>
+                         <td className="px-4 py-1 text-right font-black border-l border-gray-200">{(report as any).voucher_counts?.total || 0}</td>
+                      </tr>
+                      <tr className="border-b border-gray-200">
+                         <td className="px-4 py-1 font-bold text-gray-700">Included in Return</td>
+                         <td className="px-4 py-1 text-right font-black border-l border-gray-200">{(report as any).voucher_counts?.included || 0}</td>
+                      </tr>
+                      <tr className="border-b border-gray-200">
+                         <td className="px-4 py-1 font-bold text-gray-700">Not Relevant for This Return</td>
+                         <td className="px-4 py-1 text-right font-black border-l border-gray-200">{(report as any).voucher_counts?.not_relevant || 0}</td>
+                      </tr>
+                      <tr>
+                         <td className="px-4 py-1 font-bold text-amber-600">Uncertain Transactions (Corrections needed)</td>
+                         <td className="px-4 py-1 text-right font-black border-l border-gray-200">{(report as any).voucher_counts?.uncertain || 0}</td>
+                      </tr>
+                   </tbody>
+                </table>
               </div>
               
-              <div className="overflow-x-auto">
+              {/* ── Main Data Table ────────────────────────────────────── */}
+              <div className="overflow-x-auto border-t border-gray-100">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-gray-100/80 text-[10px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-200">
-                      <th className="px-6 py-4 w-1/3">Particulars</th>
-                      <th className="px-4 py-4 text-right">Taxable Value</th>
-                      <th className="px-4 py-4 text-right">Integrated Tax (IGST)</th>
-                      <th className="px-4 py-4 text-right">Central Tax (CGST)</th>
-                      <th className="px-4 py-4 text-right">State/UT Tax (SGST)</th>
+                    <tr className="bg-gray-50 text-[10px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-200">
+                      <th className="px-6 py-4 w-1/4">Particulars</th>
+                      <th className="px-4 py-4 text-right">Taxable Amount</th>
+                      <th className="px-4 py-4 text-right">IGST</th>
+                      <th className="px-4 py-4 text-right">CGST</th>
+                      <th className="px-4 py-4 text-right">SGST/ UTGST</th>
                       <th className="px-4 py-4 text-right">Cess</th>
+                      <th className="px-4 py-4 text-right bg-gray-100/50">Tax Amount</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100 text-xs">
-                    {/* SECTION 3.1 */}
-                    <tr className="bg-indigo-50/30">
-                      <td colSpan={6} className="px-6 py-3 font-black text-indigo-700 uppercase tracking-wider bg-indigo-50/50">
-                        3.1 Details of Outward Supplies and inward supplies liable to reverse charge
-                      </td>
+                  <tbody className="divide-y divide-gray-100 text-[11px]">
+                    <tr className="bg-white">
+                       <td className="px-6 py-3 font-black text-gray-900 uppercase italic">Return View</td>
+                       <td colSpan={6} />
                     </tr>
+                    {/* SECTION 3.1 */}
                     <GstrRow 
-                      label="(a) Outward taxable supplies (other than zero rated, nil rated and exempted)"
+                      label="3.1 Tax on Outward and Reverse Charge Inward Supplies"
                       taxable={out?.taxable_value ?? 0}
                       igst={out?.gst_collected?.igst ?? 0}
                       cgst={out?.gst_collected?.cgst ?? 0}
                       sgst={out?.gst_collected?.sgst ?? 0}
                       fmt={fmt}
+                      isHeader
+                      highlight
                     />
-                    <GstrRow label="(b) Outward taxable supplies (zero rated)" fmt={fmt} />
-                    <GstrRow label="(c) Other outward supplies (Nil rated, exempted)" fmt={fmt} />
-                    <GstrRow label="(d) Inward supplies (applicable for Reverse Charge)" fmt={fmt} />
-                    <GstrRow label="(e) Non-GST outward supplies" fmt={fmt} />
+                    <GstrRow 
+                      label="3.1a. Outward Taxable Supplies (other than Zero Rated, Nil Rated, and Exempted Supplies)"
+                      taxable={out?.taxable_value ?? 0}
+                      igst={out?.gst_collected?.igst ?? 0}
+                      cgst={out?.gst_collected?.cgst ?? 0}
+                      sgst={out?.gst_collected?.sgst ?? 0}
+                      fmt={fmt}
+                      depth={1}
+                    />
+                    <GstrRow label="3.1b. Outward Taxable Supplies (Zero Rated)" depth={1} fmt={fmt} />
+                    <GstrRow label="3.1c. Other Outward Supplies (Nil Rated and Exempted)" depth={1} fmt={fmt} />
+                    <GstrRow label="3.1d. Inward Supplies (applicable for Reverse Charge)" depth={1} fmt={fmt} />
+                    <GstrRow label="3.1e. Non-GST Outward Supplies" depth={1} fmt={fmt} />
+
+                    <GstrRow label="3.2 Interstate Supplies" isHeader fmt={fmt} />
+                    <GstrRow label="Supplies to Unregistered Persons" depth={1} fmt={fmt} />
+                    <GstrRow label="Supplies to Composition Dealers" depth={1} fmt={fmt} />
+                    <GstrRow label="Supplies to UIN holders" depth={1} fmt={fmt} />
 
                     {/* SECTION 4 */}
-                    <tr className="bg-indigo-50/30">
-                      <td colSpan={6} className="px-6 py-3 font-black text-indigo-700 uppercase tracking-wider bg-indigo-50/50">
-                        4. Eligible Input Tax Credit (ITC)
-                      </td>
-                    </tr>
+                    <GstrRow label="4 Eligible for Input Tax Credit" isHeader highlight fmt={fmt} />
                     <GstrRow 
-                      label="(A) ITC Available (whether in full or part)"
+                      label="A. Input Tax Credit Available (either in part or in full)"
                       igst={inw?.itc_available?.igst ?? 0}
                       cgst={inw?.itc_available?.cgst ?? 0}
                       sgst={inw?.itc_available?.sgst ?? 0}
                       fmt={fmt}
+                      depth={1}
                       isHeader
                     />
-                    <GstrRow label="1. Import of goods" depth={1} fmt={fmt} />
-                    <GstrRow label="2. Import of services" depth={1} fmt={fmt} />
-                    <GstrRow label="3. Inward supplies liable to reverse charge (other than 1 & 2 above)" depth={1} fmt={fmt} />
-                    <GstrRow label="4. Inward supplies from ISD" depth={1} fmt={fmt} />
+                    <GstrRow label="1. Import of Goods" depth={2} fmt={fmt} />
+                    <GstrRow label="2. Import of Services" depth={2} fmt={fmt} />
+                    <GstrRow label="3. Inward Supplies applicable for Reverse Charge (other than lines 1 & 2)" depth={2} fmt={fmt} />
+                    <GstrRow label="4. Inward Supplies from ISD" depth={2} fmt={fmt} />
                     <GstrRow 
-                      label="5. All other ITC" depth={1} 
+                      label="5. All other Input Tax Credit" depth={2} 
                       igst={inw?.itc_available?.igst ?? 0}
                       cgst={inw?.itc_available?.cgst ?? 0}
                       sgst={inw?.itc_available?.sgst ?? 0}
                       fmt={fmt}
                     />
-                    <GstrRow label="(B) ITC Reversed" isHeader fmt={fmt} />
+                    <GstrRow label="B. Input Tax Credit Reversed" isHeader depth={1} fmt={fmt} />
+                    <GstrRow label="1. As per rules 38, 42 and 43 of CGST Rules and section 17(5)" depth={2} fmt={fmt} />
+                    <GstrRow label="2. Others" depth={2} fmt={fmt} />
                     <GstrRow 
-                      label="(C) Net ITC Available (A) - (B)"
+                      label="C. Net Input Tax Credit Available (A) - (B)"
                       igst={inw?.itc_available?.igst ?? 0}
                       cgst={inw?.itc_available?.cgst ?? 0}
                       sgst={inw?.itc_available?.sgst ?? 0}
                       fmt={fmt}
                       isHeader
                       highlight
+                      depth={1}
                     />
-                    <GstrRow label="(D) Ineligible ITC" isHeader fmt={fmt} />
+                    <GstrRow label="D. Other Details" isHeader highlight fmt={fmt} />
+                    <GstrRow label="1. ITC reclaimed which was reversed under Table 4(B)(2) in earlier tax period" depth={1} fmt={fmt} />
+                    <GstrRow label="2. Ineligible ITC under section 16(4) and ITC restricted due to PoS rules" depth={1} fmt={fmt} />
+
+                    <GstrRow label="5 Exempt, Nil Rated, and Non-GST Inward Supplies" isHeader highlight fmt={fmt} />
+                    <GstrRow label="From a Supplier under Composition Scheme, Exempt and Nil Rated Supplies" depth={1} fmt={fmt} />
+                    <GstrRow label="Non-GST Supply" depth={1} fmt={fmt} />
+
+                    <GstrRow label="6.1 Interest, Late Fee, Penalty and Others" isHeader highlight fmt={fmt} />
+                    <GstrRow label="Interest" depth={1} fmt={fmt} />
+                    <GstrRow label="Late Fee" depth={1} fmt={fmt} />
+                    <GstrRow label="Penalty" depth={1} fmt={fmt} />
+                    <GstrRow label="Other Charges" depth={1} fmt={fmt} />
                   </tbody>
                 </table>
               </div>
@@ -568,16 +635,20 @@ function GstRow({ label, value, color = 'text-gray-700', bold = false }: { label
 function GstrRow({ 
   label, taxable = 0, igst = 0, cgst = 0, sgst = 0, cess = 0, fmt, isHeader = false, depth = 0, highlight = false 
 }: any) {
+  const taxAmt = igst + cgst + sgst + cess;
   return (
-    <tr className={`${isHeader ? 'bg-gray-50/50 font-bold' : ''} ${highlight ? 'bg-indigo-50/50' : 'hover:bg-gray-50/30'} transition-colors`}>
-      <td className={`px-6 py-3 text-gray-700 ${depth > 0 ? 'pl-10' : ''} ${isHeader ? 'font-black text-gray-900' : ''}`}>
+    <tr className={`${isHeader ? 'bg-gray-50/50 font-bold' : ''} ${highlight ? 'bg-indigo-50/50' : 'hover:bg-gray-50/30'} transition-colors border-b border-gray-100`}>
+      <td className={`px-6 py-2.5 text-gray-700 ${depth === 1 ? 'pl-10' : depth === 2 ? 'pl-14' : ''} ${isHeader ? 'font-black text-gray-900' : ''}`}>
         {label}
       </td>
-      <td className="px-4 py-3 text-right font-mono text-gray-600">{taxable > 0 ? fmt(taxable) : '0.00'}</td>
-      <td className={`px-4 py-3 text-right font-mono ${igst > 0 ? 'text-indigo-600 font-bold' : 'text-gray-400'}`}>{igst > 0 ? fmt(igst) : '0.00'}</td>
-      <td className={`px-4 py-3 text-right font-mono ${cgst > 0 ? 'text-emerald-600 font-bold' : 'text-gray-400'}`}>{cgst > 0 ? fmt(cgst) : '0.00'}</td>
-      <td className={`px-4 py-3 text-right font-mono ${sgst > 0 ? 'text-sky-600 font-bold' : 'text-gray-400'}`}>{sgst > 0 ? fmt(sgst) : '0.00'}</td>
-      <td className="px-4 py-3 text-right font-mono text-gray-400">{cess > 0 ? fmt(cess) : '0.00'}</td>
+      <td className="px-4 py-2.5 text-right font-mono text-gray-600">{taxable > 0 ? fmt(taxable).replace('₹', '') : ''}</td>
+      <td className={`px-4 py-2.5 text-right font-mono italic ${igst > 0 ? 'text-gray-900 font-bold' : 'text-gray-400'}`}>{igst > 0 ? fmt(igst).replace('₹', '') : ''}</td>
+      <td className={`px-4 py-2.5 text-right font-mono italic ${cgst > 0 ? 'text-gray-900 font-bold' : 'text-gray-400'}`}>{cgst > 0 ? fmt(cgst).replace('₹', '') : ''}</td>
+      <td className={`px-4 py-2.5 text-right font-mono italic ${sgst > 0 ? 'text-gray-900 font-bold' : 'text-gray-400'}`}>{sgst > 0 ? fmt(sgst).replace('₹', '') : ''}</td>
+      <td className="px-4 py-2.5 text-right font-mono text-gray-400">{cess > 0 ? fmt(cess).replace('₹', '') : ''}</td>
+      <td className={`px-4 py-2.5 text-right font-mono bg-gray-50/50 ${taxAmt > 0 ? 'text-gray-900 font-black' : 'text-gray-400'}`}>
+        {taxAmt > 0 ? fmt(taxAmt).replace('₹', '') : ''}
+      </td>
     </tr>
   );
 }

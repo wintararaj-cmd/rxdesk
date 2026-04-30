@@ -1887,8 +1887,26 @@ export async function getGstSummary(userId: string, month: number, year: number)
   const netTaxPayable = Math.max(0, finalGstCollected - finalITC);
   const itcCarryForward = Math.max(0, finalITC - finalGstCollected);
 
+  // Voucher Counts
+  const [billCount, purchaseCount] = await Promise.all([
+    prisma.bill.count({ where: { shop_id: shop.id, payment_status: 'paid', created_at: { gte: start, lte: end } } }),
+    prisma.purchaseEntry.count({ where: { shop_id: shop.id, received_date: { gte: start, lte: end } } }),
+  ]);
+
   return {
     period: { month, year },
+    shop_details: {
+      name: shop.shop_name,
+      address: shop.address,
+      email: shop.email,
+      gstin: shop.gst_number,
+    },
+    voucher_counts: {
+      total: billCount + purchaseCount,
+      included: billCount + purchaseCount,
+      not_relevant: 0,
+      uncertain: 0
+    },
     outward_supplies: {
       taxable_value: Math.round(totalOutwardTaxable * 100) / 100,
       gst_collected: {
