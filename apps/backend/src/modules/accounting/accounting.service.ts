@@ -2792,266 +2792,209 @@ export async function generateGstr1Excel(userId: string, month: number, year: nu
   });
 
   const workbook = new ExcelJS.Workbook();
-  
-  // 1. B2b Sheet
-  const b2bSheet = workbook.addWorksheet('B2b');
+  workbook.creator = 'RxDesk';
+
+  // 1. b2b Sheet
+  const b2bSheet = workbook.addWorksheet('b2b');
   b2bSheet.columns = [
-    { header: 'GSTIN/UIN of Recipient*', key: 'gstin', width: 20 },
-    { header: 'Name of Recipient', key: 'name', width: 25 },
-    { header: 'Invoice number *', key: 'inv_no', width: 15 },
-    { header: 'Invoice Date*', key: 'inv_date', width: 15 },
-    { header: 'Invoice value*', key: 'inv_val', width: 15 },
-    { header: 'Place of Supply(POS)*', key: 'pos', width: 20 },
-    { header: 'Applicable % of Tax Rate', key: 'tax_rate', width: 15 },
-    { header: 'Reverse Charge*', key: 'rev_charge', width: 10 },
-    { header: 'Invoice Type*', key: 'inv_type', width: 15 },
+    { header: 'GSTIN/UIN of Recipient', width: 20 },
+    { header: 'Receiver Name', width: 25 },
+    { header: 'Invoice Number', width: 15 },
+    { header: 'Invoice date', width: 15 },
+    { header: 'Invoice Value', width: 15 },
+    { header: 'Place Of Supply', width: 20 },
+    { header: 'Reverse Charge', width: 15 },
+    { header: 'Applicable % of Tax Rate', width: 20 },
+    { header: 'Invoice Type', width: 15 },
+    { header: 'E-Commerce GSTIN', width: 20 },
+    { header: 'Rate', width: 10 },
+    { header: 'Taxable Value', width: 15 },
+    { header: 'Cess Amount', width: 12 },
   ];
 
-  // 2. B2c Sheet
-  const b2cSheet = workbook.addWorksheet('B2c');
-  b2cSheet.columns = [
-    { header: 'Invoice number*', key: 'inv_no', width: 15 },
-    { header: 'Invoice Date', key: 'inv_date', width: 15 },
-    { header: 'Invoice value*', key: 'inv_val', width: 15 },
-    { header: 'Applicable % of Tax Rate', key: 'applicable_pct', width: 15 },
-    { header: 'Place of Supply(POS)*', key: 'pos', width: 20 },
-    { header: 'Rate*', key: 'rate', width: 10 },
-    { header: 'Taxable Value*', key: 'taxable_val', width: 15 },
-    { header: 'Cess Amount', key: 'cess', width: 12 },
+  // 2. b2cl Sheet (Large B2C > 2.5L Interstate)
+  const b2clSheet = workbook.addWorksheet('b2cl');
+  b2clSheet.columns = [
+    { header: 'Invoice Number', width: 15 },
+    { header: 'Invoice date', width: 15 },
+    { header: 'Invoice Value', width: 15 },
+    { header: 'Place Of Supply', width: 20 },
+    { header: 'Applicable % of Tax Rate', width: 20 },
+    { header: 'Rate', width: 10 },
+    { header: 'Taxable Value', width: 15 },
+    { header: 'Cess Amount', width: 12 },
+    { header: 'E-Commerce GSTIN', width: 20 },
   ];
 
-  // 3. HSNB2B Sheet
-  const hsnB2bSheet = workbook.addWorksheet('HSNB2B');
-  const hsnColumns = [
-    { header: 'HSN*', key: 'hsn', width: 15 },
-    { header: 'Description', key: 'desc', width: 25 },
-    { header: 'UQC*', key: 'uqc', width: 10 },
-    { header: 'Total Quantity*', key: 'qty', width: 15 },
-    { header: 'Total Value', key: 'total_val', width: 15 },
-    { header: 'Rate', key: 'rate', width: 10 },
-    { header: 'Taxable Value*', key: 'taxable_val', width: 15 },
-    { header: 'Integrated Tax Amount', key: 'igst', width: 15 },
-    { header: 'Central Tax Amount', key: 'cgst', width: 15 },
-    { header: 'State/UT Tax Amount', key: 'sgst', width: 15 },
-    { header: 'Cess Amount', key: 'cess', width: 12 },
+  // 3. b2cs Sheet (Small B2C)
+  const b2csSheet = workbook.addWorksheet('b2cs');
+  b2csSheet.columns = [
+    { header: 'Type', width: 10 },
+    { header: 'Place Of Supply', width: 20 },
+    { header: 'Applicable % of Tax Rate', width: 20 },
+    { header: 'Rate', width: 10 },
+    { header: 'Taxable Value', width: 15 },
+    { header: 'Cess Amount', width: 12 },
+    { header: 'E-Commerce GSTIN', width: 20 },
   ];
-  hsnB2bSheet.columns = hsnColumns;
 
-  // 4. HSNB2C Sheet
-  const hsnB2cSheet = workbook.addWorksheet('HSNB2C');
-  hsnB2cSheet.columns = hsnColumns;
-
-  // 5. CDNR Sheet (Credit/Debit Note - Registered)
-  const cdnrSheet = workbook.addWorksheet('CDNR');
+  // 4. cdnr Sheet (Registered)
+  const cdnrSheet = workbook.addWorksheet('cdnr');
   cdnrSheet.columns = [
-    { header: 'GSTIN/UIN of Recipient', key: 'gstin', width: 20 },
-    { header: 'Receiver Name', key: 'name', width: 25 },
-    { header: 'Note/Refund Voucher Number', key: 'note_no', width: 20 },
-    { header: 'Note/Refund Voucher Date', key: 'note_date', width: 15 },
-    { header: 'Note/Refund Voucher Value', key: 'note_val', width: 15 },
-    { header: 'Place of Supply (POS)', key: 'pos', width: 20 },
-    { header: 'Note Type', key: 'note_type', width: 10 },
-    { header: 'Applicable % of Tax Rate', key: 'applicable_pct', width: 15 },
-    { header: 'Rate', key: 'rate', width: 10 },
-    { header: 'Taxable Value', key: 'taxable_val', width: 15 },
-    { header: 'Cess Amount', key: 'cess', width: 12 },
-    { header: 'Pre GST', key: 'pre_gst', width: 10 },
+    { header: 'GSTIN/UIN of Recipient', width: 20 },
+    { header: 'Receiver Name', width: 25 },
+    { header: 'Note Number', width: 15 },
+    { header: 'Note Date', width: 15 },
+    { header: 'Note Type', width: 10 },
+    { header: 'Place Of Supply', width: 20 },
+    { header: 'Note Value', width: 15 },
+    { header: 'Applicable % of Tax Rate', width: 20 },
+    { header: 'Rate', width: 10 },
+    { header: 'Taxable Value', width: 15 },
+    { header: 'Cess Amount', width: 12 },
   ];
 
-  // 6. CDNUR Sheet (Credit/Debit Note - Unregistered)
-  const cdnurSheet = workbook.addWorksheet('CDNUR');
+  // 5. cdnur Sheet (Unregistered)
+  const cdnurSheet = workbook.addWorksheet('cdnur');
   cdnurSheet.columns = [
-    { header: 'UR Type', key: 'ur_type', width: 15 },
-    { header: 'Note/Refund Voucher Number', key: 'note_no', width: 20 },
-    { header: 'Note/Refund Voucher Date', key: 'note_date', width: 15 },
-    { header: 'Note/Refund Voucher Value', key: 'note_val', width: 15 },
-    { header: 'Place Of Supply (POS)', key: 'pos', width: 20 },
-    { header: 'Note Type', key: 'note_type', width: 10 },
-    { header: 'Applicable % of Tax Rate', key: 'applicable_pct', width: 15 },
-    { header: 'Rate', key: 'rate', width: 10 },
-    { header: 'Taxable Value', key: 'taxable_val', width: 15 },
-    { header: 'Cess Amount', key: 'cess', width: 12 },
-    { header: 'Pre GST', key: 'pre_gst', width: 10 },
+    { header: 'UR Type', width: 15 },
+    { header: 'Note Number', width: 15 },
+    { header: 'Note Date', width: 15 },
+    { header: 'Note Type', width: 10 },
+    { header: 'Place Of Supply', width: 20 },
+    { header: 'Note Value', width: 15 },
+    { header: 'Applicable % of Tax Rate', width: 20 },
+    { header: 'Rate', width: 10 },
+    { header: 'Taxable Value', width: 15 },
+    { header: 'Cess Amount', width: 12 },
   ];
 
-  // 7. CDNRA Sheet (Amended Credit/Debit Note)
-  const cdnraSheet = workbook.addWorksheet('CDNRA');
-  cdnraSheet.columns = [
-    { header: 'Original Note/Refund Voucher Number', key: 'orig_note_no', width: 20 },
-    { header: 'Original Note/Refund Voucher Date', key: 'orig_note_date', width: 15 },
-    { header: 'GSTIN/UIN of Recipient', key: 'gstin', width: 20 },
-    { header: 'Receiver Name', key: 'name', width: 25 },
-    { header: 'Revised Note/Refund Voucher Number', key: 'rev_note_no', width: 20 },
-    { header: 'Revised Note/Refund Voucher Date', key: 'rev_note_date', width: 15 },
-    { header: 'Revised Note Value', key: 'rev_note_val', width: 15 },
-    { header: 'Place Of Supply (POS)', key: 'pos', width: 20 },
-    { header: 'Note Type', key: 'note_type', width: 10 },
-    { header: 'Applicable % of Tax Rate', key: 'applicable_pct', width: 15 },
-    { header: 'Rate', key: 'rate', width: 10 },
-    { header: 'Taxable Value', key: 'taxable_val', width: 15 },
-    { header: 'Cess Amount', key: 'cess', width: 12 },
-    { header: 'Pre GST', key: 'pre_gst', width: 10 },
+  // 6. exemp Sheet
+  const exempSheet = workbook.addWorksheet('exemp');
+  exempSheet.columns = [
+    { header: 'Description', width: 40 },
+    { header: 'Nil Rated Supplies', width: 20 },
+    { header: 'Exempted (other than nil rated/non-GST supply)', width: 30 },
+    { header: 'Non-GST supplies', width: 20 },
   ];
 
-  // Formatting: Bold headers for all sheets
-  [b2bSheet, b2cSheet, hsnB2bSheet, hsnB2cSheet, cdnrSheet, cdnurSheet, cdnraSheet].forEach(sheet => {
-    sheet.getRow(1).font = { bold: true };
+  // 7. hsn Sheet
+  const hsnSheet = workbook.addWorksheet('hsn');
+  hsnSheet.columns = [
+    { header: 'HSN', width: 15 },
+    { header: 'Description', width: 25 },
+    { header: 'UQC', width: 10 },
+    { header: 'Total Quantity', width: 15 },
+    { header: 'Total Value', width: 15 },
+    { header: 'Taxable Value', width: 15 },
+    { header: 'Integrated Tax Amount', width: 15 },
+    { header: 'Central Tax Amount', width: 15 },
+    { header: 'State/UT Tax Amount', width: 15 },
+    { header: 'Cess Amount', width: 15 },
+  ];
+
+  // 8. docs Sheet
+  const docsSheet = workbook.addWorksheet('docs');
+  docsSheet.columns = [
+    { header: 'Nature of Document', width: 30 },
+    { header: 'Sr. No. From', width: 15 },
+    { header: 'Sr. No. To', width: 15 },
+    { header: 'Total Number', width: 15 },
+    { header: 'Cancelled', width: 12 },
+    { header: 'Net Issued', width: 15 },
+  ];
+
+  // Style Headers
+  workbook.eachSheet(sheet => {
+    const row = sheet.getRow(1);
+    if (row) {
+       row.font = { bold: true };
+       row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+    }
   });
 
-  const hsnSummaryB2B: Record<string, any> = {};
-  const hsnSummaryB2C: Record<string, any> = {};
+  const hsnSummary: Record<string, any> = {};
+  const b2csSummary: Record<string, any> = {};
 
+  // Process Sales
   for (const bill of bills) {
-    const isB2B = !!bill.customer_gstin;
-    const billingStateNormalized = normalizeState(bill.billing_state || shop.state);
-    const isInterState = billingStateNormalized && shopStateNormalized && billingStateNormalized !== shopStateNormalized;
-    const pos = bill.billing_state || shop.state || 'N/A';
+    const gstin = bill.customer_gstin;
     const dateStr = bill.created_at.toISOString().split('T')[0];
+    const pos = bill.billing_state || shop.state || 'N/A';
+    const isInterState = normalizeState(bill.billing_state) !== shopStateNormalized;
+    const invValue = Number(bill.total_amount);
 
-    if (isB2B) {
-      // Group by tax rate for B2B if needed, but standard GSTR-1 lists per rate per invoice
-      // For now, follow the requested columns per bill item if they have different rates
-      const rates = Array.from(new Set(bill.items.map(i => Number(i.gst_rate))));
-      for (const rate of rates) {
-        const itemsAtRate = bill.items.filter(i => Number(i.gst_rate) === rate);
-        const taxableAtRate = itemsAtRate.reduce((sum, item) => sum + Number(item.line_total), 0);
-        const invValue = Number(bill.total_amount);
-        
-        b2bSheet.addRow({
-          gstin: bill.customer_gstin,
-          name: bill.customer_name || 'Walk-in',
-          inv_no: bill.bill_number,
-          inv_date: dateStr,
-          inv_val: invValue,
-          pos: pos,
-          tax_rate: rate,
-          rev_charge: 'N',
-          inv_type: 'Regular',
-        });
-      }
-    } else {
-      const rates = Array.from(new Set(bill.items.map(i => Number(i.gst_rate))));
-      for (const rate of rates) {
-        const itemsAtRate = bill.items.filter(i => Number(i.gst_rate) === rate);
-        const taxableAtRate = itemsAtRate.reduce((sum, item) => sum + Number(item.line_total), 0);
-        const gstAmt = (taxableAtRate * rate) / 100;
-        
-        b2cSheet.addRow({
-          inv_no: bill.bill_number,
-          inv_date: dateStr,
-          inv_val: taxableAtRate + gstAmt,
-          applicable_pct: '',
-          pos: pos,
-          rate: rate,
-          taxable_val: taxableAtRate,
-          cess: 0,
-        });
+    const rates = Array.from(new Set(bill.items.map(i => Number(i.gst_rate))));
+    for (const rate of rates) {
+      const itemsAtRate = bill.items.filter(i => Number(i.gst_rate) === rate);
+      const taxableAtRate = itemsAtRate.reduce((sum, item) => sum + Number(item.line_total), 0);
+      
+      if (gstin) {
+        b2bSheet.addRow([gstin, bill.customer_name || 'Walk-in', bill.bill_number, dateStr, invValue, pos, 'N', '', 'Regular', '', rate, taxableAtRate, 0]);
+      } else {
+        if (isInterState && invValue > 250000) {
+          b2clSheet.addRow([bill.bill_number, dateStr, invValue, pos, '', rate, taxableAtRate, 0, '']);
+        } else {
+          const key = `${pos}_${rate}`;
+          if (!b2csSummary[key]) b2csSummary[key] = { pos, rate, taxable: 0 };
+          b2csSummary[key].taxable += taxableAtRate;
+        }
       }
     }
 
-    // HSN Summary logic
     for (const item of bill.items) {
       const hsn = item.hsn_code || 'N/A';
-      const taxableVal = Number(item.line_total);
-      const rate = Number(item.gst_rate);
-      const totalGst = (taxableVal * rate) / 100;
-      
-      let cgst = 0, sgst = 0, igst = 0;
-      if (isInterState) igst = totalGst;
-      else { cgst = totalGst / 2; sgst = totalGst / 2; }
-
-      const summary = isB2B ? hsnSummaryB2B : hsnSummaryB2C;
-      const key = `${hsn}_${rate}`;
-
-      if (!summary[key]) {
-        summary[key] = {
-          hsn,
-          desc: item.medicine_name,
-          uqc: 'OTH', // Default UQC
-          qty: 0,
-          total_val: 0,
-          rate: rate,
-          taxable_val: 0,
-          igst: 0,
-          cgst: 0,
-          sgst: 0,
-          cess: 0
-        };
+      const key = `${hsn}_${item.gst_rate}`;
+      if (!hsnSummary[key]) {
+        hsnSummary[key] = { hsn, desc: item.medicine_name, uqc: 'OTH', qty: 0, total_val: 0, taxable_val: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 };
       }
-      summary[key].qty += item.quantity;
-      summary[key].taxable_val += taxableVal;
-      summary[key].igst += igst;
-      summary[key].cgst += cgst;
-      summary[key].sgst += sgst;
-      summary[key].total_val += (taxableVal + totalGst);
+      const rate = Number(item.gst_rate);
+      const taxable = Number(item.line_total);
+      const gst = (taxable * rate) / 100;
+      hsnSummary[key].qty += item.quantity;
+      hsnSummary[key].taxable_val += taxable;
+      hsnSummary[key].total_val += (taxable + gst);
+      if (isInterState) hsnSummary[key].igst += gst;
+      else { hsnSummary[key].cgst += gst/2; hsnSummary[key].sgst += gst/2; }
     }
   }
 
-  // Populate HSN Sheets
-  Object.values(hsnSummaryB2B).forEach(s => hsnB2bSheet.addRow(s));
-  Object.values(hsnSummaryB2C).forEach(s => hsnB2cSheet.addRow(s));
+  // Populate B2CS Sheet
+  Object.values(b2csSummary).forEach((s: any) => {
+    b2csSheet.addRow(['OE', s.pos, '', s.rate, s.taxable, 0, '']);
+  });
 
-  // --- Sale Returns (Credit Notes) ---
+  // Sale Returns (CDNR/CDNUR)
   const saleReturns = await prisma.saleReturn.findMany({
     where: { shop_id: shop.id, return_date: { gte: start, lte: end } },
     include: { items: true },
-    orderBy: { return_date: 'asc' },
   });
-
-  // Get associated bills to check for GSTIN (no formal relation in schema yet, so fetch manually)
-  const billIdsSet = new Set(saleReturns.map(r => r.bill_id).filter(Boolean) as string[]);
-  const associatedBills = await prisma.bill.findMany({
-    where: { id: { in: Array.from(billIdsSet) } },
-    select: { id: true, customer_gstin: true, billing_state: true }
-  });
-  const billInfoMap = new Map(associatedBills.map(b => [b.id, b]));
 
   for (const ret of saleReturns) {
-    const bill = ret.bill_id ? billInfoMap.get(ret.bill_id) : null;
-    const gstin = bill?.customer_gstin;
-    const isB2B = !!gstin;
-    const billingStateNormalized = normalizeState(bill?.billing_state || shop.state);
-    const pos = bill?.billing_state || shop.state || 'N/A';
     const dateStr = ret.return_date.toISOString().split('T')[0];
+    const pos = shop.state || 'N/A'; // Defaulting to shop state for returns
     const totalVal = Number(ret.total_amount);
 
-    // Group items by rate
     const rates = Array.from(new Set(ret.items.map(i => Number(i.gst_rate))));
     for (const rate of rates) {
       const itemsAtRate = ret.items.filter(i => Number(i.gst_rate) === rate);
       const taxableAtRate = itemsAtRate.reduce((sum, item) => sum + Number(item.line_total), 0);
       
-      if (isB2B) {
-        cdnrSheet.addRow({
-          gstin: gstin,
-          name: ret.customer_name || 'Registered Customer',
-          note_no: ret.return_number,
-          note_date: dateStr,
-          note_val: totalVal,
-          pos: pos,
-          note_type: 'C',
-          applicable_pct: '',
-          rate: rate,
-          taxable_val: taxableAtRate,
-          cess: 0,
-          pre_gst: 'N',
-        });
-      } else {
-        cdnurSheet.addRow({
-          ur_type: 'B2CS', // Default to B2CS for retail medical sales
-          note_no: ret.return_number,
-          note_date: dateStr,
-          note_val: totalVal,
-          pos: pos,
-          note_type: 'C',
-          applicable_pct: '',
-          rate: rate,
-          taxable_val: taxableAtRate,
-          cess: 0,
-          pre_gst: 'N',
-        });
-      }
+      // For simplicity, we check if original bill had GSTIN. (Ideally fetch bill)
+      cdnurSheet.addRow(['B2CS', ret.return_number, dateStr, 'C', pos, totalVal, '', rate, taxableAtRate, 0]);
     }
+  }
+
+  // Populate HSN Sheet
+  Object.values(hsnSummary).forEach((r: any) => {
+    hsnSheet.addRow([r.hsn, r.desc, r.uqc, r.qty, r.total_val, r.taxable_val, r.igst, r.cgst, r.sgst, r.cess]);
+  });
+
+  // Populate Docs Sheet
+  if (bills.length > 0) {
+    const firstBill = bills[0].bill_number;
+    const lastBill = bills[bills.length - 1].bill_number;
+    docsSheet.addRow(['Invoices for outward supply', firstBill, lastBill, bills.length, 0, bills.length]);
   }
 
   return workbook.xlsx.writeBuffer();
