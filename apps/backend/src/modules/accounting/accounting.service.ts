@@ -3065,15 +3065,127 @@ export async function generateGstr2Excel(userId: string, month: number, year: nu
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 0, 23, 59, 59);
 
-  const templatePath = 'E:\\Project\\DocNear\\GSTR2_Excel_Workbook_TemplateNew.xlsx';
   const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'RxDesk';
   
-  try {
-    await workbook.xlsx.readFile(templatePath);
-  } catch (err: any) {
-    logger.error(`Failed to read GSTR-2 template: ${err.message}. Creating new workbook instead.`);
-    // Fallback if template missing
-  }
+  // 1. B2B Sheet
+  const b2bSheet = workbook.addWorksheet('b2b');
+  b2bSheet.columns = [
+    { header: 'GSTIN of Supplier', width: 20 },
+    { header: 'Invoice Number', width: 15 },
+    { header: 'Invoice date', width: 15 },
+    { header: 'Invoice Value', width: 15 },
+    { header: 'Place Of Supply', width: 20 },
+    { header: 'Reverse Charge', width: 15 },
+    { header: 'Invoice Type', width: 15 },
+    { header: 'Rate', width: 10 },
+    { header: 'Taxable Value', width: 15 },
+    { header: 'Integrated Tax Paid', width: 15 },
+    { header: 'Central Tax Paid', width: 15 },
+    { header: 'State/UT Tax Paid', width: 15 },
+    { header: 'Cess Paid', width: 12 },
+    { header: 'Eligibility For ITC', width: 20 },
+    { header: 'Availed ITC Integrated Tax', width: 20 },
+    { header: 'Availed ITC Central Tax', width: 18 },
+    { header: 'Availed ITC State/UT Tax', width: 20 },
+    { header: 'Availed ITC Cess', width: 15 },
+  ];
+
+  // 2. B2BUR Sheet
+  const b2burSheet = workbook.addWorksheet('b2bur');
+  b2burSheet.columns = [
+    { header: 'Supplier Name', width: 25 },
+    { header: 'Invoice Number', width: 15 },
+    { header: 'Invoice date', width: 15 },
+    { header: 'Invoice Value', width: 15 },
+    { header: 'Place Of Supply', width: 20 },
+    { header: 'Supply Type', width: 15 },
+    { header: 'Rate', width: 10 },
+    { header: 'Taxable Value', width: 15 },
+    { header: 'Integrated Tax Paid', width: 15 },
+    { header: 'Central Tax Paid', width: 15 },
+    { header: 'State/UT Tax Paid', width: 15 },
+    { header: 'Cess Paid', width: 12 },
+    { header: 'Eligibility For ITC', width: 20 },
+    { header: 'Availed ITC Integrated Tax', width: 20 },
+    { header: 'Availed ITC Central Tax', width: 18 },
+    { header: 'Availed ITC State/UT Tax', width: 20 },
+    { header: 'Availed ITC Cess', width: 15 },
+  ];
+
+  // 3. CDNR Sheet
+  const cdnrSheet = workbook.addWorksheet('cdnr');
+  cdnrSheet.columns = [
+    { header: 'GSTIN of Supplier', width: 20 },
+    { header: 'Note/Refund Voucher Number', width: 20 },
+    { header: 'Note/Refund Voucher Date', width: 15 },
+    { header: 'Note/Refund Voucher Value', width: 15 },
+    { header: 'Place Of Supply', width: 20 },
+    { header: 'Note Type', width: 10 },
+    { header: 'Reverse Charge', width: 15 },
+    { header: 'Rate', width: 10 },
+    { header: 'Taxable Value', width: 15 },
+    { header: 'Integrated Tax Paid', width: 15 },
+    { header: 'Central Tax Paid', width: 15 },
+    { header: 'State/UT Tax Paid', width: 15 },
+    { header: 'Cess Paid', width: 12 },
+    { header: 'Eligibility For ITC', width: 20 },
+    { header: 'Availed ITC Integrated Tax', width: 20 },
+    { header: 'Availed ITC Central Tax', width: 18 },
+    { header: 'Availed ITC State/UT Tax', width: 20 },
+    { header: 'Availed ITC Cess', width: 15 },
+  ];
+
+  // 4. CDNUR Sheet
+  const cdnurSheet = workbook.addWorksheet('cdnur');
+  cdnurSheet.columns = [
+    { header: 'Note/Refund Voucher Number', width: 20 },
+    { header: 'Note/Refund Voucher Date', width: 15 },
+    { header: 'Note/Refund Voucher Value', width: 15 },
+    { header: 'Place Of Supply', width: 20 },
+    { header: 'Note Type', width: 10 },
+    { header: 'Rate', width: 10 },
+    { header: 'Taxable Value', width: 15 },
+    { header: 'Integrated Tax Paid', width: 15 },
+    { header: 'Central Tax Paid', width: 15 },
+    { header: 'State/UT Tax Paid', width: 15 },
+    { header: 'Cess Paid', width: 12 },
+    { header: 'Eligibility For ITC', width: 20 },
+    { header: 'Availed ITC Integrated Tax', width: 20 },
+    { header: 'Availed ITC Central Tax', width: 18 },
+    { header: 'Availed ITC State/UT Tax', width: 20 },
+    { header: 'Availed ITC Cess', width: 15 },
+  ];
+
+  // Add dummy sheets for template compliance
+  workbook.addWorksheet('at');
+  workbook.addWorksheet('atadj');
+  workbook.addWorksheet('exemp');
+  workbook.addWorksheet('itcfel');
+
+  // 5. HSN Summary Sheet
+  const hsnSheet = workbook.addWorksheet('hsnsum');
+  hsnSheet.columns = [
+    { header: 'HSN', width: 15 },
+    { header: 'Description', width: 25 },
+    { header: 'UQC', width: 10 },
+    { header: 'Total Quantity', width: 15 },
+    { header: 'Total Value', width: 15 },
+    { header: 'Taxable Value', width: 15 },
+    { header: 'Integrated Tax Amount', width: 15 },
+    { header: 'Central Tax Amount', width: 15 },
+    { header: 'State/UT Tax Amount', width: 15 },
+    { header: 'Cess Amount', width: 15 },
+  ];
+
+  // Style headers
+  workbook.eachSheet(sheet => {
+    const headerRow = sheet.getRow(1);
+    if (headerRow) {
+      headerRow.font = { bold: true };
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+    }
+  });
 
   // Fetch Data
   const [purchases, purchaseReturns] = await Promise.all([
@@ -3103,18 +3215,6 @@ export async function generateGstr2Excel(userId: string, month: number, year: nu
 
   const hsnSummary: Record<string, any> = {};
 
-  const b2bSheet = workbook.getWorksheet('b2b') || workbook.getWorksheet('B2B');
-  const b2burSheet = workbook.getWorksheet('b2bur') || workbook.getWorksheet('B2BUR');
-  const cdnrSheet = workbook.getWorksheet('cdnr') || workbook.getWorksheet('CDNR');
-  const cdnurSheet = workbook.getWorksheet('cdnur') || workbook.getWorksheet('CDNUR');
-  const hsnSheet = workbook.getWorksheet('hsnsum') || workbook.getWorksheet('HSNSUM') || workbook.getWorksheet('hsn');
-
-  // Helper to append data to existing sheets (skipping headers)
-  const appendData = (sheet: any, data: any) => {
-    if (!sheet) return;
-    sheet.addRow(data);
-  };
-
   // Process Purchases
   for (const pur of purchases) {
     const isRegistered = !!pur.supplier?.gst_number;
@@ -3122,7 +3222,6 @@ export async function generateGstr2Excel(userId: string, month: number, year: nu
     const dateStr = pur.invoice_date.toISOString().split('T')[0];
     const isInterState = normalizeState(pur.supplier?.state) !== shopStateNormalized;
 
-    // Aggregate items for HSN and Tax Rates
     const rates = Array.from(new Set(pur.items.map(i => Number(i.gst_rate))));
     for (const rate of rates) {
       const itemsAtRate = pur.items.filter(i => Number(i.gst_rate) === rate);
@@ -3130,55 +3229,22 @@ export async function generateGstr2Excel(userId: string, month: number, year: nu
       const taxableAtRate = totalLineAtRate / (1 + rate / 100);
       const gstAtRate = totalLineAtRate - taxableAtRate;
       
-      const rowData = [
-        pur.supplier?.gst_number || '', 
-        pur.supplier?.name || 'Unregistered',
-        pur.invoice_number || '-',
-        dateStr,
-        Number(pur.total_amount),
-        pos,
-        'N', // Reverse Charge
-        'Regular',
-        rate,
-        taxableAtRate,
-        isInterState ? gstAtRate : 0, // IGST
-        isInterState ? 0 : gstAtRate / 2, // CGST
-        isInterState ? 0 : gstAtRate / 2, // SGST
-        0, // Cess
-        'Inputs',
-        isInterState ? gstAtRate : 0, // ITC IGST
-        isInterState ? 0 : gstAtRate / 2, // ITC CGST
-        isInterState ? 0 : gstAtRate / 2, // ITC SGST
-        0 // ITC Cess
-      ];
-
-      if (isRegistered && b2bSheet) {
-        b2bSheet.addRow(rowData);
-      } else if (!isRegistered && b2burSheet) {
-        // Adjust for B2BUR columns if they differ (Standard: Supplier Name, Inv No, Date, Value, POS, Supply Type, Rate, etc)
+      if (isRegistered) {
+        b2bSheet.addRow([
+          pur.supplier?.gst_number, pur.invoice_number, dateStr, Number(pur.total_amount), pos, 'N', 'Regular', rate,
+          taxableAtRate, isInterState ? gstAtRate : 0, isInterState ? 0 : gstAtRate / 2, isInterState ? 0 : gstAtRate / 2,
+          0, 'Inputs', isInterState ? gstAtRate : 0, isInterState ? 0 : gstAtRate / 2, isInterState ? 0 : gstAtRate / 2, 0
+        ]);
+      } else {
         b2burSheet.addRow([
-          pur.supplier?.name || 'Unregistered',
-          pur.invoice_number || '-',
-          dateStr,
-          Number(pur.total_amount),
-          pos,
-          isInterState ? 'Inter-State' : 'Intra-State',
-          rate,
-          taxableAtRate,
-          isInterState ? gstAtRate : 0,
-          isInterState ? 0 : gstAtRate / 2,
-          isInterState ? 0 : gstAtRate / 2,
-          0,
-          'Inputs',
-          isInterState ? gstAtRate : 0,
-          isInterState ? 0 : gstAtRate / 2,
-          isInterState ? 0 : gstAtRate / 2,
-          0
+          pur.supplier?.name || 'Unregistered', pur.invoice_number, dateStr, Number(pur.total_amount), pos,
+          isInterState ? 'Inter-State' : 'Intra-State', rate, taxableAtRate, isInterState ? gstAtRate : 0,
+          isInterState ? 0 : gstAtRate / 2, isInterState ? 0 : gstAtRate / 2, 0, 'Inputs',
+          isInterState ? gstAtRate : 0, isInterState ? 0 : gstAtRate / 2, isInterState ? 0 : gstAtRate / 2, 0
         ]);
       }
     }
 
-    // HSN Summary logic
     for (const item of pur.items) {
       const hsn = nameToHsn.get(item.medicine_name.trim().toLowerCase()) || 'N/A';
       const key = `${hsn}_${item.medicine_name.trim().toLowerCase()}`;
@@ -3197,7 +3263,7 @@ export async function generateGstr2Excel(userId: string, month: number, year: nu
     }
   }
 
-  // Process Returns (CDNR/CDNUR)
+  // Process Returns
   for (const ret of purchaseReturns) {
     const isRegistered = !!ret.supplier?.gst_number;
     const dateStr = ret.return_date.toISOString().split('T')[0];
@@ -3211,61 +3277,26 @@ export async function generateGstr2Excel(userId: string, month: number, year: nu
       const taxableAtRate = totalLineAtRate / (1 + rate / 100);
       const gstAtRate = totalLineAtRate - taxableAtRate;
 
-      const rowData = [
-        ret.supplier?.gst_number || '',
-        ret.return_number,
-        dateStr,
-        Number(ret.total_amount),
-        pos,
-        'D', // Debit Note
-        'N', // Reverse Charge
-        rate,
-        taxableAtRate,
-        isInterState ? gstAtRate : 0,
-        isInterState ? 0 : gstAtRate / 2,
-        isInterState ? 0 : gstAtRate / 2,
-        0,
-        'Inputs',
-        isInterState ? gstAtRate : 0,
-        isInterState ? 0 : gstAtRate / 2,
-        isInterState ? 0 : gstAtRate / 2,
-        0
-      ];
-
-      if (isRegistered && cdnrSheet) cdnrSheet.addRow(rowData);
-      else if (!isRegistered && cdnurSheet) {
-         cdnurSheet.addRow([
-            ret.return_number,
-            dateStr,
-            Number(ret.total_amount),
-            pos,
-            'D',
-            rate,
-            taxableAtRate,
-            isInterState ? gstAtRate : 0,
-            isInterState ? 0 : gstAtRate / 2,
-            isInterState ? 0 : gstAtRate / 2,
-            0,
-            'Inputs',
-            isInterState ? gstAtRate : 0,
-            isInterState ? 0 : gstAtRate / 2,
-            isInterState ? 0 : gstAtRate / 2,
-            0
-         ]);
+      if (isRegistered) {
+        cdnrSheet.addRow([
+          ret.supplier?.gst_number, ret.return_number, dateStr, Number(ret.total_amount), pos, 'D', 'N', rate,
+          taxableAtRate, isInterState ? gstAtRate : 0, isInterState ? 0 : gstAtRate / 2, isInterState ? 0 : gstAtRate / 2,
+          0, 'Inputs', isInterState ? gstAtRate : 0, isInterState ? 0 : gstAtRate / 2, isInterState ? 0 : gstAtRate / 2, 0
+        ]);
+      } else {
+        cdnurSheet.addRow([
+          ret.return_number, dateStr, Number(ret.total_amount), pos, 'D', rate, taxableAtRate,
+          isInterState ? gstAtRate : 0, isInterState ? 0 : gstAtRate / 2, isInterState ? 0 : gstAtRate / 2,
+          0, 'Inputs', isInterState ? gstAtRate : 0, isInterState ? 0 : gstAtRate / 2, isInterState ? 0 : gstAtRate / 2, 0
+        ]);
       }
     }
   }
 
-  // Process HSN Summary Sheet
-  if (hsnSheet) {
-    // Note: HSNSUM typically starts at a specific row in the government template. 
-    // For simplicity, we append. If headers are complex, we might need a specific row start.
-    Object.values(hsnSummary).forEach((r: any) => {
-      hsnSheet.addRow([
-        r.hsn, r.desc, r.uqc, r.qty, r.total_val, r.taxable_val, r.igst, r.cgst, r.sgst, r.cess
-      ]);
-    });
-  }
+  // HSN Summary
+  Object.values(hsnSummary).forEach((r: any) => {
+    hsnSheet.addRow([ r.hsn, r.desc, r.uqc, r.qty, r.total_val, r.taxable_val, r.igst, r.cgst, r.sgst, r.cess ]);
+  });
 
   return workbook.xlsx.writeBuffer();
 }
