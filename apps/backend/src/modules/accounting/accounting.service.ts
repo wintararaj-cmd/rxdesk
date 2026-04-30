@@ -1897,8 +1897,8 @@ export async function getGstSummary(userId: string, month: number, year: number)
     period: { month, year },
     shop_details: {
       name: shop.shop_name,
-      address: shop.address,
-      email: shop.email,
+      address: shop.address_line,
+      email: shop.contact_email,
       gstin: shop.gst_number,
     },
     voucher_counts: {
@@ -3070,7 +3070,7 @@ export async function generateGstr2Excel(userId: string, month: number, year: nu
   
   try {
     await workbook.xlsx.readFile(templatePath);
-  } catch (err) {
+  } catch (err: any) {
     logger.error(`Failed to read GSTR-2 template: ${err.message}. Creating new workbook instead.`);
     // Fallback if template missing
   }
