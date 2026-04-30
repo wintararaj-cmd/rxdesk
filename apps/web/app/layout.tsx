@@ -9,6 +9,8 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://rxdesk.in'),
   title: 'RxDesk — Pharmacy Billing Software & Doctor Appointment Management India',
   description: 'RxDesk is India\'s leading pharmacy billing and doctor appointment management software. GST-compliant medicine billing, inventory management, HSN-coded invoices, and online appointment scheduling for medical shops and clinics.',
+  manifest: '/manifest.json',
+  themeColor: '#4F46E5',
   keywords: [
     'pharmacy billing software India',
     'medical shop billing software',

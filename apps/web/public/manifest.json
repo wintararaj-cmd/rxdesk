@@ -1,0 +1,22 @@
+{
+  "name": "RxDesk — Pharmacy Billing & Appointment Management",
+  "short_name": "RxDesk",
+  "description": "India's leading pharmacy billing and doctor appointment management software.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#4F46E5",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
