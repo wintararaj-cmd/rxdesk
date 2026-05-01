@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireRole } from '../../middleware/auth';
 import * as service from './accounting.service';
+import * as reconService from './gst-reconcile.service';
 import { audit } from '../../utils/audit';
 
 const router = Router();
@@ -787,6 +788,71 @@ router.get('/reports/trial-balance', shopAuth, async (req, res, next) => {
     const { date } = req.query as { date: string };
     const data = await service.getTrialBalance(req.user!.id, date || new Date().toISOString().split('T')[0]);
     res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+// ─── GST Reconciliation ───────────────────────────────────────────────────────
+
+// GET /accounting/reports/gst-recon/books?month=3&year=2026
+router.get('/reports/gst-recon/books', shopAuth, async (req, res, next) => {
+  try {
+    const month = parseInt(req.query.month as string);
+    const year = parseInt(req.query.year as string);
+    if (!month || !year) return res.status(400).json({ success: false, message: 'month and year required' });
+    const data = await reconService.getBooksForReconciliation(req.user!.id, month, year);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+// POST /accounting/reports/gst-recon/2a  — portalData in body
+router.post('/reports/gst-recon/2a', shopAuth, async (req, res, next) => {
+  try {
+    const { month, year, portal_data } = req.body;
+    if (!month || !year || !Array.isArray(portal_data)) {
+      return res.status(400).json({ success: false, message: 'month, year and portal_data[] required' });
+    }
+    const data = await reconService.reconcileGst2A(req.user!.id, Number(month), Number(year), portal_data);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+// POST /accounting/reports/gst-recon/2b
+router.post('/reports/gst-recon/2b', shopAuth, async (req, res, next) => {
+  try {
+    const { month, year, portal_data } = req.body;
+    if (!month || !year || !Array.isArray(portal_data)) {
+      return res.status(400).json({ success: false, message: 'month, year and portal_data[] required' });
+    }
+    const data = await reconService.reconcileGst2B(req.user!.id, Number(month), Number(year), portal_data);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+// POST /accounting/reports/gst-recon/2a-excel
+router.post('/reports/gst-recon/2a-excel', shopAuth, async (req, res, next) => {
+  try {
+    const { month, year, portal_data } = req.body;
+    if (!month || !year || !Array.isArray(portal_data)) {
+      return res.status(400).json({ success: false, message: 'month, year and portal_data[] required' });
+    }
+    const buffer = await reconService.reconcileGst2AExcel(req.user!.id, Number(month), Number(year), portal_data);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=GSTR2A_Recon_${month}_${year}.xlsx`);
+    res.send(buffer);
+  } catch (err) { next(err); }
+});
+
+// POST /accounting/reports/gst-recon/2b-excel
+router.post('/reports/gst-recon/2b-excel', shopAuth, async (req, res, next) => {
+  try {
+    const { month, year, portal_data } = req.body;
+    if (!month || !year || !Array.isArray(portal_data)) {
+      return res.status(400).json({ success: false, message: 'month, year and portal_data[] required' });
+    }
+    const buffer = await reconService.reconcileGst2BExcel(req.user!.id, Number(month), Number(year), portal_data);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=GSTR2B_Recon_${month}_${year}.xlsx`);
+    res.send(buffer);
   } catch (err) { next(err); }
 });
 

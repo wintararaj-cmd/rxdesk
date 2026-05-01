@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { 
   FileText, Download, RefreshCw, AlertCircle, CheckCircle2, 
   Clock, TrendingUp, TrendingDown, Calculator, ArrowRight,
-  ChevronRight, ShieldCheck, Calendar, Wallet, Info, Zap
+  ChevronRight, ShieldCheck, Calendar, Wallet, Info, Zap, GitCompare
 } from 'lucide-react';
 
 const MONTHS = [
@@ -545,6 +545,56 @@ export default function GstReportPage() {
             </div>
           )}
         </>
+      )}
+      {/* ── Reconciliation Tool ────────────────────────────────────────── */}
+      {!isComposite && (
+        <div className="bg-gradient-to-br from-slate-900 to-indigo-900 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32 blur-3xl pointer-events-none group-hover:bg-white/10 transition-all duration-700" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/10 rounded-full -ml-32 -mb-32 blur-3xl pointer-events-none" />
+          
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+            <div className="max-w-xl">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center border border-indigo-400/30">
+                  <GitCompare className="w-6 h-6 text-indigo-300" />
+                </div>
+                <span className="text-indigo-300 text-[10px] font-black uppercase tracking-[0.2em]">Compliance Engine v2</span>
+              </div>
+              <h2 className="text-white text-3xl font-black tracking-tight mb-3">Automated GST Reconciliation</h2>
+              <p className="text-indigo-100/60 text-sm leading-relaxed">
+                Compare your purchase records directly with <span className="text-white font-bold">GSTR-2A/2B</span> portal data. 
+                Our engine auto-matches entries by GSTIN and Invoice Number, flagging discrepancies in tax amounts or missing documents instantly.
+              </p>
+              
+              <div className="flex flex-wrap items-center gap-4 mt-6">
+                {[
+                  { label: 'Auto-Match', icon: CheckCircle2 },
+                  { label: 'Discrepancy Alerts', icon: AlertCircle },
+                  { label: 'Excel Export', icon: Download }
+                ].map(feat => (
+                  <div key={feat.label} className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5">
+                    <feat.icon className="w-3.5 h-3.5 text-indigo-400" />
+                    <span className="text-white/80 text-[10px] font-black uppercase tracking-wider">{feat.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <Link 
+                href="/dashboard/reports/gst/reconcile"
+                className="w-full sm:w-auto px-8 py-4 bg-indigo-500 text-white rounded-2xl font-black text-sm hover:bg-indigo-400 transition-all shadow-xl shadow-indigo-500/20 active:scale-95 flex items-center justify-center gap-3 group/btn"
+              >
+                <span>Launch Reconciler</span>
+                <ChevronRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
+              </Link>
+              <div className="text-center sm:text-left">
+                <p className="text-white/40 text-[10px] font-bold uppercase mb-1">Last Reconciliation</p>
+                <p className="text-indigo-300 text-xs font-black">Not performed yet</p>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Composition scheme ─────────────────────────────────────── */}

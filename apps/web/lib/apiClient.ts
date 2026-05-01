@@ -292,6 +292,18 @@ export const accountingApi = {
   deleteJournalEntry: (id: string) => apiClient.delete(`/accounting/journal-entries/${id}`),
   getBalanceSheet: (date: string) => apiClient.get('/accounting/reports/balance-sheet', { params: { date } }),
   getTrialBalance: (date: string) => apiClient.get('/accounting/reports/trial-balance', { params: { date } }),
+
+  // GST Reconciliation
+  getReconBooks: (month: number, year: number) =>
+    apiClient.get('/accounting/reports/gst-recon/books', { params: { month, year } }),
+  reconcile2A: (month: number, year: number, portal_data: any[]) =>
+    apiClient.post('/accounting/reports/gst-recon/2a', { month, year, portal_data }),
+  reconcile2B: (month: number, year: number, portal_data: any[]) =>
+    apiClient.post('/accounting/reports/gst-recon/2b', { month, year, portal_data }),
+  reconcile2AExcel: (month: number, year: number, portal_data: any[]) =>
+    apiClient.post('/accounting/reports/gst-recon/2a-excel', { month, year, portal_data }, { responseType: 'blob', timeout: 60_000 }),
+  reconcile2BExcel: (month: number, year: number, portal_data: any[]) =>
+    apiClient.post('/accounting/reports/gst-recon/2b-excel', { month, year, portal_data }, { responseType: 'blob', timeout: 60_000 }),
 };
 
 export const doctorApi = {
