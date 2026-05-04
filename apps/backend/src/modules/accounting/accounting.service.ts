@@ -4439,7 +4439,7 @@ export async function importBankStatement(userId: string, filename: string, buff
   if (filename.endsWith('.csv')) {
     await workbook.csv.read(Readable.from(buffer));
   } else {
-    await workbook.xlsx.load(buffer);
+    await workbook.xlsx.load(buffer as any);
   }
 
   const sheet = workbook.getWorksheet(1);

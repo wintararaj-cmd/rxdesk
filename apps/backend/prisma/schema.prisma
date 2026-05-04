@@ -291,6 +291,7 @@ model MedicalShop {
   shop_name           String
   shop_type           ShopType           @default(medical_shop)
   gst_number          String?
+  upi_id              String?
   gst_type            GstType            @default(unregistered)
   drug_license_no     String
   drug_license_url    String?
