@@ -304,7 +304,32 @@ export const accountingApi = {
     apiClient.post('/accounting/reports/gst-recon/2a-excel', { month, year, portal_data }, { responseType: 'blob', timeout: 60_000 }),
   reconcile2BExcel: (month: number, year: number, portal_data: any[]) =>
     apiClient.post('/accounting/reports/gst-recon/2b-excel', { month, year, portal_data }, { responseType: 'blob', timeout: 60_000 }),
+
+  // BRS
+  importBankStatement: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiClient.post('/accounting/brs/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  listBankStatementImports: () => apiClient.get('/accounting/brs/imports'),
+  getBankStatementEntries: (importId: string) => apiClient.get(`/accounting/brs/entries/${importId}`),
+  autoMatchBankTransactions: (importId: string) => apiClient.post(`/accounting/brs/auto-match/${importId}`),
+  getPotentialMatches: (entryId: string) => apiClient.get(`/accounting/brs/potential-matches/${entryId}`),
+  manualMatchTransaction: (data: { entry_id: string; matched_type: string; matched_id: string }) => 
+    apiClient.post('/accounting/brs/manual-match', data),
+  getBRSReport: (date: string) => apiClient.get('/accounting/brs/report', { params: { date } }),
+
+  // Cheques
+  listCheques: (params?: { type?: string; status?: string }) => apiClient.get('/accounting/cheques', { params }),
+  createCheque: (data: object) => apiClient.post('/accounting/cheques', data),
+  updateChequeStatus: (id: string, status: string, clearanceDate?: string) => 
+    apiClient.patch(`/accounting/cheques/${id}/status`, { status, clearanceDate }),
+  getUPILink: (amount: number, note?: string) => 
+    apiClient.get('/accounting/upi-link', { params: { amount, note } }),
 };
+
 
 export const doctorApi = {
   search: (params: object) => apiClient.get('/doctors/search', { params }),

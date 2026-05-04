@@ -1,4 +1,5 @@
 import prisma from '../../config/database';
+import { Readable } from 'stream';
 import { AppError } from '../../middleware/errorHandler';
 import { Prisma } from '@prisma/client';
 import logger from '../../utils/logger';
@@ -2086,17 +2087,37 @@ export async function getPaymentSplit(userId: string, from: string, to: string) 
     _count: { id: true },
   });
 
+  // Recent digital transactions for the audit trail
+  const digitalMethods = ['upi', 'card', 'bank_transfer', 'neft'];
+  const transactions = await prisma.incomeEntry.findMany({
+    where: { 
+      shop_id: shop.id, 
+      entry_date: dateFilter,
+      payment_method: { in: digitalMethods as any }
+    },
+    orderBy: { entry_date: 'desc' },
+    take: 50
+  });
+
   const total = split.reduce((s, p) => s + Number(p._sum.amount ?? 0), 0);
+  
+  // Flattened structure for frontend convenience
+  const totals: any = {};
+  split.forEach(p => {
+    totals[p.payment_method] = Number(p._sum.amount || 0);
+  });
 
   return {
     period: { from, to },
     total,
+    ...totals,
     breakdown: split.map((p) => ({
       method: p.payment_method,
       amount: Number(p._sum.amount ?? 0),
       transaction_count: p._count.id,
       percentage: total > 0 ? Math.round((Number(p._sum.amount ?? 0) / total) * 1000) / 10 : 0,
     })),
+    transactions
   };
 }
 
@@ -4406,4 +4427,321 @@ export async function generateGstr1Json(userId: string, month: number, year: num
     hsn: { det: hsnData }
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Bank Reconciliation (BRS) & Cheque Management
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function importBankStatement(userId: string, filename: string, buffer: Buffer) {
+  const shop = await getShopOrThrow(userId);
+  const workbook = new ExcelJS.Workbook();
+  
+  if (filename.endsWith('.csv')) {
+    await workbook.csv.read(Readable.from(buffer));
+  } else {
+    await workbook.xlsx.load(buffer);
+  }
+
+  const sheet = workbook.getWorksheet(1);
+  if (!sheet) throw new AppError(400, 'VALIDATION_ERROR', 'No sheet found in file');
+
+  const entries: any[] = [];
+  
+  // Basic heuristic to find headers and data
+  // Expected columns: Date, Description, Reference, Debit, Credit, Balance
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return; // Skip potential header
+    
+    const dateCell = row.getCell(1).value;
+    const desc = row.getCell(2).text;
+    const ref = row.getCell(3).text;
+    const debit = Number(row.getCell(4).value || 0);
+    const credit = Number(row.getCell(5).value || 0);
+    const balance = Number(row.getCell(6).value || 0);
+
+    if (dateCell) {
+      entries.push({
+        date: new Date(dateCell as any),
+        description: desc,
+        reference_no: ref,
+        debit_amount: debit,
+        credit_amount: credit,
+        balance: balance,
+      });
+    }
+  });
+
+  return await prisma.$transaction(async (tx) => {
+    const imp = await tx.bankStatementImport.create({
+      data: {
+        shop_id: shop.id,
+        filename: filename,
+      }
+    });
+
+    await tx.bankStatementEntry.createMany({
+      data: entries.map(e => ({
+        import_id: imp.id,
+        ...e
+      }))
+    });
+
+    return imp;
+  });
+}
+
+export async function listBankStatementImports(userId: string) {
+  const shop = await getShopOrThrow(userId);
+  return prisma.bankStatementImport.findMany({
+    where: { shop_id: shop.id },
+    orderBy: { import_date: 'desc' },
+    include: { _count: { select: { entries: true } } }
+  });
+}
+
+export async function getBankStatementEntries(userId: string, importId: string) {
+  const shop = await getShopOrThrow(userId);
+  return prisma.bankStatementEntry.findMany({
+    where: { 
+      import_id: importId, 
+      import: { shop_id: shop.id } 
+    },
+    orderBy: { date: 'asc' }
+  });
+}
+
+/**
+ * Auto-matching logic:
+ * Matches entries with same amount and date within +/- 2 days.
+ */
+export async function autoMatchTransactions(userId: string, importId: string) {
+  const shop = await getShopOrThrow(userId);
+  const entries = await prisma.bankStatementEntry.findMany({
+    where: { import_id: importId, is_matched: false }
+  });
+
+  let matchedCount = 0;
+
+  for (const entry of entries) {
+    const amount = Number(entry.credit_amount) > 0 ? Number(entry.credit_amount) : Number(entry.debit_amount);
+    const type = Number(entry.credit_amount) > 0 ? 'credit' : 'debit';
+    
+    const dateStart = new Date(entry.date);
+    dateStart.setDate(dateStart.getDate() - 3);
+    const dateEnd = new Date(entry.date);
+    dateEnd.setDate(dateEnd.getDate() + 3);
+
+    // Look for Income (Credit) or Expense (Debit)
+    if (type === 'credit') {
+      const match = await prisma.incomeEntry.findFirst({
+        where: {
+          shop_id: shop.id,
+          amount: amount,
+          entry_date: { gte: dateStart, lte: dateEnd }
+        }
+      });
+
+      if (match) {
+        await prisma.bankStatementEntry.update({
+          where: { id: entry.id },
+          data: { is_matched: true, matched_type: 'income', matched_id: match.id }
+        });
+        matchedCount++;
+      }
+    } else {
+      const match = await prisma.expenseEntry.findFirst({
+        where: {
+          shop_id: shop.id,
+          amount: amount,
+          entry_date: { gte: dateStart, lte: dateEnd }
+        }
+      });
+
+      if (match) {
+        await prisma.bankStatementEntry.update({
+          where: { id: entry.id },
+          data: { is_matched: true, matched_type: 'expense', matched_id: match.id }
+        });
+        matchedCount++;
+      }
+    }
+  }
+
+  return { matched_count: matchedCount };
+}
+
+/**
+ * Manual linking of bank entry to software transaction
+ */
+export async function manualMatchTransaction(userId: string, entryId: string, matchedType: string, matchedId: string) {
+  const shop = await getShopOrThrow(userId);
+  
+  // Verify ownership
+  const entry = await prisma.bankStatementEntry.findFirst({
+    where: { id: entryId, import: { shop_id: shop.id } }
+  });
+  if (!entry) throw new AppError(404, 'NOT_FOUND', 'Bank statement entry not found');
+
+  return prisma.bankStatementEntry.update({
+    where: { id: entryId },
+    data: {
+      is_matched: true,
+      matched_type: matchedType,
+      matched_id: matchedId
+    }
+  });
+}
+
+/**
+ * Get list of potential matches for a bank entry
+ */
+export async function getPotentialMatches(userId: string, entryId: string) {
+  const shop = await getShopOrThrow(userId);
+  const entry = await prisma.bankStatementEntry.findFirst({
+    where: { id: entryId, import: { shop_id: shop.id } }
+  });
+  if (!entry) throw new AppError(404, 'NOT_FOUND', 'Entry not found');
+
+  const amount = Number(entry.credit_amount) > 0 ? Number(entry.credit_amount) : Number(entry.debit_amount);
+  const type = Number(entry.credit_amount) > 0 ? 'credit' : 'debit';
+  
+  // Date window of +/- 30 days for manual matching
+  const dateStart = new Date(entry.date);
+  dateStart.setDate(dateStart.getDate() - 30);
+  const dateEnd = new Date(entry.date);
+  dateEnd.setDate(dateEnd.getDate() + 30);
+
+  if (type === 'credit') {
+    return prisma.incomeEntry.findMany({
+      where: {
+        shop_id: shop.id,
+        amount: { gte: amount * 0.9, lte: amount * 1.1 }, // Allowance for slight difference
+        entry_date: { gte: dateStart, lte: dateEnd }
+      },
+      orderBy: { entry_date: 'desc' },
+      take: 10
+    });
+  } else {
+    return prisma.expenseEntry.findMany({
+      where: {
+        shop_id: shop.id,
+        amount: { gte: amount * 0.9, lte: amount * 1.1 },
+        entry_date: { gte: dateStart, lte: dateEnd }
+      },
+      orderBy: { entry_date: 'desc' },
+      take: 10
+    });
+  }
+}
+
+export async function getBRSReport(userId: string, date: string) {
+  const shop = await getShopOrThrow(userId);
+  const asOfDate = new Date(date);
+  
+  // 1. Balance as per Books
+  const methods = ['upi', 'neft', 'cheque', 'card', 'bank_transfer'];
+  const inc = await prisma.incomeEntry.aggregate({ where: { shop_id: shop.id, payment_method: { in: methods as any }, entry_date: { lte: asOfDate } }, _sum: { amount: true } });
+  const exp = await prisma.expenseEntry.aggregate({ where: { shop_id: shop.id, payment_method: { in: methods as any }, entry_date: { lte: asOfDate } }, _sum: { amount: true } });
+  const sup = await prisma.supplierPayment.aggregate({ where: { shop_id: shop.id, payment_method: { in: methods as any }, payment_date: { lte: asOfDate } }, _sum: { amount: true } });
+  const contras = await prisma.contraEntry.findMany({ where: { shop_id: shop.id, entry_date: { lte: asOfDate } } });
+
+  let bookBalance = Number(shop.opening_bank_balance) + Number(inc._sum.amount || 0) - Number(exp._sum.amount || 0) - Number(sup._sum.amount || 0);
+  for (const c of contras) {
+    if (methods.includes(c.from_account as any)) bookBalance -= Number(c.amount);
+    if (methods.includes(c.to_account as any)) bookBalance += Number(c.amount);
+  }
+
+  // 2. Unmatched Bank Entries (Bank has it, Books don't)
+  const unmatchedBank = await prisma.bankStatementEntry.aggregate({
+    where: { is_matched: false, import: { shop_id: shop.id }, date: { lte: asOfDate } },
+    _sum: { credit_amount: true, debit_amount: true }
+  });
+
+  // 3. Outstanding Cheques (Books have it, Bank doesn't)
+  const outstandingCheques = await prisma.cheque.aggregate({
+    where: { shop_id: shop.id, status: 'pending', date: { lte: asOfDate } },
+    _sum: { amount: true }
+  });
+
+  return {
+    as_of: asOfDate,
+    book_balance: bookBalance,
+    unmatched_bank_credits: Number(unmatchedBank._sum.credit_amount || 0),
+    unmatched_bank_debits: Number(unmatchedBank._sum.debit_amount || 0),
+    outstanding_cheques: Number(outstandingCheques._sum.amount || 0),
+    calculated_bank_balance: bookBalance + Number(unmatchedBank._sum.credit_amount || 0) - Number(unmatchedBank._sum.debit_amount || 0) + Number(outstandingCheques._sum.amount || 0)
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Cheque Management
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function listCheques(userId: string, filters: { type?: string; status?: string }) {
+  const shop = await getShopOrThrow(userId);
+  return prisma.cheque.findMany({
+    where: {
+      shop_id: shop.id,
+      ...(filters.type ? { type: filters.type } : {}),
+      ...(filters.status ? { status: filters.status } : {}),
+    },
+    orderBy: { date: 'desc' }
+  });
+}
+
+export async function createCheque(userId: string, data: any) {
+  const shop = await getShopOrThrow(userId);
+  return prisma.cheque.create({
+    data: {
+      shop_id: shop.id,
+      cheque_no: data.cheque_no,
+      date: new Date(data.date),
+      amount: data.amount,
+      party_name: data.party_name,
+      bank_name: data.bank_name,
+      type: data.type,
+      status: 'pending',
+      notes: data.notes
+    }
+  });
+}
+
+export async function updateChequeStatus(userId: string, id: string, status: string, clearanceDate?: string) {
+  const shop = await getShopOrThrow(userId);
+  
+  return await prisma.$transaction(async (tx) => {
+    const cheque = await tx.cheque.findUnique({ where: { id, shop_id: shop.id } });
+    if (!cheque) throw new Error('Cheque not found');
+
+    const updated = await tx.cheque.update({
+      where: { id },
+      data: { 
+        status, 
+        clearance_date: clearanceDate ? new Date(clearanceDate) : (status === 'cleared' ? new Date() : null)
+      }
+    });
+
+    return updated;
+  });
+}
+
+/**
+ * Generate a UPI Intent link for payments
+ */
+export async function getUPIPaymentLink(userId: string, amount: number, transactionNote: string) {
+  const shop = await getShopOrThrow(userId);
+  if (!shop.upi_id) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'Shop UPI ID not configured in settings');
+  }
+
+  const pa = shop.upi_id;
+  const pn = shop.shop_name.replace(/\s+/g, '%20');
+  const am = amount.toFixed(2);
+  const tn = transactionNote.replace(/\s+/g, '%20');
+  
+  const upiLink = `upi://pay?pa=${pa}&pn=${pn}&am=${am}&cu=INR&tn=${tn}`;
+  
+  return { upi_link: upiLink, upi_id: pa };
+}
+
 

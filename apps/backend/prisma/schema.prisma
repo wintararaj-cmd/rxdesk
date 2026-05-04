@@ -1,5 +1,5 @@
-// RxDesk â€” Prisma Schema
-// PostgreSQL Â· Prisma ORM
+// RxDesk — Prisma Schema
+// PostgreSQL · Prisma ORM
 
 generator client {
   provider = "prisma-client-js"
@@ -10,9 +10,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ————————————————————————————————————————————————
 //  Enums
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ————————————————————————————————————————————————
 
 enum UserRole {
   patient
@@ -114,7 +114,7 @@ enum DiscountType {
   amount
 }
 
-// â”€â”€â”€ Accounting Enums â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ——— Accounting Enums ——————————————————————
 
 enum ExpenseCategory {
   medicine_purchase
@@ -192,9 +192,9 @@ enum SubscriptionStatus {
   cancelled
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ————————————————————————————————————————————————
 //  Models
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ————————————————————————————————————————————————
 
 model User {
   id          String   @id @default(uuid())
@@ -350,6 +350,10 @@ model MedicalShop {
   chart_of_accounts   ChartOfAccount[]
   journal_entries     JournalEntry[]
   audit_logs          AuditLog[]
+  
+  // BRS & Cheques
+  bank_statement_imports BankStatementImport[]
+  cheques                Cheque[]
 
   @@map("medical_shops")
 }
@@ -767,9 +771,9 @@ model DoctorTemplateItem {
   @@map("doctor_template_items")
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ————————————————————————————————————————————————
 //  Accounting Module
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ————————————————————————————————————————————————
 
 model Supplier {
   id              String   @id @default(uuid())
@@ -991,9 +995,9 @@ model DailyCashRegister {
   @@map("daily_cash_register")
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ————————————————————————————————————————————————
 //  Sale Returns
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ————————————————————————————————————————————————
 
 model SaleReturn {
   id            String                  @id @default(uuid())
@@ -1032,9 +1036,9 @@ model SaleReturnItem {
   @@map("sale_return_items")
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ————————————————————————————————————————————————
 //  Purchase Returns
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ————————————————————————————————————————————————
 
 model PurchaseReturn {
   id                String   @id @default(uuid())
@@ -1074,9 +1078,9 @@ model PurchaseReturnItem {
   @@map("purchase_return_items")
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ————————————————————————————————————————————————
 //  Contra Entries
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ————————————————————————————————————————————————
 
 model ContraEntry {
   id           String                  @id @default(uuid())
@@ -1218,4 +1222,58 @@ model JournalItem {
   account     ChartOfAccount @relation(fields: [account_id], references: [id])
 
   @@map("journal_items")
+}
+
+// ————————————————————————————————————————————————
+//  BRS & Cheque Management
+// ————————————————————————————————————————————————
+
+model BankStatementImport {
+  id          String               @id @default(uuid())
+  shop_id     String
+  import_date DateTime             @default(now())
+  filename    String
+  entries     BankStatementEntry[]
+  
+  shop        MedicalShop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+
+  @@map("bank_statement_imports")
+}
+
+model BankStatementEntry {
+  id              String   @id @default(uuid())
+  import_id       String
+  date            DateTime @db.Date
+  description     String
+  reference_no    String?
+  debit_amount    Decimal  @default(0) @db.Decimal(12, 2)
+  credit_amount   Decimal  @default(0) @db.Decimal(12, 2)
+  balance         Decimal? @db.Decimal(12, 2)
+  is_matched      Boolean  @default(false)
+  matched_type    String?  // 'income', 'expense', 'contra', 'purchase_payment'
+  matched_id      String?  // ID of the matched record
+  
+  import          BankStatementImport @relation(fields: [import_id], references: [id], onDelete: Cascade)
+
+  @@map("bank_statement_entries")
+}
+
+model Cheque {
+  id              String   @id @default(uuid())
+  shop_id         String
+  cheque_no       String
+  date            DateTime @db.Date
+  amount          Decimal  @db.Decimal(12, 2)
+  party_id        String?  
+  party_name      String?
+  bank_name       String?
+  type            String   // 'received' | 'issued'
+  status          String   @default("pending") // 'pending' | 'cleared' | 'bounced'
+  clearance_date  DateTime? @db.Date
+  notes           String?
+  created_at      DateTime @default(now())
+  
+  shop            MedicalShop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+
+  @@map("cheques")
 }

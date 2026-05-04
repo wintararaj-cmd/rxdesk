@@ -3,6 +3,9 @@ import { requireRole } from '../../middleware/auth';
 import * as service from './accounting.service';
 import * as reconService from './gst-reconcile.service';
 import { audit } from '../../utils/audit';
+import multer from 'multer';
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 const router = Router();
 
@@ -856,4 +859,95 @@ router.post('/reports/gst-recon/2b-excel', shopAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ─── Bank Reconciliation (BRS) ────────────────────────────────────────────────
+
+router.post('/brs/import', shopAuth, upload.single('file'), async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, error: 'File is required' });
+    const data = await service.importBankStatement(req.user!.id, req.file.originalname, req.file.buffer);
+    res.json({ success: true, data, message: 'Bank statement imported' });
+  } catch (err) { next(err); }
+});
+
+router.get('/brs/imports', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.listBankStatementImports(req.user!.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/brs/entries/:importId', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.getBankStatementEntries(req.user!.id, req.params.importId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/brs/auto-match/:importId', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.autoMatchTransactions(req.user!.id, req.params.importId);
+    res.json({ success: true, data, message: `Auto-matched ${data.matched_count} transactions` });
+  } catch (err) { next(err); }
+});
+
+router.get('/brs/potential-matches/:entryId', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.getPotentialMatches(req.user!.id, req.params.entryId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/brs/manual-match', shopAuth, async (req, res, next) => {
+  try {
+    const { entry_id, matched_type, matched_id } = req.body;
+    const data = await service.manualMatchTransaction(req.user!.id, entry_id, matched_type, matched_id);
+    res.json({ success: true, data, message: 'Transaction linked manually' });
+  } catch (err) { next(err); }
+});
+
+router.get('/brs/report', shopAuth, async (req, res, next) => {
+  try {
+    const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+    const data = await service.getBRSReport(req.user!.id, date);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+// ─── Cheque Management ───────────────────────────────────────────────────────
+
+router.get('/cheques', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.listCheques(req.user!.id, { 
+      type: req.query.type as string, 
+      status: req.query.status as string 
+    });
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.post('/cheques', shopAuth, async (req, res, next) => {
+  try {
+    const data = await service.createCheque(req.user!.id, req.body);
+    res.status(201).json({ success: true, data, message: 'Cheque record created' });
+  } catch (err) { next(err); }
+});
+
+router.patch('/cheques/:id/status', shopAuth, async (req, res, next) => {
+  try {
+    const { status, clearanceDate } = req.body;
+    const data = await service.updateChequeStatus(req.user!.id, req.params.id, status, clearanceDate);
+    res.json({ success: true, data, message: 'Cheque status updated' });
+  } catch (err) { next(err); }
+});
+
+router.get('/upi-link', shopAuth, async (req, res, next) => {
+  try {
+    const { amount, note } = req.query;
+    if (!amount) return res.status(400).json({ success: false, message: 'Amount is required' });
+    const data = await service.getUPIPaymentLink(req.user!.id, Number(amount), (note as string) || 'Payment to Shop');
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 export default router;
+

@@ -259,7 +259,7 @@ function HsnEntryModal({ medicineName, onSave, onCancel }: { medicineName: strin
 }
 
 // ── panel tabs ────────────────────────────────────────────────────────────────
-const TABS = ['Reports', 'Vouchers', 'Purchases', 'Returns', 'Books', 'Outstandings', 'Setup'] as const;
+const TABS = ['Reports', 'Vouchers', 'Purchases', 'Returns', 'Books', 'Banking', 'Outstandings', 'Setup'] as const;
 type Tab = (typeof TABS)[number];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3147,7 +3147,581 @@ function PurchaseReturnDetailModal({ id, onClose }: { id: string; onClose: () =>
 // ─────────────────────────────────────────────────────────────────────────────
 //  Outstandings Tab
 // ─────────────────────────────────────────────────────────────────────────────
+function BankingTab() {
+  const [subTab, setSubTab] = useState<'brs' | 'cheques' | 'digital'>('brs');
+  
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+       <div className="bg-white/50 backdrop-blur-sm p-1.5 rounded-2xl w-fit border border-gray-100 flex gap-1 shadow-sm">
+          {(['brs', 'cheques', 'digital'] as const).map(t => (
+             <button
+                key={t}
+                onClick={() => setSubTab(t)}
+                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${subTab === t ? 'bg-gray-900 text-white shadow-lg shadow-gray-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+             >
+                {t === 'brs' ? 'Bank Reconciliation' : t === 'cheques' ? 'Cheque Management' : 'Digital Payments'}
+             </button>
+          ))}
+       </div>
+
+       {subTab === 'brs' && <BRSSubTab />}
+       {subTab === 'cheques' && <ChequesSubTab />}
+       {subTab === 'digital' && <DigitalTrackerSubTab />}
+    </div>
+  );
+}
+
+function BRSSubTab() {
+  const [selectedImportId, setSelectedImportId] = useState<string | null>(null);
+  const [showReport, setShowReport] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data: imports, isLoading: loadingImports } = useQuery({
+    queryKey: ['brs-imports'],
+    queryFn: () => accountingApi.listBankStatementImports().then(r => r.data.data)
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: (file: File) => accountingApi.importBankStatement(file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['brs-imports'] });
+      alert('Statement uploaded successfully');
+    }
+  });
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) uploadMutation.mutate(file);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left: Import History */}
+        <div className="lg:col-span-1 space-y-4">
+          <div className="bg-white rounded-[32px] p-6 border border-gray-100 shadow-sm">
+             <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xs font-black uppercase tracking-widest text-gray-400">Statement History</h3>
+                <label className="cursor-pointer bg-violet-600 text-white p-2 rounded-xl hover:bg-violet-700 transition-colors shadow-lg shadow-violet-100">
+                   <Upload className="w-4 h-4" />
+                   <input type="file" className="hidden" onChange={handleFileUpload} accept=".csv,.xlsx" />
+                </label>
+             </div>
+             
+             {loadingImports ? (
+               <div className="py-10 text-center animate-pulse text-[10px] font-black text-gray-300 uppercase">Loading history...</div>
+             ) : (
+               <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2 no-scrollbar">
+                 {imports?.map((imp: any) => (
+                   <button
+                     key={imp.id}
+                     onClick={() => setSelectedImportId(imp.id)}
+                     className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedImportId === imp.id ? 'border-violet-500 bg-violet-50/50 ring-2 ring-violet-100' : 'border-gray-50 hover:border-gray-200 bg-gray-50/30'}`}
+                   >
+                     <div className="flex justify-between items-start mb-1">
+                        <span className="text-xs font-black text-gray-900 truncate max-w-[150px]">{imp.filename}</span>
+                        <span className="text-[9px] font-bold text-gray-400">{new Date(imp.import_date).toLocaleDateString()}</span>
+                     </div>
+                     <p className="text-[10px] text-gray-500 font-medium">{imp._count.entries} transactions found</p>
+                   </button>
+                 ))}
+                 {!imports?.length && <p className="text-center py-10 text-[10px] font-bold text-gray-300 uppercase">No imports yet</p>}
+               </div>
+             )}
+          </div>
+
+          <button 
+            onClick={() => setShowReport(true)}
+            className="w-full bg-gray-900 text-white p-5 rounded-[24px] font-black text-xs uppercase tracking-widest shadow-xl shadow-gray-200 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3"
+          >
+            <PieChart className="w-4 h-4" />
+            Generate BRS Report
+          </button>
+        </div>
+
+        {/* Right: Matching Interface */}
+        <div className="lg:col-span-2">
+           {selectedImportId ? (
+             <BRSMatchingPanel importId={selectedImportId} />
+           ) : (
+             <div className="h-full min-h-[400px] bg-white rounded-[40px] border border-dashed border-gray-200 flex flex-col items-center justify-center text-center p-10 grayscale opacity-40">
+                <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-6">
+                  <Activity className="w-10 h-10 text-gray-400" />
+                </div>
+                <h3 className="text-sm font-black uppercase tracking-widest text-gray-500">Awaiting Selection</h3>
+                <p className="text-xs text-gray-400 max-w-xs mt-2">Select a bank statement from the history to begin the reconciliation process.</p>
+             </div>
+           )}
+        </div>
+      </div>
+
+      {showReport && <BRSReportModal onClose={() => setShowReport(false)} />}
+    </div>
+  );
+}
+
+function BRSMatchingPanel({ importId }: { importId: string }) {
+  const queryClient = useQueryClient();
+  const [selectedEntry, setSelectedEntry] = useState<any>(null);
+  const { data: entries, isLoading } = useQuery({
+    queryKey: ['brs-entries', importId],
+    queryFn: () => accountingApi.getBankStatementEntries(importId).then(r => r.data.data)
+  });
+
+  const autoMatch = useMutation({
+    mutationFn: () => accountingApi.autoMatchBankTransactions(importId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['brs-entries', importId] });
+      alert(data.data.message);
+    }
+  });
+
+  if (isLoading) return <div className="p-20 text-center animate-pulse text-xs font-black text-gray-300 uppercase tracking-widest">Scanning Ledger...</div>;
+
+  return (
+    <div className="bg-white rounded-[40px] shadow-sm border border-gray-100 overflow-hidden flex flex-col h-full">
+       <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+          <div>
+            <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Matching Workspace</h3>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight mt-0.5">Linking Bank Entries to Software Vouchers</p>
+          </div>
+          <button 
+            onClick={() => autoMatch.mutate()}
+            disabled={autoMatch.isPending}
+            className="bg-emerald-500 text-white px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100 flex items-center gap-2"
+          >
+            {autoMatch.isPending ? 'Matching...' : <><RefreshCcw className="w-3 h-3" /> Run Auto-Match</>}
+          </button>
+       </div>
+
+       <div className="flex-1 overflow-y-auto max-h-[600px] no-scrollbar">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-white z-10 shadow-sm shadow-gray-50">
+              <tr className="text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
+                <th className="text-left px-8 py-5">Date</th>
+                <th className="text-left px-5 py-5">Bank Description</th>
+                <th className="text-right px-5 py-5">Withdrawal</th>
+                <th className="text-right px-5 py-5">Deposit</th>
+                <th className="text-center px-8 py-5 w-40">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {entries?.map((entry: any) => (
+                <tr key={entry.id} className="hover:bg-gray-50/50 transition-colors group">
+                  <td className="px-8 py-5 font-black text-gray-900 whitespace-nowrap">{new Date(entry.date).toLocaleDateString()}</td>
+                  <td className="px-5 py-5">
+                    <p className="text-xs font-bold text-gray-800 line-clamp-1">{entry.description}</p>
+                    <p className="text-[9px] text-gray-400 font-mono">{entry.reference_no}</p>
+                  </td>
+                  <td className="px-5 py-5 text-right font-black text-rose-500">{entry.debit_amount > 0 ? fmt(entry.debit_amount) : '-'}</td>
+                  <td className="px-5 py-5 text-right font-black text-emerald-500">{entry.credit_amount > 0 ? fmt(entry.credit_amount) : '-'}</td>
+                  <td className="px-8 py-5 text-center">
+                    {entry.is_matched ? (
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-tighter border border-emerald-100">
+                        <CheckCircle2 className="w-3 h-3" /> Matched
+                      </div>
+                    ) : (
+                      <button 
+                        onClick={() => setSelectedEntry(entry)}
+                        className="text-[9px] font-black uppercase text-violet-600 hover:underline"
+                      >
+                        Link Manually
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+       </div>
+       {selectedEntry && (
+         <ManualMatchModal 
+           entry={selectedEntry} 
+           onClose={() => setSelectedEntry(null)} 
+         />
+       )}
+    </div>
+  );
+}
+
+function ManualMatchModal({ entry, onClose }: { entry: any; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const { data: potentials, isLoading } = useQuery({
+    queryKey: ['potential-matches', entry.id],
+    queryFn: () => accountingApi.getPotentialMatches(entry.id).then(r => r.data.data)
+  });
+
+  const matchMutation = useMutation({
+    mutationFn: (matchId: string) => accountingApi.manualMatchTransaction({
+      entry_id: entry.id,
+      matched_type: Number(entry.credit_amount) > 0 ? 'income' : 'expense',
+      matched_id: matchId
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['brs-entries'] });
+      alert('Transaction linked successfully');
+      onClose();
+    }
+  });
+
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-6">
+       <div className="bg-white rounded-[40px] w-full max-w-xl shadow-2xl border border-gray-100 overflow-hidden animate-in zoom-in-95 duration-300">
+          <div className="p-8 border-b border-gray-50 flex justify-between items-center bg-gray-50/30">
+             <div>
+                <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Manual Reconciliation</h3>
+                <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">Linking: {entry.description}</p>
+             </div>
+             <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors"><X className="w-5 h-5 text-gray-400" /></button>
+          </div>
+
+          <div className="p-8 space-y-6">
+             <div className="bg-violet-50 p-6 rounded-3xl border border-violet-100">
+                <div className="flex justify-between items-center mb-2">
+                   <span className="text-[10px] font-black text-violet-400 uppercase tracking-widest">Bank Statement Entry</span>
+                   <span className="text-xs font-black text-violet-600">{fmt(entry.credit_amount || entry.debit_amount)}</span>
+                </div>
+                <p className="text-sm font-bold text-gray-800">{entry.description}</p>
+                <p className="text-[10px] text-gray-400 mt-1 font-mono">{new Date(entry.date).toLocaleDateString()} | REF: {entry.reference_no}</p>
+             </div>
+
+             <div className="space-y-4">
+                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Potential Matches in Software</h4>
+                {isLoading ? (
+                  <div className="py-10 text-center animate-pulse text-xs font-black text-gray-300 uppercase">Searching Ledger...</div>
+                ) : potentials?.length > 0 ? (
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 no-scrollbar">
+                    {potentials.map((m: any) => (
+                      <button
+                        key={m.id}
+                        onClick={() => matchMutation.mutate(m.id)}
+                        disabled={matchMutation.isPending}
+                        className="w-full text-left p-4 rounded-2xl border border-gray-50 hover:border-violet-200 hover:bg-violet-50/30 transition-all group flex justify-between items-center"
+                      >
+                        <div>
+                           <p className="text-xs font-black text-gray-900">{new Date(m.entry_date).toLocaleDateString()}</p>
+                           <p className="text-[10px] text-gray-500 font-bold uppercase mt-0.5">{m.party_name || 'Generic Transaction'}</p>
+                        </div>
+                        <div className="text-right">
+                           <p className="text-sm font-black text-gray-900">{fmt(m.amount)}</p>
+                           <p className="text-[9px] font-black text-violet-500 uppercase tracking-tighter group-hover:underline">Link This</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-10 text-center bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+                     <p className="text-[10px] font-black text-gray-400 uppercase">No close matches found</p>
+                     <p className="text-[9px] text-gray-400 mt-1">Try searching by amount or date in the main ledger.</p>
+                  </div>
+                )}
+             </div>
+          </div>
+
+          <div className="p-6 bg-gray-50 border-t border-gray-100 flex justify-end">
+             <button onClick={onClose} className="px-8 py-3 text-xs font-black uppercase tracking-widest text-gray-500">Cancel</button>
+          </div>
+       </div>
+    </div>
+  );
+}
+
+function BRSReportModal({ onClose }: { onClose: () => void }) {
+  const [date, setDate] = useState(TODAY_STR);
+  const { data: report, isLoading } = useQuery({
+    queryKey: ['brs-report', date],
+    queryFn: () => accountingApi.getBRSReport(date).then(r => r.data.data)
+  });
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-gray-900/60 backdrop-blur-md p-6">
+       <div className="bg-white rounded-[48px] w-full max-w-2xl shadow-2xl border border-white/20 overflow-hidden animate-in zoom-in-95 duration-300">
+          <div className="p-10 border-b border-gray-100 flex justify-between items-start">
+             <div>
+               <h2 className="text-2xl font-black text-gray-900 tracking-tighter uppercase">Bank Reconciliation Report</h2>
+               <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Verification of Books vs. Actual Statement</p>
+             </div>
+             <button onClick={onClose} className="p-3 hover:bg-gray-100 rounded-2xl transition-colors"><X className="w-6 h-6" /></button>
+          </div>
+
+          <div className="p-10 space-y-8">
+             <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-3xl border border-gray-100">
+               <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-4">As on date</span>
+               <input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-white border-0 rounded-2xl px-6 py-2.5 text-sm font-black shadow-sm focus:ring-2 focus:ring-violet-500" />
+             </div>
+
+             {isLoading ? (
+               <div className="py-20 text-center animate-pulse text-xs font-black text-gray-300 uppercase tracking-widest">Compiling Data...</div>
+             ) : report ? (
+               <div className="space-y-4">
+                  <div className="flex justify-between items-center p-6 bg-white border border-gray-100 rounded-[32px]">
+                    <span className="text-xs font-bold text-gray-600">Balance as per Books (General Ledger)</span>
+                    <span className="text-lg font-black text-gray-900">{fmt(report.book_balance)}</span>
+                  </div>
+                  <div className="space-y-2 pl-6 border-l-4 border-emerald-500/20 py-2">
+                    <div className="flex justify-between items-center text-xs px-4">
+                      <span className="text-gray-500 font-medium">+ Deposits in Bank not in Books</span>
+                      <span className="font-black text-emerald-600">{fmt(report.unmatched_bank_credits)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs px-4">
+                      <span className="text-gray-500 font-medium">+ Outstanding Cheques (Issued but not cleared)</span>
+                      <span className="font-black text-emerald-600">{fmt(report.outstanding_cheques)}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2 pl-6 border-l-4 border-rose-500/20 py-2">
+                    <div className="flex justify-between items-center text-xs px-4">
+                      <span className="text-gray-500 font-medium">- Withdrawals in Bank not in Books</span>
+                      <span className="font-black text-rose-600">{fmt(report.unmatched_bank_debits)}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center p-8 bg-gray-900 rounded-[32px] text-white shadow-2xl shadow-gray-200 mt-8">
+                    <div>
+                      <p className="text-[10px] font-black text-white/50 uppercase tracking-widest mb-1">Actual Bank Balance</p>
+                      <h4 className="text-sm font-bold text-white/80">Computed Statement Figure</h4>
+                    </div>
+                    <span className="text-3xl font-black tracking-tighter">{fmt(report.calculated_bank_balance)}</span>
+                  </div>
+               </div>
+             ) : null}
+          </div>
+
+          <div className="p-8 bg-gray-50 border-t border-gray-100 flex justify-end gap-4">
+             <button onClick={() => window.print()} className="px-8 py-3 text-xs font-black uppercase tracking-widest text-gray-500 hover:text-gray-900">Print Statement</button>
+             <button onClick={onClose} className="px-10 py-3 bg-gray-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest">Close</button>
+          </div>
+       </div>
+    </div>
+  );
+}
+
+function ChequesSubTab() {
+  const [showAdd, setShowAdd] = useState(false);
+  const queryClient = useQueryClient();
+  const { data: cheques, isLoading } = useQuery({
+    queryKey: ['cheques'],
+    queryFn: () => accountingApi.listCheques().then(r => r.data.data)
+  });
+
+  const updateStatus = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) => accountingApi.updateChequeStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cheques'] });
+      alert('Cheque status updated');
+    }
+  });
+
+  return (
+    <div className="space-y-8">
+       <div className="bg-white rounded-[40px] p-10 border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-8">
+          <div>
+            <h2 className="text-2xl font-black text-gray-900 tracking-tighter uppercase">Cheque Lifecycle Management</h2>
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Track clearing status and handle bounce alerts</p>
+          </div>
+          <button 
+            onClick={() => setShowAdd(true)}
+            className="bg-indigo-600 text-white px-8 py-4 rounded-[24px] font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-3"
+          >
+            <Plus className="w-4 h-4" /> Record New Cheque
+          </button>
+       </div>
+
+       <div className="bg-white rounded-[40px] shadow-sm border border-gray-100 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50/50">
+              <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
+                <th className="text-left px-8 py-5">Date</th>
+                <th className="text-left px-5 py-5">Cheque No & Bank</th>
+                <th className="text-left px-5 py-5">Party / Reference</th>
+                <th className="text-right px-5 py-5">Amount</th>
+                <th className="text-center px-8 py-5">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+               {isLoading ? (
+                 <tr><td colSpan={5} className="py-20 text-center animate-pulse text-xs font-black text-gray-300 uppercase tracking-widest">Accessing Vault...</td></tr>
+               ) : cheques?.map((ch: any) => (
+                 <tr key={ch.id} className="hover:bg-gray-50/30 transition-colors group">
+                    <td className="px-8 py-6 font-black text-gray-900">{new Date(ch.date).toLocaleDateString()}</td>
+                    <td className="px-5 py-6">
+                       <p className="text-xs font-black text-gray-800">#{ch.cheque_no}</p>
+                       <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">{ch.bank_name || 'N/A'}</p>
+                    </td>
+                    <td className="px-5 py-6">
+                       <p className="text-xs font-bold text-gray-600">{ch.party_name || 'Generic Party'}</p>
+                       <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase ${ch.type === 'received' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>{ch.type}</span>
+                    </td>
+                    <td className="px-5 py-6 text-right font-black text-gray-900">{fmt(ch.amount)}</td>
+                    <td className="px-8 py-6">
+                       <div className="flex items-center justify-center gap-3">
+                          {ch.status === 'pending' ? (
+                            <div className="flex gap-2">
+                               <button 
+                                 onClick={() => updateStatus.mutate({ id: ch.id, status: 'cleared' })}
+                                 className="px-3 py-1 bg-emerald-500 text-white rounded-lg text-[9px] font-black uppercase hover:bg-emerald-600"
+                               >Clear</button>
+                               <button 
+                                 onClick={() => updateStatus.mutate({ id: ch.id, status: 'bounced' })}
+                                 className="px-3 py-1 bg-rose-500 text-white rounded-lg text-[9px] font-black uppercase hover:bg-rose-600"
+                               >Bounce</button>
+                            </div>
+                          ) : (
+                            <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${ch.status === 'cleared' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
+                              {ch.status}
+                            </span>
+                          )}
+                       </div>
+                    </td>
+                 </tr>
+               ))}
+               {!cheques?.length && <tr><td colSpan={5} className="py-20 text-center text-[10px] font-bold text-gray-300 uppercase italic">No cheque records found in the system</td></tr>}
+            </tbody>
+          </table>
+       </div>
+
+       {showAdd && <AddChequeModal onClose={() => setShowAdd(false)} />}
+    </div>
+  );
+}
+
+function AddChequeModal({ onClose }: { onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState({
+    cheque_no: '',
+    bank_name: '',
+    party_name: '',
+    amount: '',
+    date: TODAY_STR,
+    type: 'received',
+    notes: ''
+  });
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => accountingApi.createCheque(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cheques'] });
+      onClose();
+    }
+  });
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6">
+       <div className="bg-white rounded-[40px] w-full max-w-lg shadow-2xl border border-gray-100 overflow-hidden animate-in slide-in-from-bottom-8 duration-300">
+          <div className="p-8 border-b border-gray-50 flex justify-between items-center">
+             <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Record Voucher Cheque</h3>
+             <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors"><X className="w-5 h-5 text-gray-400" /></button>
+          </div>
+          
+          <div className="p-8 space-y-6">
+             <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-1">
+                   <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-2 ml-1">Cheque Number</label>
+                   <input type="text" value={form.cheque_no} onChange={e => setForm({...form, cheque_no: e.target.value})} className="w-full border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-gray-50/30" placeholder="000123" />
+                </div>
+                <div className="col-span-1">
+                   <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-2 ml-1">Type</label>
+                   <select value={form.type} onChange={e => setForm({...form, type: e.target.value})} className="w-full border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-gray-50/30">
+                      <option value="received">Received</option>
+                      <option value="issued">Issued</option>
+                   </select>
+                </div>
+             </div>
+
+             <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-1">
+                   <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-2 ml-1">Amount</label>
+                   <input type="number" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} className="w-full border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-gray-50/30" placeholder="0.00" />
+                </div>
+                <div className="col-span-1">
+                   <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-2 ml-1">Cheque Date</label>
+                   <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className="w-full border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-gray-50/30" />
+                </div>
+             </div>
+
+             <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-2 ml-1">Bank Name</label>
+                <input type="text" value={form.bank_name} onChange={e => setForm({...form, bank_name: e.target.value})} className="w-full border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-gray-50/30" placeholder="e.g. HDFC Bank" />
+             </div>
+
+             <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-2 ml-1">Party / Payee Name</label>
+                <input type="text" value={form.party_name} onChange={e => setForm({...form, party_name: e.target.value})} className="w-full border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-gray-50/30" placeholder="Name of supplier or customer" />
+             </div>
+          </div>
+
+          <div className="p-8 bg-gray-50 flex gap-4">
+             <button onClick={onClose} className="flex-1 px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:text-gray-600 transition-colors">Discard</button>
+             <button 
+               onClick={() => mutation.mutate(form)}
+               disabled={mutation.isPending}
+               className="flex-1 bg-indigo-600 text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
+             >
+               {mutation.isPending ? 'Saving...' : 'Record Cheque'}
+             </button>
+          </div>
+       </div>
+    </div>
+  );
+}
+
+function DigitalTrackerSubTab() {
+  const [from, setFrom] = useState(FIRST_OF_MONTH);
+  const [to, setTo] = useState(TODAY_STR);
+
+  const { data: split, isLoading } = useQuery({
+    queryKey: ['payment-split', from, to],
+    queryFn: () => accountingApi.getPaymentSplit(from, to).then(r => r.data.data)
+  });
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm relative overflow-hidden group">
+             <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4"><Zap className="w-5 h-5" /></div>
+             <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">UPI Collections</p>
+             <h3 className="text-2xl font-black text-gray-900">{isLoading ? '...' : fmt(split?.upi ?? 0)}</h3>
+             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-125 transition-transform duration-700"><Activity className="w-20 h-20" /></div>
+          </div>
+          <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm relative overflow-hidden group">
+             <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mb-4"><CreditCard className="w-5 h-5" /></div>
+             <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">Card Payments</p>
+             <h3 className="text-2xl font-black text-gray-900">{isLoading ? '...' : fmt(split?.card ?? 0)}</h3>
+          </div>
+          <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm relative overflow-hidden group">
+             <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center mb-4"><ExternalLink className="w-5 h-5" /></div>
+             <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">Net Banking / NEFT</p>
+             <h3 className="text-2xl font-black text-gray-900">{isLoading ? '...' : fmt(split?.neft ?? 0 + (split?.bank_transfer ?? 0))}</h3>
+          </div>
+       </div>
+
+       <div className="bg-white rounded-[40px] p-10 border border-gray-100 shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+             <div>
+                <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">Digital Transaction Audit</h3>
+                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Real-time tracking of non-cash inflows</p>
+             </div>
+             <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-2xl border border-gray-100">
+                <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="bg-transparent border-0 text-[10px] font-black uppercase tracking-widest focus:ring-0 p-2 cursor-pointer" />
+                <span className="text-gray-300">→</span>
+                <input type="date" value={to} onChange={e => setTo(e.target.value)} className="bg-transparent border-0 text-[10px] font-black uppercase tracking-widest focus:ring-0 p-2 cursor-pointer" />
+             </div>
+          </div>
+
+          <div className="flex items-center justify-center py-20 text-center grayscale opacity-30 border-2 border-dashed border-gray-100 rounded-[32px]">
+             <div className="max-w-xs">
+                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                   <Filter className="w-8 h-8 text-gray-400" />
+                </div>
+                <h4 className="text-sm font-black uppercase tracking-widest text-gray-500">Unified Payment View</h4>
+                <p className="text-[10px] font-bold text-gray-400 mt-2">Integrating individual digital vouchers from multiple gateways and point-of-sale entries.</p>
+             </div>
+          </div>
+       </div>
+    </div>
+  );
+}
+
 function OutstandingsTab() {
+
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -6129,6 +6703,7 @@ export default function AccountingPage() {
             />
           )}
           {activeTab === 'Books' && <BooksTab />}
+          {activeTab === 'Banking' && <BankingTab />}
           {activeTab === 'Outstandings' && <OutstandingsTab />}
           {activeTab === 'Setup' && <SetupTab />}
         </div>
